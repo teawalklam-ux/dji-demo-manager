@@ -12,8 +12,10 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
+import { Checkbox } from '@/components/ui/checkbox'
+import { BatchBarcodePrint } from '@/components/barcode/barcode-print'
 import { ITEM_STATUS_MAP } from '@/lib/constants'
-import { Plus, Download, ScanLine, Search } from 'lucide-react'
+import { Plus, Download, ScanLine, Search, Printer } from 'lucide-react'
 import type { Item, Category, ItemStatus } from '@/types'
 
 export function ItemsList() {
@@ -27,6 +29,10 @@ export function ItemsList() {
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [scanDialogOpen, setScanDialogOpen] = useState(false)
   const [scanValue, setScanValue] = useState('')
+
+  // 批量打印相关状态
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [batchPrintOpen, setBatchPrintOpen] = useState(false)
 
   const loadItems = useCallback(async () => {
     try {
@@ -78,6 +84,29 @@ export function ItemsList() {
     }
   }
 
+  // 勾选操作
+  function toggleSelect(id: string) {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  function toggleSelectAll() {
+    if (selectedIds.size === items.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(items.map(i => i.id)))
+    }
+  }
+
+  function openBatchPrint() {
+    if (selectedIds.size === 0) return
+    setBatchPrintOpen(true)
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -91,6 +120,15 @@ export function ItemsList() {
               </Button>
             </Link>
           )}
+          <Button
+            variant="outline"
+            onClick={openBatchPrint}
+            disabled={selectedIds.size === 0}
+          >
+            <Printer className="size-4" />
+            批量打印
+            {selectedIds.size > 0 && ` (${selectedIds.size})`}
+          </Button>
           <Button variant="outline" onClick={handleExport}>
             <Download className="size-4" />
             导出Excel
@@ -157,6 +195,12 @@ export function ItemsList() {
             <Table>
               <TableHeader>
                 <TableRow>
+                  <TableHead className="w-10">
+                    <Checkbox
+                      checked={items.length > 0 && selectedIds.size === items.length}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
                   <TableHead>条码</TableHead>
                   <TableHead>名称</TableHead>
                   <TableHead>型号</TableHead>
@@ -168,7 +212,13 @@ export function ItemsList() {
               </TableHeader>
               <TableBody>
                 {items.map(item => (
-                  <TableRow key={item.id}>
+                  <TableRow key={item.id} className={selectedIds.has(item.id) ? 'bg-accent/50' : ''}>
+                    <TableCell>
+                      <Checkbox
+                        checked={selectedIds.has(item.id)}
+                        onCheckedChange={() => toggleSelect(item.id)}
+                      />
+                    </TableCell>
                     <TableCell className="font-mono text-sm">{item.barcode}</TableCell>
                     <TableCell className="font-medium">{item.name}</TableCell>
                     <TableCell>{item.model}</TableCell>
@@ -214,6 +264,15 @@ export function ItemsList() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* 批量打印弹窗 */}
+      {batchPrintOpen && (
+        <BatchBarcodePrint
+          items={items}
+          selectedIds={Array.from(selectedIds)}
+          onClose={() => setBatchPrintOpen(false)}
+        />
+      )}
     </div>
   )
 }
