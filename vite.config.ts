@@ -4,7 +4,7 @@ import { defineConfig } from "vite"
 
 // https://vite.dev/config/
 export default defineConfig({
-  base: '/dji-inventory/',
+  base: '/dji-demo-manager/',
   plugins: [react()],
   resolve: {
     alias: {

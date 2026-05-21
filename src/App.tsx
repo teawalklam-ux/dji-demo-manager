@@ -23,7 +23,7 @@ import { ReportsPage } from '@/pages/reports/index'
 
 function App() {
   return (
-    <BrowserRouter basename="/dji-inventory">
+    <BrowserRouter basename="/dji-demo-manager">
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginForm />} />
