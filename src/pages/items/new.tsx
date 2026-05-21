@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ScanInput } from '@/components/barcode/scan-input'
 import type { Category, ItemCreateInput } from '@/types'
 
 export function NewItem() {
@@ -172,10 +173,10 @@ export function NewItem() {
 
               <div className="space-y-2">
                 <Label htmlFor="serial_number">序列号</Label>
-                <Input
+                <ScanInput
                   id="serial_number"
                   value={form.serial_number || ''}
-                  onChange={(e) => handleChange('serial_number', e.target.value)}
+                  onChange={(val) => handleChange('serial_number', val)}
                   placeholder="请输入序列号"
                 />
               </div>
