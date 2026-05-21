@@ -1,0 +1,99 @@
+import { supabase } from '@/lib/supabase'
+import type { Item, ItemCreateInput, ItemFilters, PaginatedResponse } from '@/types'
+
+export const itemsService = {
+  async getAll(filters?: ItemFilters): Promise<PaginatedResponse<Item>> {
+    let query = supabase
+      .from('items')
+      .select('*, category:categories(*), current_borrower:profiles(*)', { count: 'exact' })
+
+    if (filters?.search) {
+      query = query.or(`name.ilike.%${filters.search}%,model.ilike.%${filters.search}%,barcode.ilike.%${filters.search}%,serial_number.ilike.%${filters.search}%`)
+    }
+    if (filters?.category_id) {
+      query = query.eq('category_id', filters.category_id)
+    }
+    if (filters?.status) {
+      query = query.eq('status', filters.status)
+    }
+
+    query = query.order('created_at', { ascending: false })
+
+    const { data, count, error } = await query
+    if (error) throw error
+    return { data: data || [], count: count || 0 }
+  },
+
+  async getById(id: string): Promise<Item | null> {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*, category:categories(*), current_borrower:profiles(*)')
+      .eq('id', id)
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async getByBarcode(barcode: string): Promise<Item | null> {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*, category:categories(*), current_borrower:profiles(*)')
+      .eq('barcode', barcode)
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async create(data: ItemCreateInput): Promise<Item> {
+    const { data: item, error } = await supabase
+      .from('items')
+      .insert(data)
+      .select('*, category:categories(*)')
+      .single()
+    if (error) throw error
+
+    // 记录库存变动
+    await supabase.from('stock_movements').insert({
+      item_id: item.id,
+      movement_type: 'new_entry',
+      operator_id: (await supabase.auth.getUser()).data.user?.id,
+      notes: '新样机入库',
+    })
+
+    return item
+  },
+
+  async update(id: string, data: Partial<ItemCreateInput>): Promise<Item> {
+    const { data: item, error } = await supabase
+      .from('items')
+      .update(data)
+      .eq('id', id)
+      .select('*, category:categories(*)')
+      .single()
+    if (error) throw error
+    return item
+  },
+
+  async delete(id: string): Promise<void> {
+    const { error } = await supabase.from('items').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  async getInStockItems(): Promise<Item[]> {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*, category:categories(*)')
+      .eq('status', 'in_stock')
+      .order('name')
+    if (error) throw error
+    return data || []
+  },
+
+  async getStats() {
+    const { count: total } = await supabase.from('items').select('*', { count: 'exact', head: true })
+    const { count: inStock } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'in_stock')
+    const { count: borrowed } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'borrowed')
+    const { count: overdue } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'overdue')
+    return { total: total || 0, inStock: inStock || 0, borrowed: borrowed || 0, overdue: overdue || 0 }
+  },
+}
