@@ -11,9 +11,9 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from '@/components/ui/dialog'
 import { Checkbox } from '@/components/ui/checkbox'
 import { BatchBarcodePrint } from '@/components/barcode/barcode-print'
+import { BarcodeScanner } from '@/components/barcode/barcode-scanner'
 import { ITEM_STATUS_MAP } from '@/lib/constants'
 import { Plus, Download, ScanLine, Search, Printer } from 'lucide-react'
 import type { Item, Category, ItemStatus } from '@/types'
@@ -28,7 +28,6 @@ export function ItemsList() {
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [scanDialogOpen, setScanDialogOpen] = useState(false)
-  const [scanValue, setScanValue] = useState('')
 
   // 批量打印相关状态
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
@@ -73,14 +72,6 @@ export function ItemsList() {
       exportService.exportItemsToExcel(items)
     } catch (error) {
       console.error('导出失败:', error)
-    }
-  }
-
-  function handleScanSearch() {
-    if (scanValue.trim()) {
-      setSearch(scanValue.trim())
-      setScanDialogOpen(false)
-      setScanValue('')
     }
   }
 
@@ -297,27 +288,14 @@ export function ItemsList() {
       </Card>
 
       {/* 扫码对话框 */}
-      <Dialog open={scanDialogOpen} onOpenChange={setScanDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>扫码查询</DialogTitle>
-            <DialogDescription>扫描或输入条码进行查询</DialogDescription>
-          </DialogHeader>
-          <div className="space-y-4">
-            <Input
-              placeholder="请扫描条码或手动输入..."
-              value={scanValue}
-              onChange={(e) => setScanValue(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleScanSearch()}
-              autoFocus
-            />
-            <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setScanDialogOpen(false)}>取消</Button>
-              <Button onClick={handleScanSearch}>查询</Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
+      <BarcodeScanner
+        open={scanDialogOpen}
+        onOpenChange={setScanDialogOpen}
+        onScan={(code) => {
+          setScanDialogOpen(false)
+          setSearch(code)
+        }}
+      />
 
       {/* 批量打印弹窗 */}
       {batchPrintOpen && (
