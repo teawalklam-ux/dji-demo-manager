@@ -81,5 +81,39 @@ export const USER_STATUS_MAP: Record<string, StatusInfo> = {
 // 条码前缀
 export const BARCODE_PREFIX = 'DJI'
 
+// ===== 条码系统共享配置 =====
+// 生成端和扫描端统一使用，确保耦合一致
+
+// 条码格式 (JsBarcode format 名称)
+export const BARCODE_FORMAT = 'CODE128' as const
+
+// JsBarcode 生成参数（优化后，确保打印后相机可识别）
+export const BARCODE_GENERATE_OPTIONS = {
+  format: BARCODE_FORMAT,
+  width: 2,          // 条线宽度 (原1.5→2，加粗提高识别率)
+  height: 60,        // 条码高度 (原50→60，更高的条码更容易扫描)
+  displayValue: true, // 在条码下方显示文字
+  fontSize: 14,      // 文字字号 (原12→14)
+  margin: 10,        // 安静区边距 (原5→10，ISO标准要求≥10倍窄条宽度)
+  flat: true,        // 扁平渲染，减少抗锯齿干扰
+} as const
+
+// html5-qrcode 扫描器配置
+export const BARCODE_SCAN_FORMATS = [
+  5,  // CODE_128 (优先 - 系统生成格式)
+  0,  // QR_CODE (兼容二维码)
+  3,  // CODE_39
+  8,  // EAN_13
+  14, // UPC_A
+  9,  // ITF
+  11, // PDF_417
+] as const
+
+// 扫描器视窗配置 (横向矩形，适合1D条码)
+export const BARCODE_SCAN_QRBOX = {
+  width: 280,
+  height: 160,
+} as const
+
 // 默认借用天数
 export const DEFAULT_BORROW_DAYS = 14
