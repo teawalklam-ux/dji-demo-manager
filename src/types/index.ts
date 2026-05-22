@@ -1,5 +1,6 @@
 import type {
   UserRole,
+  UserStatus,
   ItemStatus,
   BorrowType,
   BorrowRequestStatus,
@@ -12,6 +13,7 @@ import type {
 
 export type {
   UserRole,
+  UserStatus,
   ItemStatus,
   BorrowType,
   BorrowRequestStatus,
@@ -32,6 +34,7 @@ export interface Profile {
   role: UserRole
   avatar_url: string | null
   is_active: boolean
+  status: UserStatus
   created_at: string
   updated_at: string
 }

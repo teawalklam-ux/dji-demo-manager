@@ -8,10 +8,13 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   hasRole: (role: UserRole) => boolean
   isAdmin: boolean
   isApprover: boolean
+  isPendingApproval: boolean
+  isDisabled: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -87,6 +90,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function signUp(email: string, password: string, displayName: string) {
+    try {
+      const { error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            display_name: displayName,
+          },
+        },
+      })
+      return { error: error ? new Error(error.message) : null }
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error('注册失败') }
+    }
+  }
+
   async function signOut() {
     await supabase.auth.signOut()
     setUser(null)
@@ -99,9 +119,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const isAdmin = profile?.role === 'admin'
   const isApprover = profile?.role === 'approver' || profile?.role === 'admin'
+  const isPendingApproval = profile?.status === 'pending_approval'
+  const isDisabled = profile?.status === 'disabled'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signOut, hasRole, isAdmin, isApprover }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, hasRole, isAdmin, isApprover, isPendingApproval, isDisabled }}>
       {children}
     </AuthContext.Provider>
   )
