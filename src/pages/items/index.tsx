@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { categoriesService } from '@/services/categories.service'
@@ -25,6 +25,8 @@ export function ItemsList() {
   const [totalCount, setTotalCount] = useState(0)
   const [categories, setCategories] = useState<Category[]>([])
   const [search, setSearch] = useState('')
+  const [debouncedSearch, setDebouncedSearch] = useState('')
+  const debounceTimer = useRef<ReturnType<typeof setTimeout>>(undefined)
   const [categoryFilter, setCategoryFilter] = useState<string>('')
   const [statusFilter, setStatusFilter] = useState<string>('')
   const [scanDialogOpen, setScanDialogOpen] = useState(false)
@@ -37,7 +39,7 @@ export function ItemsList() {
     try {
       setLoading(true)
       const result = await itemsService.getAll({
-        search: search || undefined,
+        search: debouncedSearch || undefined,
         category_id: categoryFilter || undefined,
         status: (statusFilter || undefined) as ItemStatus | undefined,
       })
@@ -48,11 +50,22 @@ export function ItemsList() {
     } finally {
       setLoading(false)
     }
-  }, [search, categoryFilter, statusFilter])
+  }, [debouncedSearch, categoryFilter, statusFilter])
 
   useEffect(() => {
     loadCategories()
   }, [])
+
+  // 搜索防抖：300ms 无输入后才触发查询
+  useEffect(() => {
+    if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    debounceTimer.current = setTimeout(() => {
+      setDebouncedSearch(search)
+    }, 300)
+    return () => {
+      if (debounceTimer.current) clearTimeout(debounceTimer.current)
+    }
+  }, [search])
 
   useEffect(() => {
     loadItems()
@@ -145,7 +158,7 @@ export function ItemsList() {
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
-                placeholder="搜索名称/型号/条码..."
+                placeholder="搜索名称/型号/条码/SN码..."
                 value={search}
                 onChange={(e) => setSearch(e.target.value)}
                 className="pl-9 w-full"

@@ -46,7 +46,8 @@ export function BorrowApply() {
     (item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.barcode.toLowerCase().includes(searchQuery.toLowerCase())
+      item.barcode.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.serial_number && item.serial_number.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   const loadInitialData = useCallback(async () => {
@@ -151,7 +152,7 @@ export function BorrowApply() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
-            placeholder="搜索样机名称、型号或条码..."
+            placeholder="搜索样机名称、型号、条码或SN码..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
