@@ -8,6 +8,7 @@ import { LoginForm } from '@/components/auth/login-form'
 import { Dashboard } from '@/pages/dashboard'
 import { ItemsList } from '@/pages/items/index'
 import { NewItem } from '@/pages/items/new'
+import { EditItem } from '@/pages/items/edit'
 import { ItemDetail } from '@/pages/items/detail'
 import { BorrowApply } from '@/pages/borrow/apply'
 import { MyRequests } from '@/pages/borrow/my-requests'
@@ -45,6 +46,11 @@ function App() {
               </AuthGuard>
             } />
             <Route path="items/:id" element={<ItemDetail />} />
+            <Route path="items/:id/edit" element={
+              <AuthGuard requireRole={['admin']}>
+                <EditItem />
+              </AuthGuard>
+            } />
             <Route path="borrow/apply" element={<BorrowApply />} />
             <Route path="borrow/apply/:itemId" element={<BorrowApply />} />
             <Route path="borrow/my-requests" element={<MyRequests />} />
