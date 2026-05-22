@@ -10,7 +10,18 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
+import { ArrowLeft, Plus, Trash2, AlertTriangle } from 'lucide-react'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { ScanInput } from '@/components/barcode/scan-input'
 import type { Category, ItemCreateInput } from '@/types'
 
@@ -22,6 +33,7 @@ export function EditItem() {
   const [pageLoading, setPageLoading] = useState(true)
   const [categories, setCategories] = useState<Category[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [deleting, setDeleting] = useState(false)
 
   const [form, setForm] = useState<ItemCreateInput>({
     name: '',
@@ -148,6 +160,17 @@ export function EditItem() {
       setError(err instanceof Error ? err.message : '更新失败，请重试')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function handleDelete() {
+    try {
+      setDeleting(true)
+      await itemsService.delete(id!)
+      navigate('/items')
+    } catch (err) {
+      setError(err instanceof Error ? err.message : '删除失败，请重试')
+      setDeleting(false)
     }
   }
 
@@ -329,14 +352,42 @@ export function EditItem() {
               />
             </div>
 
-            <div className="flex justify-end gap-2">
-              <Link to={`/items/${id}`}>
-                <Button type="button" variant="outline">取消</Button>
-              </Link>
-              <Button type="submit" disabled={loading}>
-                {loading && <Spinner className="size-4" />}
-                保存修改
-              </Button>
+            <div className="flex items-center justify-between">
+              <AlertDialog>
+                <AlertDialogTrigger asChild>
+                  <Button type="button" variant="destructive" disabled={deleting}>
+                    {deleting ? <Spinner className="size-4" /> : <Trash2 className="size-4" />}
+                    删除样机
+                  </Button>
+                </AlertDialogTrigger>
+                <AlertDialogContent>
+                  <AlertDialogHeader>
+                    <AlertDialogTitle className="flex items-center gap-2">
+                      <AlertTriangle className="size-5 text-destructive" />
+                      确认删除
+                    </AlertDialogTitle>
+                    <AlertDialogDescription>
+                      确定要删除样机「{form.name}」吗？此操作不可撤销，相关借用记录和库存变动记录也将被删除。
+                    </AlertDialogDescription>
+                  </AlertDialogHeader>
+                  <AlertDialogFooter>
+                    <AlertDialogCancel>取消</AlertDialogCancel>
+                    <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground hover:bg-destructive/90">
+                      确认删除
+                    </AlertDialogAction>
+                  </AlertDialogFooter>
+                </AlertDialogContent>
+              </AlertDialog>
+
+              <div className="flex gap-2">
+                <Link to={`/items/${id}`}>
+                  <Button type="button" variant="outline">取消</Button>
+                </Link>
+                <Button type="submit" disabled={loading}>
+                  {loading && <Spinner className="size-4" />}
+                  保存修改
+                </Button>
+              </div>
             </div>
           </form>
         </CardContent>
