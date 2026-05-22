@@ -98,15 +98,18 @@ export const BARCODE_GENERATE_OPTIONS = {
   flat: true,        // 扁平渲染，减少抗锯齿干扰
 } as const
 
-// html5-qrcode 扫描器配置
+// html5-qrcode 扫描器配置 - 条码扫描（样机列表页，扫系统条码）
+// 精简到最少格式，大幅减少每帧解码计算量
 export const BARCODE_SCAN_FORMATS = [
-  5,  // CODE_128 (优先 - 系统生成格式)
+  5,  // CODE_128 (系统条码唯一格式，最优先)
   0,  // QR_CODE (兼容二维码)
+] as const
+
+// SN 码扫描格式（支持更多条码+二维码）
+export const SN_SCAN_FORMATS = [
+  0,  // QR_CODE (优先 - DJI 产品 SN 码常为二维码)
+  5,  // CODE_128
   3,  // CODE_39
-  8,  // EAN_13
-  14, // UPC_A
-  9,  // ITF
-  11, // PDF_417
 ] as const
 
 // 扫描器视窗配置 (横向矩形，适合1D条码)
