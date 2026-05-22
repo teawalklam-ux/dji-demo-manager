@@ -9,7 +9,7 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, requireRole }: AuthGuardProps) {
-  const { user, profile, loading } = useAuth()
+  const { user, profile, loading, isPendingApproval, isDisabled } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -24,7 +24,18 @@ export function AuthGuard({ children, requireRole }: AuthGuardProps) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
-  if (requireRole && profile && !requireRole.includes(profile.role)) {
+  // 待审批用户 → 跳转到等待审批页面
+  if (isPendingApproval && !location.pathname.startsWith('/pending-approval')) {
+    return <Navigate to="/pending-approval" replace />
+  }
+
+  // 已禁用用户 → 跳转到账户禁用页面
+  if (isDisabled && !location.pathname.startsWith('/account-disabled')) {
+    return <Navigate to="/account-disabled" replace />
+  }
+
+  // 角色检查：admin 自动通过所有角色限制
+  if (requireRole && profile && !requireRole.includes(profile.role) && profile.role !== 'admin') {
     return <Navigate to="/" replace />
   }
 

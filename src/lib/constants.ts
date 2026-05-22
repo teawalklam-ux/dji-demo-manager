@@ -1,6 +1,9 @@
 // 用户角色
 export type UserRole = 'admin' | 'approver' | 'user'
 
+// 用户状态
+export type UserStatus = 'pending_approval' | 'active' | 'disabled'
+
 // 样机状态
 export type ItemStatus = 'in_stock' | 'borrowed' | 'overdue' | 'maintenance' | 'retired'
 
@@ -67,6 +70,12 @@ export const ROLE_MAP: Record<string, StatusInfo> = {
   admin: { label: '管理员', color: 'bg-red-100 text-red-800' },
   approver: { label: '审批人', color: 'bg-blue-100 text-blue-800' },
   user: { label: '普通用户', color: 'bg-gray-100 text-gray-800' },
+}
+
+export const USER_STATUS_MAP: Record<string, StatusInfo> = {
+  pending_approval: { label: '待审批', color: 'bg-yellow-100 text-yellow-800' },
+  active: { label: '已启用', color: 'bg-green-100 text-green-800' },
+  disabled: { label: '已禁用', color: 'bg-gray-100 text-gray-800' },
 }
 
 // 条码前缀

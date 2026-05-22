@@ -347,7 +347,7 @@ export function ApprovalChainsPage() {
                           </SelectTrigger>
                           <SelectContent>
                             {profiles
-                              .filter(p => p.is_active)
+                              .filter(p => p.status === 'active')
                               .map(p => (
                                 <SelectItem key={p.id} value={p.id}>
                                   {p.display_name} ({p.email})
