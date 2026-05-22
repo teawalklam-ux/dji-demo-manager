@@ -20,6 +20,8 @@ import { CategoriesPage } from '@/pages/admin/categories'
 import { ApprovalChainsPage } from '@/pages/admin/approval-chains'
 import { SettingsPage } from '@/pages/admin/settings'
 import { ReportsPage } from '@/pages/reports/index'
+import { PendingApproval } from '@/pages/pending-approval'
+import { AccountDisabled } from '@/pages/account-disabled'
 
 function App() {
   return (
@@ -27,6 +29,8 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginForm />} />
+          <Route path="/pending-approval" element={<PendingApproval />} />
+          <Route path="/account-disabled" element={<AccountDisabled />} />
 
           <Route element={
             <AuthGuard>
