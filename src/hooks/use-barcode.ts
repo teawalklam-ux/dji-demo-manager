@@ -1,5 +1,6 @@
 import { useState, useCallback, useRef } from 'react'
 import JsBarcode from 'jsbarcode'
+import { BARCODE_GENERATE_OPTIONS } from '@/lib/constants'
 
 export function useBarcode() {
   const barcodeRef = useRef<SVGSVGElement>(null)
@@ -8,12 +9,7 @@ export function useBarcode() {
     if (barcodeRef.current) {
       try {
         JsBarcode(barcodeRef.current, value, {
-          format: 'CODE128',
-          width: 2,
-          height: 60,
-          displayValue: true,
-          fontSize: 14,
-          margin: 10,
+          ...BARCODE_GENERATE_OPTIONS,
         })
       } catch (error) {
         console.error('Barcode generation failed:', error)
