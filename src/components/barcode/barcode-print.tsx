@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Printer } from 'lucide-react'
+import { BARCODE_GENERATE_OPTIONS } from '@/lib/constants'
 import type { Item } from '@/types'
 
 // ===== 单个条码标签渲染 =====
@@ -23,12 +24,7 @@ function BarcodeLabel({ barcode, itemName, model, categoryName }: BarcodeLabelPr
     if (svgRef.current && barcode) {
       try {
         JsBarcode(svgRef.current, barcode, {
-          format: 'CODE128',
-          width: 1.5,
-          height: 50,
-          displayValue: true,
-          fontSize: 12,
-          margin: 5,
+          ...BARCODE_GENERATE_OPTIONS,
         })
       } catch (err) {
         console.error('条码渲染失败:', err)
@@ -419,7 +415,7 @@ export function BarcodePrint({ barcode, itemName, model }: BarcodePrintProps) {
   </div>
   <script src="https://cdn.jsdelivr.net/npm/jsbarcode@3.11/dist/JsBarcode.all.min.js"></script>
   <script>
-    JsBarcode("#barcode", "${barcode}", { format: "CODE128", width: 1.5, height: 50, displayValue: true, fontSize: 12, margin: 5 });
+    JsBarcode("#barcode", "${barcode}", { format: "${BARCODE_GENERATE_OPTIONS.format}", width: ${BARCODE_GENERATE_OPTIONS.width}, height: ${BARCODE_GENERATE_OPTIONS.height}, displayValue: ${BARCODE_GENERATE_OPTIONS.displayValue}, fontSize: ${BARCODE_GENERATE_OPTIONS.fontSize}, margin: ${BARCODE_GENERATE_OPTIONS.margin}, flat: ${BARCODE_GENERATE_OPTIONS.flat} });
     window.onload = function() { window.print(); };
   </script>
 </body>

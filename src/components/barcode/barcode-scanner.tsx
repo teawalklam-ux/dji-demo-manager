@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Html5Qrcode } from 'html5-qrcode'
+import { BARCODE_SCAN_FORMATS, BARCODE_SCAN_QRBOX, BARCODE_FORMAT } from '@/lib/constants'
 import { ScanLine, Camera } from 'lucide-react'
 
 interface BarcodeScannerProps {
@@ -50,36 +51,37 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       setScanning(true)
       setError('')
 
+      // 只配置系统使用的条码格式，CODE128 优先
       const scanner = new Html5Qrcode(readerId, {
         verbose: false,
-        formatsToSupport: [
-          0,  // QR_CODE
-          1,  // AZTEC
-          5,  // CODE_128
-          3,  // CODE_39
-          4,  // CODE_93
-          7,  // EAN_8
-          8,  // EAN_13
-          14, // UPC_A
-          15, // UPC_E
-          9,  // ITF
-          11, // PDF_417
-          6,  // DATA_MATRIX
-        ],
+        formatsToSupport: [...BARCODE_SCAN_FORMATS],
       })
       scannerRef.current = scanner
 
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: 15,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
+          fps: 20,  // 提高帧率 (原15→20)，加快识别速度
+          qrbox: { ...BARCODE_SCAN_QRBOX },  // 横向矩形扫描区域，适合1D条码
+          aspectRatio: 1.778,  // 16:9 宽屏比例，更适合横向条码
+          disableFlip: true,   // 禁用翻转，提高识别速度
         },
         (decodedText) => {
           // 成功识别
-          setLastScanResult(decodedText)
-          onScan(decodedText)
+          const text = decodedText.trim()
+
+          // 优先匹配系统条码格式 (DJI-YYYYMMDD-XXXX)
+          if (text.startsWith('DJI-')) {
+            setLastScanResult(text)
+            onScan(text)
+            stopScanning()
+            onOpenChange(false)
+            return
+          }
+
+          // 其他条码也接受（SN码、序列号等场景）
+          setLastScanResult(text)
+          onScan(text)
           stopScanning()
           onOpenChange(false)
         },
@@ -187,6 +189,10 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
               <Button onClick={handleManualSubmit}>确认</Button>
             </div>
           </div>
+
+          <p className="text-xs text-muted-foreground text-center">
+            系统条码格式：{BARCODE_FORMAT} · 将条码对准横向扫描框
+          </p>
         </div>
       </DialogContent>
     </Dialog>
