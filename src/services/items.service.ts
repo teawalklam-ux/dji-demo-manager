@@ -75,6 +75,27 @@ export const itemsService = {
   },
 
   async delete(id: string): Promise<void> {
+    // 先删除关联记录（外键约束顺序：approval_records → borrow_records → stock_movements → borrow_requests → items）
+    // 1. 删除审批记录（borrow_requests 有 ON DELETE CASCADE，但 borrow_records 没有）
+    const { error: arErr } = await supabase
+      .from('approval_records')
+      .delete()
+      .in('request_id', (await supabase.from('borrow_requests').select('id').eq('item_id', id)).data?.map(r => r.id) || [])
+    if (arErr) console.warn('删除审批记录失败:', arErr.message)
+
+    // 2. 删除借用记录
+    const { error: brErr } = await supabase.from('borrow_records').delete().eq('item_id', id)
+    if (brErr) console.warn('删除借用记录失败:', brErr.message)
+
+    // 3. 删除库存变动记录
+    const { error: smErr } = await supabase.from('stock_movements').delete().eq('item_id', id)
+    if (smErr) console.warn('删除库存变动记录失败:', smErr.message)
+
+    // 4. 删除借用申请
+    const { error: reqErr } = await supabase.from('borrow_requests').delete().eq('item_id', id)
+    if (reqErr) console.warn('删除借用申请失败:', reqErr.message)
+
+    // 5. 删除样机
     const { error } = await supabase.from('items').delete().eq('id', id)
     if (error) throw error
   },
