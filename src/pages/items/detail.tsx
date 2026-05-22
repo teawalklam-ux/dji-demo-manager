@@ -135,7 +135,7 @@ export function ItemDetail() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Link to={`/borrow?item_id=${item.id}`}>
+          <Link to={`/borrow/apply/${item.id}`}>
             <Button>
               <FileText className="size-4" />
               申请借用
