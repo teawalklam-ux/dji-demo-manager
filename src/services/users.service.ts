@@ -46,12 +46,19 @@ export const usersService = {
   },
 
   async approveUser(userId: string): Promise<void> {
-    const { error } = await supabase.rpc('approve_user', { p_user_id: userId })
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: 'active', updated_at: new Date().toISOString() })
+      .eq('id', userId)
     if (error) throw error
   },
 
   async rejectUser(userId: string): Promise<void> {
-    const { error } = await supabase.rpc('reject_user', { p_user_id: userId })
+    // 拒绝用户：禁用该用户 profile，阻止其登录使用系统
+    const { error } = await supabase
+      .from('profiles')
+      .update({ status: 'disabled', updated_at: new Date().toISOString() })
+      .eq('id', userId)
     if (error) throw error
   },
 
