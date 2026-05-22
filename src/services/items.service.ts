@@ -8,7 +8,8 @@ export const itemsService = {
       .select('*, category:categories(*), current_borrower:profiles(*)', { count: 'exact' })
 
     if (filters?.search) {
-      query = query.or(`name.ilike.%${filters.search}%,model.ilike.%${filters.search}%,barcode.ilike.%${filters.search}%,serial_number.ilike.%${filters.search}%`)
+      const s = filters.search.replace(/%/g, '\\%').replace(/_/g, '\\_')
+      query = query.or(`name.ilike.%${s}%,model.ilike.%${s}%,barcode.ilike.%${s}%,serial_number.ilike.%${s}%`)
     }
     if (filters?.category_id) {
       query = query.eq('category_id', filters.category_id)
