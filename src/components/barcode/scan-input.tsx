@@ -10,9 +10,11 @@ interface ScanInputProps {
   placeholder?: string
   id?: string
   className?: string
+  /** 扫描模式：barcode=系统条码，sn=SN码/序列号(支持更多格式) */
+  mode?: 'barcode' | 'sn'
 }
 
-export function ScanInput({ value, onChange, placeholder, id, className }: ScanInputProps) {
+export function ScanInput({ value, onChange, placeholder, id, className, mode = 'sn' }: ScanInputProps) {
   const [scannerOpen, setScannerOpen] = useState(false)
 
   return (
@@ -40,6 +42,7 @@ export function ScanInput({ value, onChange, placeholder, id, className }: ScanI
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         onScan={(code) => onChange(code)}
+        mode={mode}
       />
     </>
   )

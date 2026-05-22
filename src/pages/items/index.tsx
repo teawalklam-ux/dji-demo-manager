@@ -295,6 +295,7 @@ export function ItemsList() {
           setScanDialogOpen(false)
           setSearch(code)
         }}
+        mode="barcode"
       />
 
       {/* 批量打印弹窗 */}

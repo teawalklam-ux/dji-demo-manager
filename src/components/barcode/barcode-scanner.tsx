@@ -2,19 +2,21 @@ import { useEffect, useRef, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Html5Qrcode } from 'html5-qrcode'
-import { BARCODE_SCAN_FORMATS, BARCODE_SCAN_QRBOX, BARCODE_FORMAT } from '@/lib/constants'
+import { BARCODE_SCAN_FORMATS, SN_SCAN_FORMATS, BARCODE_SCAN_QRBOX, BARCODE_FORMAT } from '@/lib/constants'
 import { ScanLine, Camera } from 'lucide-react'
 
 interface BarcodeScannerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onScan: (barcode: string) => void
+  /** 扫描模式：barcode=系统条码(仅CODE128+QR)，sn=SN码(QR+CODE128+CODE39) */
+  mode?: 'barcode' | 'sn'
 }
 
 // Unique ID counter to avoid duplicate DOM IDs
 let idCounter = 0
 
-export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerProps) {
+export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }: BarcodeScannerProps) {
   const [error, setError] = useState('')
   const [manualValue, setManualValue] = useState('')
   const [scanning, setScanning] = useState(false)
@@ -51,35 +53,34 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       setScanning(true)
       setError('')
 
-      // 只配置系统使用的条码格式，CODE128 优先
+      const formats = mode === 'sn' ? [...SN_SCAN_FORMATS] : [...BARCODE_SCAN_FORMATS]
+
       const scanner = new Html5Qrcode(readerId, {
         verbose: false,
-        formatsToSupport: [...BARCODE_SCAN_FORMATS],
+        formatsToSupport: formats,
       })
       scannerRef.current = scanner
+
+      // 高分辨率视频流配置 - 1280x720 起步，条码识别需要足够像素
+      // focusMode 属于 advanced 约束，运行时有效但 TS 类型未声明
+      const videoConstraints = {
+        facingMode: 'environment' as const,
+        width: { ideal: 1280 },
+        height: { ideal: 720 },
+        focusMode: 'continuous',
+      }
 
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: 20,  // 提高帧率 (原15→20)，加快识别速度
-          qrbox: { ...BARCODE_SCAN_QRBOX },  // 横向矩形扫描区域，适合1D条码
-          aspectRatio: 1.778,  // 16:9 宽屏比例，更适合横向条码
-          disableFlip: true,   // 禁用翻转，提高识别速度
+          fps: 30,  // 高帧率：解码快则吞吐高，解码慢则自动降速
+          qrbox: { ...BARCODE_SCAN_QRBOX },
+          aspectRatio: 1.778,  // 16:9
+          disableFlip: true,
+          videoConstraints,
         },
         (decodedText) => {
-          // 成功识别
           const text = decodedText.trim()
-
-          // 优先匹配系统条码格式 (DJI-YYYYMMDD-XXXX)
-          if (text.startsWith('DJI-')) {
-            setLastScanResult(text)
-            onScan(text)
-            stopScanning()
-            onOpenChange(false)
-            return
-          }
-
-          // 其他条码也接受（SN码、序列号等场景）
           setLastScanResult(text)
           onScan(text)
           stopScanning()
@@ -101,7 +102,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       }
       console.error('Scanner error:', err)
     }
-  }, [onScan, onOpenChange, stopScanning])
+  }, [onScan, onOpenChange, stopScanning, mode])
 
   useEffect(() => {
     mountedRef.current = true
@@ -138,6 +139,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     }
   }
 
+  const modeLabel = mode === 'sn' ? '序列号 / SN码' : '条码 / 二维码'
+
   return (
     <Dialog open={open} onOpenChange={(v) => {
       if (!v) stopScanning()
@@ -145,7 +148,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>扫描条码 / 二维码</DialogTitle>
+          <DialogTitle>扫描{modeLabel}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {error ? (
@@ -183,7 +186,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
                 value={manualValue}
                 onChange={(e) => setManualValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-                placeholder="输入条码或序列号"
+                placeholder={mode === 'sn' ? '输入序列号' : '输入条码'}
                 className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
               <Button onClick={handleManualSubmit}>确认</Button>
@@ -191,7 +194,10 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            系统条码格式：{BARCODE_FORMAT} · 将条码对准横向扫描框
+            {mode === 'sn'
+              ? '支持 QR二维码 / CODE128 / CODE39 条码'
+              : `系统条码格式：${BARCODE_FORMAT} · 将条码对准横向扫描框`
+            }
           </p>
         </div>
       </DialogContent>
