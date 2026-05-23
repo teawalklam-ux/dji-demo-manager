@@ -23,6 +23,7 @@ import { SettingsPage } from '@/pages/admin/settings'
 import { ReportsPage } from '@/pages/reports/index'
 import { PendingApproval } from '@/pages/pending-approval'
 import { AccountDisabled } from '@/pages/account-disabled'
+import { ResetPassword } from '@/pages/reset-password'
 
 function App() {
   return (
@@ -30,6 +31,7 @@ function App() {
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<LoginForm />} />
+          <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/pending-approval" element={<PendingApproval />} />
           <Route path="/account-disabled" element={<AccountDisabled />} />
 

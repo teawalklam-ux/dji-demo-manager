@@ -64,7 +64,7 @@ export const usersService = {
 
   async resetUserPassword(email: string): Promise<void> {
     const { error } = await supabase.auth.resetPasswordForEmail(email, {
-      redirectTo: `${window.location.origin}/dji-demo-manager/`,
+      redirectTo: `${window.location.origin}/dji-demo-manager/reset-password`,
     })
     if (error) throw error
   },
