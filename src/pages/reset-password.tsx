@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react'
-import { useNavigate, useSearchParams } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -10,53 +10,11 @@ import { AlertCircle, CheckCircle2 } from 'lucide-react'
 
 export function ResetPassword() {
   const navigate = useNavigate()
-  const [searchParams] = useSearchParams()
   const [password, setPassword] = useState('')
   const [confirmPassword, setConfirmPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
-  const [verifying, setVerifying] = useState(true)
-
-  // 验证是否有 recovery token（兼容 PKCE 和 implicit 流程）
-  useEffect(() => {
-    async function verifyRecovery() {
-      // PKCE 流程: ?type=recovery&token_hash=xxx
-      const type = searchParams.get('type')
-
-      // Implicit 流程: #access_token=xxx&type=recovery
-      const hashParams = new URLSearchParams(window.location.hash.substring(1))
-      const hashType = hashParams.get('type')
-
-      if (type === 'recovery' || hashType === 'recovery') {
-        // 如果是 implicit 流程，Supabase JS SDK 会自动从 hash 中恢复 session
-        // PKCE 流程需要 exchangeCodeForSession
-        if (hashParams.get('access_token')) {
-          const { error } = await supabase.auth.exchangeCodeForSession(
-            hashParams.get('access_token')!
-          )
-          if (error) {
-            console.error('Session exchange failed:', error)
-          }
-        }
-        setVerifying(false)
-        return
-      }
-
-      // 既不是 query type 也不是 hash type，检查是否已有有效 session
-      const { data: { session } } = await supabase.auth.getSession()
-      if (session) {
-        // 有 session 可能是从邮件点过来的，Supabase 已自动处理
-        setVerifying(false)
-        return
-      }
-
-      // 没有任何有效凭证，跳转登录页
-      navigate('/login', { replace: true })
-    }
-
-    verifyRecovery()
-  }, [searchParams, navigate])
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -81,14 +39,6 @@ export function ResetPassword() {
     } finally {
       setLoading(false)
     }
-  }
-
-  if (verifying) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-muted/30">
-        <Spinner className="size-8" />
-      </div>
-    )
   }
 
   if (success) {
