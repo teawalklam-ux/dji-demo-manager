@@ -34,9 +34,17 @@ export function AuthGuard({ children, requireRole }: AuthGuardProps) {
     return <Navigate to="/account-disabled" replace />
   }
 
-  // 角色检查：super_admin 和 admin 自动通过所有角色限制
-  if (requireRole && profile && !requireRole.includes(profile.role) && profile.role !== 'super_admin' && profile.role !== 'admin') {
-    return <Navigate to="/" replace />
+  // 角色检查
+  if (requireRole && profile) {
+    const hasRequiredRole = requireRole.some(role => {
+      if (profile.role === 'super_admin') return true
+      if (profile.role === 'admin') return role === 'admin' || role === 'approver' || role === 'user'
+      if (profile.role === 'approver') return role === 'approver' || role === 'user'
+      return profile.role === role
+    })
+    if (!hasRequiredRole) {
+      return <Navigate to="/" replace />
+    }
   }
 
   return <>{children}</>

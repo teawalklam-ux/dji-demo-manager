@@ -121,7 +121,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function hasRole(role: UserRole): boolean {
-    return profile?.role === role || profile?.role === 'super_admin' || profile?.role === 'admin'
+    if (!profile) return false
+    // super_admin 拥有所有权限
+    if (profile.role === 'super_admin') return true
+    // admin 拥有 admin/approver/user 权限
+    if (profile.role === 'admin') {
+      return role === 'admin' || role === 'approver' || role === 'user'
+    }
+    // approver 拥有 approver/user 权限
+    if (profile.role === 'approver') {
+      return role === 'approver' || role === 'user'
+    }
+    // 普通用户只能匹配 user
+    return profile.role === role
   }
 
   const isSuperAdmin = profile?.role === 'super_admin'
