@@ -45,7 +45,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     // 监听认证状态变化 (用 setTimeout 避免 Supabase 死锁)
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (_event, session) => {
+      (event, session) => {
+        // 密码重置流程：跳转到重置密码页面
+        if (event === 'PASSWORD_RECOVERY') {
+          window.location.href = '/dji-demo-manager/reset-password'
+          return
+        }
+
         setUser(session?.user ?? null)
         if (session?.user) {
           setTimeout(() => fetchProfile(session.user.id), 0)
