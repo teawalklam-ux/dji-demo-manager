@@ -1,5 +1,5 @@
 // 用户角色
-export type UserRole = 'admin' | 'approver' | 'user'
+export type UserRole = 'super_admin' | 'admin' | 'approver' | 'user'
 
 // 用户状态
 export type UserStatus = 'pending_approval' | 'active' | 'disabled'
@@ -67,6 +67,7 @@ export const REQUEST_STATUS_MAP: Record<string, StatusInfo> = {
 }
 
 export const ROLE_MAP: Record<string, StatusInfo> = {
+  super_admin: { label: '超级管理员', color: 'bg-purple-100 text-purple-800' },
   admin: { label: '管理员', color: 'bg-red-100 text-red-800' },
   approver: { label: '审批人', color: 'bg-blue-100 text-blue-800' },
   user: { label: '普通用户', color: 'bg-gray-100 text-gray-800' },

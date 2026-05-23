@@ -34,8 +34,8 @@ export function AuthGuard({ children, requireRole }: AuthGuardProps) {
     return <Navigate to="/account-disabled" replace />
   }
 
-  // 角色检查：admin 自动通过所有角色限制
-  if (requireRole && profile && !requireRole.includes(profile.role) && profile.role !== 'admin') {
+  // 角色检查：super_admin 和 admin 自动通过所有角色限制
+  if (requireRole && profile && !requireRole.includes(profile.role) && profile.role !== 'super_admin' && profile.role !== 'admin') {
     return <Navigate to="/" replace />
   }
 

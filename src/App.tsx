@@ -65,22 +65,22 @@ function App() {
             } />
             <Route path="approval/:id" element={<ApprovalDetail />} />
             <Route path="admin/users" element={
-              <AuthGuard requireRole={['admin']}>
+              <AuthGuard requireRole={['super_admin']}>
                 <UsersPage />
               </AuthGuard>
             } />
             <Route path="admin/categories" element={
-              <AuthGuard requireRole={['admin']}>
+              <AuthGuard requireRole={['super_admin']}>
                 <CategoriesPage />
               </AuthGuard>
             } />
             <Route path="admin/approval-chains" element={
-              <AuthGuard requireRole={['admin']}>
+              <AuthGuard requireRole={['super_admin']}>
                 <ApprovalChainsPage />
               </AuthGuard>
             } />
             <Route path="admin/settings" element={
-              <AuthGuard requireRole={['admin']}>
+              <AuthGuard requireRole={['super_admin']}>
                 <SettingsPage />
               </AuthGuard>
             } />

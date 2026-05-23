@@ -7,17 +7,35 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 import { ROLE_MAP, USER_STATUS_MAP } from '@/lib/constants'
 import type { UserRole, Profile, UserStatus } from '@/types'
-import { UserPlus, KeyRound, Pencil, Check, X } from 'lucide-react'
+import { UserPlus, KeyRound, Pencil, Check, X, Crown, AlertTriangle } from 'lucide-react'
 
 type TabKey = 'pending_approval' | 'active' | 'disabled'
 
+// 角色选项（不含 super_admin，super_admin 只能通过转移获得）
+const ROLE_OPTIONS: { value: UserRole; label: string }[] = [
+  { value: 'user', label: '普通用户' },
+  { value: 'approver', label: '审批人' },
+  { value: 'admin', label: '管理员' },
+]
+
 export function UsersPage() {
-  const { profile: currentProfile } = useAuth()
+  const { profile: currentProfile, isSuperAdmin } = useAuth()
   const [users, setUsers] = useState<Profile[]>([])
   const [loading, setLoading] = useState(true)
   const [activeTab, setActiveTab] = useState<TabKey>('pending_approval')
@@ -37,6 +55,9 @@ export function UsersPage() {
   const [editUser, setEditUser] = useState<Profile | null>(null)
   const [editForm, setEditForm] = useState({ display_name: '', phone: '', department: '', role: 'user' as UserRole })
   const [editLoading, setEditLoading] = useState(false)
+
+  // 转移超级管理员
+  const [transferLoading, setTransferLoading] = useState(false)
 
   const fetchUsers = useCallback(async () => {
     try {
@@ -119,9 +140,16 @@ export function UsersPage() {
   async function handleResetPassword(email: string) {
     try {
       await usersService.resetUserPassword(email)
-      toast.success('重置密码邮件已发送')
-    } catch (err) {
-      toast.error('发送重置邮件失败')
+      toast.success('重置密码邮件已发送，请通知用户查收邮箱')
+    } catch (err: any) {
+      const msg = err?.message || err?.toString() || '未知错误'
+      if (msg.includes('rate limit') || msg.includes('429')) {
+        toast.error('发送过于频繁，请稍后再试（Supabase 免费版每小时限3封）')
+      } else if (msg.includes('not found') || msg.includes('no user')) {
+        toast.error('该邮箱未注册，无法发送重置邮件')
+      } else {
+        toast.error(`发送重置邮件失败: ${msg}`)
+      }
       console.error(err)
     }
   }
@@ -152,11 +180,12 @@ export function UsersPage() {
 
   function openEditDialog(user: Profile) {
     setEditUser(user)
+    // super_admin 在编辑对话框中显示但不可修改角色
     setEditForm({
       display_name: user.display_name,
       phone: user.phone || '',
       department: user.department || '',
-      role: user.role,
+      role: user.role === 'super_admin' ? 'super_admin' : user.role,
     })
     setEditDialogOpen(true)
   }
@@ -165,13 +194,21 @@ export function UsersPage() {
     if (!editUser) return
     try {
       setEditLoading(true)
-      await usersService.updateUser(editUser.id, {
-        display_name: editForm.display_name,
-        phone: editForm.phone || undefined,
-        department: editForm.department || undefined,
-        role: editForm.role,
-      })
-      setUsers(prev => prev.map(u => (u.id === editUser.id ? { ...u, ...editForm, phone: editForm.phone || null, department: editForm.department || null } : u)))
+      // super_admin 不允许修改角色
+      const updateData = editUser.role === 'super_admin'
+        ? {
+            display_name: editForm.display_name,
+            phone: editForm.phone || undefined,
+            department: editForm.department || undefined,
+          }
+        : {
+            display_name: editForm.display_name,
+            phone: editForm.phone || undefined,
+            department: editForm.department || undefined,
+            role: editForm.role,
+          }
+      await usersService.updateUser(editUser.id, updateData)
+      setUsers(prev => prev.map(u => (u.id === editUser.id ? { ...u, ...updateData, phone: editForm.phone || null, department: editForm.department || null } : u)))
       toast.success('用户信息已更新')
       setEditDialogOpen(false)
     } catch (err) {
@@ -180,6 +217,27 @@ export function UsersPage() {
     } finally {
       setEditLoading(false)
     }
+  }
+
+  async function handleTransferSuperAdmin(newSuperAdminId: string) {
+    try {
+      setTransferLoading(true)
+      await usersService.transferSuperAdmin(newSuperAdminId)
+      toast.success('超级管理员权限已转移，您已成为普通管理员。页面即将刷新...')
+      // 转移后当前用户角色变化，需要刷新页面重新加载
+      setTimeout(() => {
+        window.location.href = '/dji-demo-manager/'
+      }, 2000)
+    } catch (err: any) {
+      toast.error(err?.message || '转移权限失败')
+      console.error(err)
+      setTransferLoading(false)
+    }
+  }
+
+  // 判断用户是否为 super_admin
+  function isSuperAdminUser(user: Profile) {
+    return user.role === 'super_admin'
   }
 
   if (loading) {
@@ -232,9 +290,9 @@ export function UsersPage() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="user">普通用户</SelectItem>
-                    <SelectItem value="approver">审批人</SelectItem>
-                    <SelectItem value="admin">管理员</SelectItem>
+                    {ROLE_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -337,69 +395,119 @@ export function UsersPage() {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {currentList.map(user => (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.display_name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell className="hidden sm:table-cell">{user.phone || '-'}</TableCell>
-                      <TableCell className="hidden sm:table-cell">{user.department || '-'}</TableCell>
-                      <TableCell>
-                        {currentProfile?.id === user.id ? (
-                          <Badge className={ROLE_MAP[user.role]?.color}>{ROLE_MAP[user.role]?.label}</Badge>
-                        ) : (
-                          <Select
-                            value={user.role}
-                            onValueChange={(v: UserRole) => handleRoleChange(user.id, v)}
-                          >
-                            <SelectTrigger className="w-28">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="user">普通用户</SelectItem>
-                              <SelectItem value="approver">审批人</SelectItem>
-                              <SelectItem value="admin">管理员</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        )}
-                      </TableCell>
-                      <TableCell>
-                        <Badge className={USER_STATUS_MAP[user.status]?.color}>
-                          {USER_STATUS_MAP[user.status]?.label}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <div className="flex items-center gap-1">
-                          {currentProfile?.id !== user.id && (
-                            <>
-                              <Button
-                                variant={user.status === 'active' ? 'destructive' : 'default'}
-                                size="sm"
-                                onClick={() => handleToggleStatus(user.id, user.status)}
-                              >
-                                {user.status === 'active' ? '禁用' : '启用'}
-                              </Button>
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openEditDialog(user)}
-                                title="编辑"
-                              >
-                                <Pencil className="size-3.5" />
-                              </Button>
-                            </>
+                  {currentList.map(user => {
+                    const isTargetSuperAdmin = isSuperAdminUser(user)
+                    const isSelf = currentProfile?.id === user.id
+
+                    return (
+                      <TableRow key={user.id}>
+                        <TableCell className="font-medium">
+                          <div className="flex items-center gap-1.5">
+                            {isTargetSuperAdmin && <Crown className="size-3.5 text-purple-600" />}
+                            {user.display_name}
+                          </div>
+                        </TableCell>
+                        <TableCell>{user.email}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{user.phone || '-'}</TableCell>
+                        <TableCell className="hidden sm:table-cell">{user.department || '-'}</TableCell>
+                        <TableCell>
+                          {isSelf || isTargetSuperAdmin ? (
+                            <Badge className={ROLE_MAP[user.role]?.color}>{ROLE_MAP[user.role]?.label}</Badge>
+                          ) : (
+                            <Select
+                              value={user.role}
+                              onValueChange={(v: UserRole) => handleRoleChange(user.id, v)}
+                            >
+                              <SelectTrigger className="w-28">
+                                <SelectValue />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {ROLE_OPTIONS.map(opt => (
+                                  <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
                           )}
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleResetPassword(user.email)}
-                            title="重置密码"
-                          >
-                            <KeyRound className="size-3.5" />
-                          </Button>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))}
+                        </TableCell>
+                        <TableCell>
+                          <Badge className={USER_STATUS_MAP[user.status]?.color}>
+                            {USER_STATUS_MAP[user.status]?.label}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            {/* 非 super_admin 且非自己：显示禁用/启用和编辑 */}
+                            {!isTargetSuperAdmin && !isSelf && (
+                              <>
+                                <Button
+                                  variant={user.status === 'active' ? 'destructive' : 'default'}
+                                  size="sm"
+                                  onClick={() => handleToggleStatus(user.id, user.status)}
+                                >
+                                  {user.status === 'active' ? '禁用' : '启用'}
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => openEditDialog(user)}
+                                  title="编辑"
+                                >
+                                  <Pencil className="size-3.5" />
+                                </Button>
+                              </>
+                            )}
+
+                            {/* 重置密码：所有用户都可（super_admin 也可以重置自己密码） */}
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleResetPassword(user.email)}
+                              title="重置密码"
+                            >
+                              <KeyRound className="size-3.5" />
+                            </Button>
+
+                            {/* 转移超级管理员权限：仅 super_admin 可见，且只能转给 admin */}
+                            {isSuperAdmin && !isSelf && user.role === 'admin' && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    title="转移超级管理员权限"
+                                    disabled={transferLoading}
+                                  >
+                                    <Crown className="size-3.5 text-purple-600" />
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle className="flex items-center gap-2">
+                                      <AlertTriangle className="size-5 text-orange-500" />
+                                      转移超级管理员权限
+                                    </AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      确定要将超级管理员权限转移给「{user.display_name}」吗？<br />
+                                      转移后您将成为普通管理员，此操作不可撤销。
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>取消</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => handleTransferSuperAdmin(user.id)}
+                                      className="bg-purple-600 text-white hover:bg-purple-700"
+                                    >
+                                      确认转移
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
                 </TableBody>
               </Table>
             </div>
@@ -439,19 +547,23 @@ export function UsersPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">角色</label>
-              <Select
-                value={editForm.role}
-                onValueChange={(v: UserRole) => setEditForm(prev => ({ ...prev, role: v }))}
-              >
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">普通用户</SelectItem>
-                  <SelectItem value="approver">审批人</SelectItem>
-                  <SelectItem value="admin">管理员</SelectItem>
-                </SelectContent>
-              </Select>
+              {editUser?.role === 'super_admin' ? (
+                <Badge className="bg-purple-100 text-purple-800">超级管理员（不可修改）</Badge>
+              ) : (
+                <Select
+                  value={editForm.role}
+                  onValueChange={(v: UserRole) => setEditForm(prev => ({ ...prev, role: v }))}
+                >
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ROLE_OPTIONS.map(opt => (
+                      <SelectItem key={opt.value} value={opt.value}>{opt.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              )}
             </div>
             <div className="flex justify-end gap-2">
               <Button variant="outline" onClick={() => setEditDialogOpen(false)}>取消</Button>

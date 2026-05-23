@@ -12,6 +12,7 @@ interface AuthContextType {
   signOut: () => Promise<void>
   hasRole: (role: UserRole) => boolean
   isAdmin: boolean
+  isSuperAdmin: boolean
   isApprover: boolean
   isPendingApproval: boolean
   isDisabled: boolean
@@ -120,16 +121,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   function hasRole(role: UserRole): boolean {
-    return profile?.role === role || profile?.role === 'admin'
+    return profile?.role === role || profile?.role === 'super_admin' || profile?.role === 'admin'
   }
 
-  const isAdmin = profile?.role === 'admin'
-  const isApprover = profile?.role === 'approver' || profile?.role === 'admin'
+  const isSuperAdmin = profile?.role === 'super_admin'
+  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const isApprover = profile?.role === 'approver' || isAdmin
   const isPendingApproval = profile?.status === 'pending_approval'
   const isDisabled = profile?.status === 'disabled'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, hasRole, isAdmin, isApprover, isPendingApproval, isDisabled }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, hasRole, isAdmin, isSuperAdmin, isApprover, isPendingApproval, isDisabled }}>
       {children}
     </AuthContext.Provider>
   )
