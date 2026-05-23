@@ -69,6 +69,13 @@ export const usersService = {
     if (error) throw error
   },
 
+  async transferSuperAdmin(newSuperAdminId: string): Promise<void> {
+    const { error } = await supabase.rpc('transfer_super_admin', {
+      p_new_super_admin_id: newSuperAdminId,
+    })
+    if (error) throw error
+  },
+
   async inviteUser(email: string, displayName: string, role: UserRole, password: string): Promise<void> {
     const { error } = await supabase.auth.signUp({
       email,
