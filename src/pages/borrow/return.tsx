@@ -15,7 +15,8 @@ import { Label } from '@/components/ui/label'
 
 export function BorrowReturn() {
   const navigate = useNavigate()
-  const { recordId } = useParams<{ recordId: string }>()
+  const { id } = useParams<{ id: string }>()
+  const recordId = id
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
