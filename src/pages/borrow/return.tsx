@@ -24,8 +24,17 @@ export function BorrowReturn() {
   const [notes, setNotes] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
 
+  // DEBUG: 强制显示 recordId
+  console.log('[return] MOUNTED, id from URL:', id, 'recordId:', recordId)
+
   const loadRecord = useCallback(async () => {
-    if (!recordId) return
+    console.log('[return] loadRecord called, recordId:', recordId)
+    if (!recordId) {
+      console.log('[return] NO recordId, skipping')
+      setLoading(false)
+      setLoadError('URL 参数缺失: ' + JSON.stringify({ id, recordId }))
+      return
+    }
     setLoading(true)
     setLoadError(null)
     try {
