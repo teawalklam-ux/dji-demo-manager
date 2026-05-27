@@ -23,7 +23,7 @@ const mainNavItems = [
   { title: '样机管理', href: '/items', icon: Package },
   { title: '借用申请', href: '/borrow/apply', icon: FileText },
   { title: '我的申请', href: '/borrow/my-requests', icon: CheckSquare },
-  { title: '审批队列', href: '/approval/queue', icon: CheckSquare, roles: ['admin', 'approver'] },
+  { title: '审批队列', href: '/approval/queue', icon: CheckSquare, roles: ['super_admin', 'admin', 'approver'] },
   { title: '报表导出', href: '/reports', icon: BarChart3 },
 ]
 
@@ -35,12 +35,11 @@ const adminNavItems = [
 ]
 
 function AppSidebar() {
-  const { profile, signOut, isAdmin, isSuperAdmin } = useAuth()
+  const { profile, signOut, isSuperAdmin, hasRole } = useAuth()
   const location = useLocation()
-  const isApprover = profile?.role === 'approver' || isAdmin
 
   const filteredMainNav = mainNavItems.filter(
-    item => !item.roles || item.roles.some(r => isApprover && r === 'approver' || isAdmin && r === 'admin')
+    item => !item.roles || item.roles.some(r => hasRole(r as any))
   )
 
   return (

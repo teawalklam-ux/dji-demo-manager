@@ -329,6 +329,7 @@ export function ApprovalChainsPage() {
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
+                            <SelectItem value="super_admin">超级管理员</SelectItem>
                             <SelectItem value="admin">管理员</SelectItem>
                             <SelectItem value="approver">审批人</SelectItem>
                             <SelectItem value="user">普通用户</SelectItem>
