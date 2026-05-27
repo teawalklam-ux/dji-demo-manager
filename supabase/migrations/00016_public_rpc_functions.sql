@@ -55,7 +55,7 @@ BEGIN
         -- 按角色查找: 取该角色中第一个活跃用户
         SELECT id INTO v_approver_id
         FROM public.profiles
-        WHERE role = v_step->>'role' AND status = 'active'
+        WHERE role = v_step->>'role' AND is_active = true
         LIMIT 1;
       END IF;
 
