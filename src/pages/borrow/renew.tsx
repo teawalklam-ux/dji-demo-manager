@@ -27,7 +27,9 @@ export function BorrowRenew() {
     if (!requestId) return
     setLoading(true)
     try {
+      console.log('[renew] requestId from URL:', requestId)
       const data = await borrowService.getRequestById(requestId)
+      console.log('[renew] getRequestById result:', data)
       setRequest(data)
       // 预填新归还日期为原归还日期后14天
       if (data?.expected_return_date) {
@@ -37,7 +39,7 @@ export function BorrowRenew() {
       }
     } catch (error) {
       toast.error('加载申请信息失败')
-      console.error(error)
+      console.error('[renew] error:', error)
     } finally {
       setLoading(false)
     }

@@ -25,26 +25,33 @@ export function BorrowReturn() {
     if (!recordId) return
     setLoading(true)
     try {
+      console.log('[return] recordId from URL:', recordId)
+
       // 传入的可能是 request_id 或 borrow_record_id
       // 先尝试按 request_id 查找（从我的申请页面传入的是 request_id）
       let record = await borrowService.getBorrowRecordByRequestId(recordId)
+      console.log('[return] getBorrowRecordByRequestId result:', record)
 
       // 如果没找到，尝试按 borrow_record_id 查找
       if (!record) {
         const records = await borrowService.getBorrowRecords({ status: 'borrowed' })
+        console.log('[return] getBorrowRecords result count:', records.length)
         record = records.find((r) => r.id === recordId) || null
       }
 
       // 最后尝试我的借用记录
       if (!record) {
-        const myRecords = await borrowService.getMyBorrowRecords()
-        record = myRecords.find((r) => r.id === recordId || r.request_id === recordId) || null
+        const myRecords = await borrowService.getBorrowRecords()
+        console.log('[return] all borrowRecords count:', myRecords.length)
+        const found = myRecords.find((r) => r.id === recordId || r.request_id === recordId)
+        record = found || null
       }
 
+      console.log('[return] final record:', record)
       setRecord(record)
     } catch (error) {
       toast.error('加载借用记录失败')
-      console.error(error)
+      console.error('[return] error:', error)
     } finally {
       setLoading(false)
     }
