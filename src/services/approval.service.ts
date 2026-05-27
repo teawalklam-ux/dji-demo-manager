@@ -6,12 +6,27 @@ export const approvalService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')
 
-    const { data, error } = await supabase
+    // 先获取当前用户角色
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin'
+
+    // super_admin/admin 能看到所有未审批记录，其他角色只能看到自己的
+    let query = supabase
       .from('approval_records')
       .select('*, approver:profiles(*), request:borrow_requests(*, item:items(*, category:categories(*)), requester:profiles(*)), chain:approval_chains(*)')
-      .eq('approver_id', user.id)
       .is('acted_at', null)
       .order('created_at', { ascending: false })
+
+    if (!isAdmin) {
+      query = query.eq('approver_id', user.id)
+    }
+
+    const { data, error } = await query
     if (error) throw error
     return data || []
   },
@@ -20,12 +35,27 @@ export const approvalService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')
 
-    const { data, error } = await supabase
+    // 先获取当前用户角色
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('role')
+      .eq('id', user.id)
+      .single()
+
+    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin'
+
+    // super_admin/admin 能看到所有已审批记录，其他角色只能看到自己的
+    let query = supabase
       .from('approval_records')
       .select('*, approver:profiles(*), request:borrow_requests(*, item:items(*, category:categories(*)), requester:profiles(*)), chain:approval_chains(*)')
-      .eq('approver_id', user.id)
       .not('acted_at', 'is', null)
       .order('acted_at', { ascending: false })
+
+    if (!isAdmin) {
+      query = query.eq('approver_id', user.id)
+    }
+
+    const { data, error } = await query
     if (error) throw error
     return data || []
   },
