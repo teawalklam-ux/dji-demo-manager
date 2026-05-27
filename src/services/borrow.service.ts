@@ -110,6 +110,16 @@ export const borrowService = {
     return data || []
   },
 
+  async getBorrowRecordByRequestId(requestId: string): Promise<BorrowRecord | null> {
+    const { data, error } = await supabase
+      .from('borrow_records')
+      .select('*, item:items(*, category:categories(*)), borrower:profiles(*)')
+      .eq('request_id', requestId)
+      .maybeSingle()
+    if (error) throw error
+    return data
+  },
+
   async getMyBorrowRecords(): Promise<BorrowRecord[]> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')
