@@ -4,10 +4,11 @@ import { Button } from '@/components/ui/button'
 import { Html5Qrcode, type Html5QrcodeResult } from 'html5-qrcode'
 import {
   getBarcodeScanProfile,
+  getSelectableScanModes,
   isAcceptedScanResult,
   type BarcodeScanMode,
 } from './barcode-scan-profile'
-import { ScanLine, Camera } from 'lucide-react'
+import { ScanLine, Camera, QrCode } from 'lucide-react'
 
 interface BarcodeScannerProps {
   open: boolean
@@ -20,6 +21,7 @@ interface BarcodeScannerProps {
 let idCounter = 0
 
 export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }: BarcodeScannerProps) {
+  const [activeMode, setActiveMode] = useState<BarcodeScanMode>(mode)
   const [error, setError] = useState('')
   const [manualValue, setManualValue] = useState('')
   const [scanning, setScanning] = useState(false)
@@ -28,7 +30,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const readerIdRef = useRef(`barcode-reader-${++idCounter}`)
   const mountedRef = useRef(false)
-  const scanProfile = getBarcodeScanProfile(mode)
+  const scanProfile = getBarcodeScanProfile(activeMode)
+  const selectableModes = getSelectableScanModes()
 
   const stopScanning = useCallback(async () => {
     if (scannerRef.current) {
@@ -79,7 +82,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
           const text = decodedText.trim()
           const format = decodedResult.result.format?.format
 
-          if (!isAcceptedScanResult(mode, text, format)) {
+          if (!isAcceptedScanResult(activeMode, text, format)) {
             setScanNotice(scanProfile.mismatchMessage)
             return
           }
@@ -106,7 +109,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       }
       console.error('Scanner error:', err)
     }
-  }, [mode, onScan, onOpenChange, scanProfile, stopScanning])
+  }, [activeMode, onScan, onOpenChange, scanProfile, stopScanning])
 
   useEffect(() => {
     mountedRef.current = true
@@ -116,10 +119,16 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     }
   }, [stopScanning])
 
+  useEffect(() => {
+    if (open) {
+      setActiveMode(mode)
+    }
+  }, [mode, open])
+
   // Handle dialog open/close
   useEffect(() => {
     if (!open) {
-      stopScanning()
+      void stopScanning()
       setManualValue('')
       setLastScanResult('')
       setScanNotice('')
@@ -128,14 +137,34 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     }
 
     // Wait for dialog DOM to be fully rendered before starting
+    let cancelled = false
     const timer = setTimeout(() => {
       if (mountedRef.current) {
-        startScanning()
+        void (async () => {
+          await stopScanning()
+          if (mountedRef.current && !cancelled) {
+            await startScanning()
+          }
+        })()
       }
     }, 500)
 
-    return () => clearTimeout(timer)
-  }, [open, startScanning, stopScanning])
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [activeMode, open, startScanning, stopScanning])
+
+  const handleModeChange = (nextMode: BarcodeScanMode) => {
+    if (nextMode === activeMode) return
+
+    setActiveMode(nextMode)
+    setManualValue('')
+    setLastScanResult('')
+    setScanNotice('')
+    setError('')
+    void stopScanning()
+  }
 
   const handleManualSubmit = () => {
     if (manualValue.trim()) {
@@ -154,6 +183,28 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
           <DialogTitle>{scanProfile.title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
+          <div className="grid grid-cols-2 gap-1 rounded-md border bg-muted/40 p-1">
+            {selectableModes.map((scanMode) => {
+              const active = scanMode === activeMode
+              const Icon = scanMode === 'qrcode' ? QrCode : ScanLine
+
+              return (
+                <Button
+                  key={scanMode}
+                  type="button"
+                  variant={active ? 'default' : 'ghost'}
+                  size="sm"
+                  className="h-8 justify-center gap-1.5"
+                  aria-pressed={active}
+                  onClick={() => handleModeChange(scanMode)}
+                >
+                  <Icon className="size-4" />
+                  {getModeLabel(scanMode)}
+                </Button>
+              )
+            })}
+          </div>
+
           {error ? (
             <div className="space-y-3">
               <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">{error}</div>
@@ -209,4 +260,10 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       </DialogContent>
     </Dialog>
   )
+}
+
+function getModeLabel(mode: BarcodeScanMode) {
+  if (mode === 'qrcode') return '二维码'
+  if (mode === 'mixed') return '兼容'
+  return '条形码'
 }

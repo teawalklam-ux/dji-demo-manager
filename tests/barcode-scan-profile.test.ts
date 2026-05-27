@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import { Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import {
   getBarcodeScanProfile,
+  getSelectableScanModes,
   isAcceptedScanResult,
 } from '../src/components/barcode/barcode-scan-profile'
 
@@ -24,3 +25,5 @@ assert.deepEqual(getBarcodeScanProfile('mixed').formatsToSupport, [code128, qrCo
 assert.equal(isAcceptedScanResult('mixed', 'DJI-20260527-0001', code128), true)
 assert.equal(isAcceptedScanResult('mixed', 'https://example.test/item/1', qrCode), true)
 assert.equal(isAcceptedScanResult('mixed', '5901234123457', ean13), false)
+
+assert.deepEqual(getSelectableScanModes(), ['barcode', 'qrcode'])
