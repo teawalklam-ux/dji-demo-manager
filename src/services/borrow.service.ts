@@ -97,27 +97,35 @@ export const borrowService = {
   },
 
   async getBorrowRecords(filters?: { status?: string; borrower_id?: string }): Promise<BorrowRecord[]> {
+    // 简化查询，避免复杂 join 超时
     let query = supabase
       .from('borrow_records')
-      .select('*, item:items(*, category:categories(*)), borrower:profiles(*), request:borrow_requests(*)')
+      .select('*')
       .order('created_at', { ascending: false })
 
     if (filters?.status) query = query.eq('status', filters.status)
     if (filters?.borrower_id) query = query.eq('borrower_id', filters.borrower_id)
 
     const { data, error } = await query
-    if (error) throw error
-    return data || []
+    if (error) {
+      console.error('[getBorrowRecords] error:', error)
+      throw error
+    }
+    return (data || []) as BorrowRecord[]
   },
 
   async getBorrowRecordByRequestId(requestId: string): Promise<BorrowRecord | null> {
+    // 先简单查询，避免复杂 join 导致超时
     const { data, error } = await supabase
       .from('borrow_records')
-      .select('*, item:items(*, category:categories(*)), borrower:profiles(*)')
+      .select('*')
       .eq('request_id', requestId)
       .maybeSingle()
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('[getBorrowRecordByRequestId] error:', error)
+      throw error
+    }
+    return data as BorrowRecord | null
   },
 
   async getMyBorrowRecords(): Promise<BorrowRecord[]> {
