@@ -1,27 +1,34 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Html5Qrcode } from 'html5-qrcode'
-import { BARCODE_SCAN_FORMATS, BARCODE_SCAN_QRBOX, BARCODE_FORMAT } from '@/lib/constants'
+import { Html5Qrcode, type Html5QrcodeResult } from 'html5-qrcode'
+import {
+  getBarcodeScanProfile,
+  isAcceptedScanResult,
+  type BarcodeScanMode,
+} from './barcode-scan-profile'
 import { ScanLine, Camera } from 'lucide-react'
 
 interface BarcodeScannerProps {
   open: boolean
   onOpenChange: (open: boolean) => void
   onScan: (barcode: string) => void
+  mode?: BarcodeScanMode
 }
 
 // Unique ID counter to avoid duplicate DOM IDs
 let idCounter = 0
 
-export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerProps) {
+export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }: BarcodeScannerProps) {
   const [error, setError] = useState('')
   const [manualValue, setManualValue] = useState('')
   const [scanning, setScanning] = useState(false)
   const [lastScanResult, setLastScanResult] = useState('')
+  const [scanNotice, setScanNotice] = useState('')
   const scannerRef = useRef<Html5Qrcode | null>(null)
   const readerIdRef = useRef(`barcode-reader-${++idCounter}`)
   const mountedRef = useRef(false)
+  const scanProfile = getBarcodeScanProfile(mode)
 
   const stopScanning = useCallback(async () => {
     if (scannerRef.current) {
@@ -50,48 +57,46 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     try {
       setScanning(true)
       setError('')
+      setScanNotice('')
 
       // 只配置系统使用的条码格式，CODE128 优先
       const scanner = new Html5Qrcode(readerId, {
         verbose: false,
-        formatsToSupport: [...BARCODE_SCAN_FORMATS],
+        formatsToSupport: [...scanProfile.formatsToSupport],
       })
       scannerRef.current = scanner
 
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: 20,  // 提高帧率 (原15→20)，加快识别速度
-          qrbox: { ...BARCODE_SCAN_QRBOX },  // 横向矩形扫描区域，适合1D条码
-          aspectRatio: 1.778,  // 16:9 宽屏比例，更适合横向条码
+          fps: scanProfile.fps,
+          qrbox: { ...scanProfile.qrbox },
+          aspectRatio: scanProfile.aspectRatio,
           disableFlip: true,   // 禁用翻转，提高识别速度
         },
-        (decodedText) => {
+        (decodedText, decodedResult: Html5QrcodeResult) => {
           // 成功识别
           const text = decodedText.trim()
+          const format = decodedResult.result.format?.format
 
-          // 优先匹配系统条码格式 (DJI-YYYYMMDD-XXXX)
-          if (text.startsWith('DJI-')) {
-            setLastScanResult(text)
-            onScan(text)
-            stopScanning()
-            onOpenChange(false)
+          if (!isAcceptedScanResult(mode, text, format)) {
+            setScanNotice(scanProfile.mismatchMessage)
             return
           }
 
-          // 其他条码也接受（SN码、序列号等场景）
           setLastScanResult(text)
+          setScanNotice('')
           onScan(text)
-          stopScanning()
+          void stopScanning()
           onOpenChange(false)
         },
         () => {
           // 每帧未识别到，忽略
         }
       )
-    } catch (err: any) {
+    } catch (err: unknown) {
       setScanning(false)
-      const msg = err?.message || String(err)
+      const msg = err instanceof Error ? err.message : String(err)
       if (msg.includes('Permission') || msg.includes('NotAllowedError')) {
         setError('摄像头权限被拒绝，请在浏览器设置中允许访问摄像头')
       } else if (msg.includes('NotFound') || msg.includes('Requested device not found')) {
@@ -101,7 +106,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       }
       console.error('Scanner error:', err)
     }
-  }, [onScan, onOpenChange, stopScanning])
+  }, [mode, onScan, onOpenChange, scanProfile, stopScanning])
 
   useEffect(() => {
     mountedRef.current = true
@@ -117,6 +122,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
       stopScanning()
       setManualValue('')
       setLastScanResult('')
+      setScanNotice('')
       setError('')
       return
     }
@@ -145,7 +151,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
     }}>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
-          <DialogTitle>扫描条码 / 二维码</DialogTitle>
+          <DialogTitle>{scanProfile.title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
           {error ? (
@@ -175,6 +181,12 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
             </div>
           )}
 
+          {scanNotice && !lastScanResult && (
+            <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-700">
+              {scanNotice}
+            </div>
+          )}
+
           <div className="space-y-2">
             <p className="text-sm text-muted-foreground">或手动输入：</p>
             <div className="flex gap-2">
@@ -183,7 +195,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
                 value={manualValue}
                 onChange={(e) => setManualValue(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleManualSubmit()}
-                placeholder="输入条码或序列号"
+                placeholder={scanProfile.placeholder}
                 className="flex-1 rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
               <Button onClick={handleManualSubmit}>确认</Button>
@@ -191,7 +203,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan }: BarcodeScannerPro
           </div>
 
           <p className="text-xs text-muted-foreground text-center">
-            系统条码格式：{BARCODE_FORMAT} · 将条码对准横向扫描框
+            {scanProfile.helpText}
           </p>
         </div>
       </DialogContent>
