@@ -140,6 +140,9 @@ export function AppLayout() {
         <main className="flex-1 overflow-auto p-6">
           <Outlet />
         </main>
+        <div className="text-right px-4 py-1 text-[10px] text-muted-foreground/40 select-none">
+          v1.12
+        </div>
       </div>
     </SidebarProvider>
   )
