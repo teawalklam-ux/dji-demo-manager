@@ -17,6 +17,7 @@ type TabKey = 'all' | BorrowRequestStatus
 const TABS: { key: TabKey; label: string }[] = [
   { key: 'all', label: '全部' },
   { key: 'pending', label: '待审批' },
+  { key: 'partially_approved', label: '审批中' },
   { key: 'approved', label: '已通过' },
   { key: 'rejected', label: '已拒绝' },
   { key: 'borrowed', label: '借用中' },
@@ -165,6 +166,15 @@ export function MyRequests() {
                           onClick={() => handleCancel(request.id)}
                         >
                           取消申请
+                        </Button>
+                      )}
+                      {(request.status === 'approved' || request.status === 'partially_approved') && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleApplyReturn(request.id)}
+                        >
+                          申请归还
                         </Button>
                       )}
                       {request.status === 'borrowed' && (
