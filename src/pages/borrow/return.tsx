@@ -25,15 +25,22 @@ export function BorrowReturn() {
     if (!recordId) return
     setLoading(true)
     try {
+      // 先尝试直接用 borrow_record_id 查找
       const records = await borrowService.getBorrowRecords({ borrower_id: undefined })
       const found = records.find((r) => r.id === recordId)
       if (found) {
         setRecord(found)
       } else {
-        // Fallback: try my records
-        const myRecords = await borrowService.getMyBorrowRecords()
-        const myFound = myRecords.find((r) => r.id === recordId)
-        setRecord(myFound || null)
+        // 尝试通过 request_id 查找 borrow_record（从我的申请页面传入的是 request_id）
+        const recordByRequest = await borrowService.getBorrowRecordByRequestId(recordId)
+        if (recordByRequest) {
+          setRecord(recordByRequest)
+        } else {
+          // Fallback: try my records
+          const myRecords = await borrowService.getMyBorrowRecords()
+          const myFound = myRecords.find((r) => r.id === recordId || r.request_id === recordId)
+          setRecord(myFound || null)
+        }
       }
     } catch (error) {
       toast.error('加载借用记录失败')
