@@ -55,6 +55,13 @@ BEGIN
     UPDATE public.borrow_requests SET status = 'rejected', rejection_reason = p_comment, updated_at = now()
     WHERE id = p_request_id;
   ELSE
+    -- super_admin/admin 代理审批时，一次性通过所有剩余步骤
+    IF v_approver_role IN ('super_admin', 'admin') THEN
+      UPDATE public.approval_records
+      SET action = 'approved', acted_at = now(), approver_id = v_approver_id
+      WHERE request_id = p_request_id AND acted_at IS NULL;
+    END IF;
+
     -- 检查是否还有未审批的步骤
     SELECT COUNT(*) INTO v_acted_count
     FROM public.approval_records
