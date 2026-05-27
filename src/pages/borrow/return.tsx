@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { borrowService } from '@/services/borrow.service'
+import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { BorrowRecord } from '@/types'
 import { BORROW_TYPE_MAP } from '@/lib/constants'
@@ -20,37 +21,57 @@ export function BorrowReturn() {
   const [submitting, setSubmitting] = useState(false)
   const [record, setRecord] = useState<BorrowRecord | null>(null)
   const [notes, setNotes] = useState('')
+  const [loadError, setLoadError] = useState<string | null>(null)
 
   const loadRecord = useCallback(async () => {
     if (!recordId) return
     setLoading(true)
+    setLoadError(null)
     try {
       console.log('[return] recordId from URL:', recordId)
 
-      // 传入的可能是 request_id 或 borrow_record_id
-      // 先尝试按 request_id 查找（从我的申请页面传入的是 request_id）
-      let record = await borrowService.getBorrowRecordByRequestId(recordId)
-      console.log('[return] getBorrowRecordByRequestId result:', record)
+      // 方法1: 直接用 supabase 查询 borrow_records（最原始方式）
+      console.log('[return] trying direct supabase query...')
+      const { data: directData, error: directError } = await supabase
+        .from('borrow_records')
+        .select('*')
+        .eq('request_id', recordId)
+        .maybeSingle()
 
-      // 如果没找到，尝试按 borrow_record_id 查找
-      if (!record) {
-        const records = await borrowService.getBorrowRecords({ status: 'borrowed' })
-        console.log('[return] getBorrowRecords(borrowed) count:', records.length)
-        record = records.find((r) => r.id === recordId) || null
+      console.log('[return] direct query result:', directData, 'error:', directError)
+
+      if (directError) {
+        throw new Error('直接查询失败: ' + directError.message)
       }
 
-      // 最后尝试所有借用记录
-      if (!record) {
-        const allRecords = await borrowService.getBorrowRecords()
-        console.log('[return] all borrowRecords count:', allRecords.length)
-        const found = allRecords.find((r) => r.id === recordId || r.request_id === recordId)
-        record = found || null
+      if (directData) {
+        setRecord(directData as BorrowRecord)
+        setLoading(false)
+        return
       }
 
-      console.log('[return] final record:', record)
-      setRecord(record)
+      // 方法2: 按 borrow_record_id 查
+      console.log('[return] trying by borrow_record_id...')
+      const { data: allData, error: allError } = await supabase
+        .from('borrow_records')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      console.log('[return] all records count:', allData?.length, 'error:', allError)
+
+      if (allError) {
+        throw new Error('查询全部失败: ' + allError.message)
+      }
+
+      const found = allData?.find((r) => r.id === recordId || r.request_id === recordId)
+      if (found) {
+        setRecord(found as BorrowRecord)
+      } else {
+        setRecord(null)
+      }
     } catch (error: any) {
       console.error('[return] error:', error)
+      setLoadError(error.message || '加载失败')
       toast.error('加载借用记录失败: ' + (error.message || '未知错误'))
     } finally {
       setLoading(false)
@@ -83,8 +104,24 @@ export function BorrowReturn() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Spinner className="size-6" />
+        <p className="text-sm text-muted-foreground">正在加载借用记录...</p>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl p-6">
+        <div className="py-12 text-center text-red-600">
+          <p className="font-medium">加载失败</p>
+          <p className="text-sm mt-1">{loadError}</p>
+        </div>
+        <div className="flex justify-center gap-3">
+          <Button variant="outline" onClick={() => navigate(-1)}>返回</Button>
+          <Button onClick={loadRecord}>重试</Button>
+        </div>
       </div>
     )
   }
@@ -95,10 +132,9 @@ export function BorrowReturn() {
         <div className="py-12 text-center text-muted-foreground">
           未找到借用记录
         </div>
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            返回
-          </Button>
+        <div className="flex justify-center gap-3">
+          <Button variant="outline" onClick={() => navigate(-1)}>返回</Button>
+          <Button onClick={loadRecord}>重试</Button>
         </div>
       </div>
     )
