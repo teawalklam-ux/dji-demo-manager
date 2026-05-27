@@ -25,23 +25,23 @@ export function BorrowReturn() {
     if (!recordId) return
     setLoading(true)
     try {
-      // 先尝试直接用 borrow_record_id 查找
-      const records = await borrowService.getBorrowRecords({ borrower_id: undefined })
-      const found = records.find((r) => r.id === recordId)
-      if (found) {
-        setRecord(found)
-      } else {
-        // 尝试通过 request_id 查找 borrow_record（从我的申请页面传入的是 request_id）
-        const recordByRequest = await borrowService.getBorrowRecordByRequestId(recordId)
-        if (recordByRequest) {
-          setRecord(recordByRequest)
-        } else {
-          // Fallback: try my records
-          const myRecords = await borrowService.getMyBorrowRecords()
-          const myFound = myRecords.find((r) => r.id === recordId || r.request_id === recordId)
-          setRecord(myFound || null)
-        }
+      // 传入的可能是 request_id 或 borrow_record_id
+      // 先尝试按 request_id 查找（从我的申请页面传入的是 request_id）
+      let record = await borrowService.getBorrowRecordByRequestId(recordId)
+
+      // 如果没找到，尝试按 borrow_record_id 查找
+      if (!record) {
+        const records = await borrowService.getBorrowRecords({ status: 'borrowed' })
+        record = records.find((r) => r.id === recordId) || null
       }
+
+      // 最后尝试我的借用记录
+      if (!record) {
+        const myRecords = await borrowService.getMyBorrowRecords()
+        record = myRecords.find((r) => r.id === recordId || r.request_id === recordId) || null
+      }
+
+      setRecord(record)
     } catch (error) {
       toast.error('加载借用记录失败')
       console.error(error)
