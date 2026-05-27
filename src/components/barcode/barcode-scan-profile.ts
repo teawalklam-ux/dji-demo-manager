@@ -58,6 +58,10 @@ export function getBarcodeScanProfile(mode: BarcodeScanMode): BarcodeScanProfile
   return scanProfiles[mode]
 }
 
+export function getSelectableScanModes(): readonly BarcodeScanMode[] {
+  return ['barcode', 'qrcode']
+}
+
 export function isAcceptedScanResult(
   mode: BarcodeScanMode,
   decodedText: string,
