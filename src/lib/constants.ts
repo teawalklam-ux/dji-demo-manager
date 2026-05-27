@@ -99,22 +99,5 @@ export const BARCODE_GENERATE_OPTIONS = {
   flat: true,        // 扁平渲染，减少抗锯齿干扰
 } as const
 
-// html5-qrcode 扫描器配置
-export const BARCODE_SCAN_FORMATS = [
-  5,  // CODE_128 (优先 - 系统生成格式)
-  0,  // QR_CODE (兼容二维码)
-  3,  // CODE_39
-  8,  // EAN_13
-  14, // UPC_A
-  9,  // ITF
-  11, // PDF_417
-] as const
-
-// 扫描器视窗配置 (横向矩形，适合1D条码)
-export const BARCODE_SCAN_QRBOX = {
-  width: 280,
-  height: 160,
-} as const
-
 // 默认借用天数
 export const DEFAULT_BORROW_DAYS = 14
