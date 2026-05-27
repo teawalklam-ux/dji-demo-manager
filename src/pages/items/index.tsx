@@ -304,6 +304,7 @@ export function ItemsList() {
       <BarcodeScanner
         open={scanDialogOpen}
         onOpenChange={setScanDialogOpen}
+        mode="barcode"
         onScan={(code) => {
           setScanDialogOpen(false)
           setSearch(code)

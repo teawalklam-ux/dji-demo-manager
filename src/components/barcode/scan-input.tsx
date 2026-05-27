@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { BarcodeScanner } from './barcode-scanner'
+import type { BarcodeScanMode } from './barcode-scan-profile'
 import { ScanLine } from 'lucide-react'
 
 interface ScanInputProps {
@@ -10,9 +11,10 @@ interface ScanInputProps {
   placeholder?: string
   id?: string
   className?: string
+  scanMode?: BarcodeScanMode
 }
 
-export function ScanInput({ value, onChange, placeholder, id, className }: ScanInputProps) {
+export function ScanInput({ value, onChange, placeholder, id, className, scanMode = 'barcode' }: ScanInputProps) {
   const [scannerOpen, setScannerOpen] = useState(false)
 
   return (
@@ -40,6 +42,7 @@ export function ScanInput({ value, onChange, placeholder, id, className }: ScanI
         open={scannerOpen}
         onOpenChange={setScannerOpen}
         onScan={(code) => onChange(code)}
+        mode={scanMode}
       />
     </>
   )
