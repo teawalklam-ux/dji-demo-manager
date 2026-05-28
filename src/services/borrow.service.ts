@@ -46,11 +46,14 @@ export const borrowService = {
   async getRequestById(id: string): Promise<BorrowRequest | null> {
     const { data, error } = await supabase
       .from('borrow_requests')
-      .select('*, item:items(*, category:categories(*)), requester:profiles(*), approval_records:approval_records(*, approver:profiles(*))')
+      .select('*')
       .eq('id', id)
       .single()
-    if (error) throw error
-    return data
+    if (error) {
+      console.error('[getRequestById] error:', error)
+      throw error
+    }
+    return data as BorrowRequest | null
   },
 
   async processReturn(recordId: string, notes?: string): Promise<void> {

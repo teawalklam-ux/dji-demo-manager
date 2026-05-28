@@ -15,17 +15,29 @@ import { Label } from '@/components/ui/label'
 
 export function BorrowRenew() {
   const navigate = useNavigate()
-  const { requestId } = useParams<{ requestId: string }>()
+  const { id } = useParams<{ id: string }>()
+  const requestId = id
 
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [request, setRequest] = useState<BorrowRequest | null>(null)
   const [expectedReturnDate, setExpectedReturnDate] = useState('')
   const [purpose, setPurpose] = useState('')
+  const [loadError, setLoadError] = useState<string | null>(null)
+
+  // DEBUG
+  console.log('[renew] MOUNTED, id:', id, 'requestId:', requestId)
 
   const loadRequest = useCallback(async () => {
-    if (!requestId) return
+    console.log('[renew] loadRequest called, requestId:', requestId)
+    if (!requestId) {
+      console.log('[renew] NO requestId, skipping')
+      setLoading(false)
+      setLoadError('URL 参数缺失: ' + JSON.stringify({ id, requestId }))
+      return
+    }
     setLoading(true)
+    setLoadError(null)
     try {
       console.log('[renew] requestId from URL:', requestId)
       const data = await borrowService.getRequestById(requestId)
@@ -37,9 +49,10 @@ export function BorrowRenew() {
         current.setDate(current.getDate() + 14)
         setExpectedReturnDate(current.toISOString().split('T')[0])
       }
-    } catch (error) {
-      toast.error('加载申请信息失败')
+    } catch (error: any) {
       console.error('[renew] error:', error)
+      setLoadError(error.message || '加载失败')
+      toast.error('加载申请信息失败: ' + (error.message || '未知错误'))
     } finally {
       setLoading(false)
     }
@@ -83,8 +96,24 @@ export function BorrowRenew() {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center py-20">
+      <div className="flex flex-col items-center justify-center py-20 gap-4">
         <Spinner className="size-6" />
+        <p className="text-sm text-muted-foreground">正在加载申请信息...</p>
+      </div>
+    )
+  }
+
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl p-6">
+        <div className="py-12 text-center text-red-600">
+          <p className="font-medium">加载失败</p>
+          <p className="text-sm mt-1">{loadError}</p>
+        </div>
+        <div className="flex justify-center gap-3">
+          <Button variant="outline" onClick={() => navigate(-1)}>返回</Button>
+          <Button onClick={loadRequest}>重试</Button>
+        </div>
       </div>
     )
   }
@@ -95,10 +124,9 @@ export function BorrowRenew() {
         <div className="py-12 text-center text-muted-foreground">
           未找到申请记录
         </div>
-        <div className="flex justify-center">
-          <Button variant="outline" onClick={() => navigate(-1)}>
-            返回
-          </Button>
+        <div className="flex justify-center gap-3">
+          <Button variant="outline" onClick={() => navigate(-1)}>返回</Button>
+          <Button onClick={loadRequest}>重试</Button>
         </div>
       </div>
     )
