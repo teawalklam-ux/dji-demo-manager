@@ -77,14 +77,15 @@ export function BorrowReturn() {
   }, [loadRecord])
 
   const handleConfirmReturn = async () => {
-    if (!recordId) return
+    if (!record) return
     if (!photoData) {
       toast.error('请先拍摄归还照片')
       return
     }
     setSubmitting(true)
     try {
-      await borrowService.processReturn(recordId, {
+      // 必须传 borrow_records.id，不是 request_id
+      await borrowService.processReturn(record.id, {
         notes: notes.trim() || undefined,
         photo: photoData,
       })

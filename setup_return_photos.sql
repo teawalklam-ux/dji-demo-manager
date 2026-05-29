@@ -1,7 +1,6 @@
 -- ==========================================
 -- 归还拍照功能 - 合并 SQL 脚本
--- 包含: 00023 + 00024 + 00025（含 super_admin 修复）
-+ Storage bucket 创建
+-- 包含: 00023 + 00024 + 00025（含 super_admin 修复）+ Storage bucket 创建
 -- 在 Supabase Dashboard → SQL Editor 中执行
 -- ==========================================
 
@@ -28,6 +27,9 @@ COMMENT ON TABLE public.return_photos IS '归还照片记录，照片30天自动
 COMMENT ON COLUMN public.return_photos.photo_deleted_at IS 'NULL表示照片仍在Storage中，非NULL表示已从Storage删除';
 
 -- ===== 2. 更新 process_return 函数（增加照片参数） =====
+-- 先删除旧版本，避免参数歧义
+DROP FUNCTION IF EXISTS public.process_return(UUID, TEXT);
+
 CREATE OR REPLACE FUNCTION public.process_return(
   p_borrow_record_id UUID,
   p_notes TEXT DEFAULT NULL,
@@ -94,6 +96,7 @@ VALUES (
 -- ===== 4. return_photos 表 RLS 策略 =====
 ALTER TABLE public.return_photos ENABLE ROW LEVEL SECURITY;
 
+DROP POLICY IF EXISTS "归还人可查看自己的归还照片" ON public.return_photos;
 CREATE POLICY "归还人可查看自己的归还照片"
   ON public.return_photos FOR SELECT
   USING (
@@ -101,15 +104,18 @@ CREATE POLICY "归还人可查看自己的归还照片"
     OR public.get_current_user_role() IN ('admin', 'super_admin', 'approver')
   );
 
+DROP POLICY IF EXISTS "用户可创建归还照片记录" ON public.return_photos;
 CREATE POLICY "用户可创建归还照片记录"
   ON public.return_photos FOR INSERT
   WITH CHECK (uploader_id = (select auth.uid()));
 
+DROP POLICY IF EXISTS "管理员可删除归还照片" ON public.return_photos;
 CREATE POLICY "管理员可删除归还照片"
   ON public.return_photos FOR DELETE
   USING (public.get_current_user_role() IN ('admin', 'super_admin'));
 
 -- ===== 5. Storage RLS 策略 =====
+DROP POLICY IF EXISTS "用户可上传归还照片" ON storage.objects;
 CREATE POLICY "用户可上传归还照片"
   ON storage.objects FOR INSERT
   WITH CHECK (
@@ -117,6 +123,7 @@ CREATE POLICY "用户可上传归还照片"
     AND auth.uid()::text = (storage.foldername(name))[1]
   );
 
+DROP POLICY IF EXISTS "用户可查看归还照片" ON storage.objects;
 CREATE POLICY "用户可查看归还照片"
   ON storage.objects FOR SELECT
   USING (
