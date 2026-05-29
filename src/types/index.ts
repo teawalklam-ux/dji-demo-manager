@@ -217,6 +217,23 @@ export interface OverdueNotification {
   borrow_record?: BorrowRecord
 }
 
+// ===== 归还照片 =====
+export interface ReturnPhoto {
+  id: string
+  borrow_record_id: string
+  uploader_id: string
+  storage_path: string
+  captured_at: string
+  latitude: number | null
+  longitude: number | null
+  address: string | null
+  photo_deleted_at: string | null
+  created_at: string
+  // Joined
+  uploader?: Profile
+  borrow_record?: BorrowRecord
+}
+
 // ===== 通用 =====
 export interface PaginatedResponse<T> {
   data: T[]

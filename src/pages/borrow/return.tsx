@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { BorrowRecord } from '@/types'
 import { BORROW_TYPE_MAP } from '@/lib/constants'
+import { ReturnPhotoCapture } from '@/components/borrow/return-photo-capture'
+import type { PhotoData } from '@/components/borrow/return-photo-capture'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -23,66 +25,48 @@ export function BorrowReturn() {
   const [record, setRecord] = useState<BorrowRecord | null>(null)
   const [notes, setNotes] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
-
-  // DEBUG: 强制显示 recordId
-  console.log('[return] MOUNTED, id from URL:', id, 'recordId:', recordId)
+  const [photoData, setPhotoData] = useState<PhotoData | null>(null)
 
   const loadRecord = useCallback(async () => {
-    console.log('[return] loadRecord called, recordId:', recordId)
     if (!recordId) {
-      console.log('[return] NO recordId, skipping')
       setLoading(false)
-      setLoadError('URL 参数缺失: ' + JSON.stringify({ id, recordId }))
+      setLoadError('缺少借用记录ID')
       return
     }
     setLoading(true)
     setLoadError(null)
     try {
-      console.log('[return] recordId from URL:', recordId)
-
-      // 方法1: 直接用 supabase 查询 borrow_records（最原始方式）
-      console.log('[return] trying direct supabase query...')
+      // 先按 request_id 查找 borrow_records
       const { data: directData, error: directError } = await supabase
         .from('borrow_records')
         .select('*')
         .eq('request_id', recordId)
         .maybeSingle()
 
-      console.log('[return] direct query result:', directData, 'error:', directError)
-
       if (directError) {
-        throw new Error('直接查询失败: ' + directError.message)
+        throw new Error('查询失败: ' + directError.message)
       }
 
       if (directData) {
         setRecord(directData as BorrowRecord)
-        setLoading(false)
         return
       }
 
-      // 方法2: 按 borrow_record_id 查
-      console.log('[return] trying by borrow_record_id...')
+      // 按 borrow_record_id 查找
       const { data: allData, error: allError } = await supabase
         .from('borrow_records')
         .select('*')
         .order('created_at', { ascending: false })
 
-      console.log('[return] all records count:', allData?.length, 'error:', allError)
-
       if (allError) {
-        throw new Error('查询全部失败: ' + allError.message)
+        throw new Error('查询失败: ' + allError.message)
       }
 
       const found = allData?.find((r) => r.id === recordId || r.request_id === recordId)
-      if (found) {
-        setRecord(found as BorrowRecord)
-      } else {
-        setRecord(null)
-      }
+      setRecord(found ? (found as BorrowRecord) : null)
     } catch (error: any) {
-      console.error('[return] error:', error)
       setLoadError(error.message || '加载失败')
-      toast.error('加载借用记录失败: ' + (error.message || '未知错误'))
+      toast.error('加载借用记录失败')
     } finally {
       setLoading(false)
     }
@@ -94,14 +78,20 @@ export function BorrowReturn() {
 
   const handleConfirmReturn = async () => {
     if (!recordId) return
+    if (!photoData) {
+      toast.error('请先拍摄归还照片')
+      return
+    }
     setSubmitting(true)
     try {
-      await borrowService.processReturn(recordId, notes.trim() || undefined)
+      await borrowService.processReturn(recordId, {
+        notes: notes.trim() || undefined,
+        photo: photoData,
+      })
       toast.success('归还确认成功')
       navigate('/borrow/my-requests')
     } catch (error: any) {
       toast.error(error.message || '归还确认失败')
-      console.error(error)
     } finally {
       setSubmitting(false)
     }
@@ -208,6 +198,12 @@ export function BorrowReturn() {
         </CardContent>
       </Card>
 
+      {/* 归还拍照（必填） */}
+      <ReturnPhotoCapture
+        onPhotoCaptured={(data) => setPhotoData(data)}
+        onPhotoCleared={() => setPhotoData(null)}
+      />
+
       {/* 归还备注 */}
       <Card>
         <CardHeader>
@@ -233,7 +229,7 @@ export function BorrowReturn() {
         <Button variant="outline" onClick={() => navigate(-1)}>
           取消
         </Button>
-        <Button onClick={handleConfirmReturn} disabled={submitting}>
+        <Button onClick={handleConfirmReturn} disabled={submitting || !photoData}>
           {submitting && <Spinner className="mr-2 size-4" />}
           确认归还
         </Button>
