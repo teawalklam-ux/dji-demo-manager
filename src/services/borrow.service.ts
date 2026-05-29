@@ -1,5 +1,11 @@
 import { supabase } from '@/lib/supabase'
 import type { BorrowRequest, BorrowRequestInput, RenewInput, BorrowRecord } from '@/types'
+import type { PhotoData } from '@/components/borrow/return-photo-capture'
+
+export interface ProcessReturnData {
+  notes?: string
+  photo: PhotoData
+}
 
 export const borrowService = {
   async createRequest(data: BorrowRequestInput): Promise<string> {
@@ -56,12 +62,43 @@ export const borrowService = {
     return data as BorrowRequest | null
   },
 
-  async processReturn(recordId: string, notes?: string): Promise<void> {
+  async processReturn(recordId: string, data: ProcessReturnData): Promise<void> {
+    // 1. 上传照片到 Storage
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('未登录')
+
+    const filePath = `${user.id}/${recordId}/${Date.now()}.jpg`
+    const { error: uploadError } = await supabase.storage
+      .from('return-photos')
+      .upload(filePath, data.photo.blob, {
+        contentType: 'image/jpeg',
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error('[processReturn] 照片上传失败:', uploadError)
+      throw new Error('照片上传失败: ' + uploadError.message)
+    }
+
+    // 2. 调用 process_return RPC（含照片数据）
     const { error } = await supabase.rpc('process_return', {
       p_borrow_record_id: recordId,
-      p_notes: notes || null,
+      p_notes: data.notes || null,
+      p_photo_storage_path: filePath,
+      p_photo_captured_at: data.photo.capturedAt.toISOString(),
+      p_photo_latitude: data.photo.latitude,
+      p_photo_longitude: data.photo.longitude,
+      p_photo_address: data.photo.address,
     })
-    if (error) throw error
+    if (error) {
+      // 如果 RPC 失败，尝试清理已上传的照片
+      try {
+        await supabase.storage.from('return-photos').remove([filePath])
+      } catch (cleanupErr) {
+        console.error('[processReturn] 清理上传照片失败:', cleanupErr)
+      }
+      throw error
+    }
   },
 
   async createRenewal(parentRequestId: string, data: RenewInput): Promise<string> {
