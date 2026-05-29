@@ -25,23 +25,16 @@ export function BorrowRenew() {
   const [purpose, setPurpose] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
 
-  // DEBUG
-  console.log('[renew] MOUNTED, id:', id, 'requestId:', requestId)
-
   const loadRequest = useCallback(async () => {
-    console.log('[renew] loadRequest called, requestId:', requestId)
     if (!requestId) {
-      console.log('[renew] NO requestId, skipping')
       setLoading(false)
-      setLoadError('URL 参数缺失: ' + JSON.stringify({ id, requestId }))
+      setLoadError('缺少申请记录ID')
       return
     }
     setLoading(true)
     setLoadError(null)
     try {
-      console.log('[renew] requestId from URL:', requestId)
       const data = await borrowService.getRequestById(requestId)
-      console.log('[renew] getRequestById result:', data)
       setRequest(data)
       // 预填新归还日期为原归还日期后14天
       if (data?.expected_return_date) {
@@ -50,9 +43,8 @@ export function BorrowRenew() {
         setExpectedReturnDate(current.toISOString().split('T')[0])
       }
     } catch (error: any) {
-      console.error('[renew] error:', error)
       setLoadError(error.message || '加载失败')
-      toast.error('加载申请信息失败: ' + (error.message || '未知错误'))
+      toast.error('加载申请信息失败')
     } finally {
       setLoading(false)
     }
