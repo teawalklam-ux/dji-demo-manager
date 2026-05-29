@@ -1,5 +1,9 @@
 -- 更新 process_return 函数，增加照片参数
 -- 照片为必填项，函数内同时插入 return_photos 记录
+-- 同时支持 borrow_record_id 和 request_id 传入
+
+DROP FUNCTION IF EXISTS public.process_return(UUID, TEXT);
+DROP FUNCTION IF EXISTS public.process_return(UUID, TEXT, TEXT, TIMESTAMPTZ, DOUBLE PRECISION, DOUBLE PRECISION, TEXT);
 
 CREATE OR REPLACE FUNCTION public.process_return(
   p_borrow_record_id UUID,
@@ -14,14 +18,22 @@ RETURNS VOID AS $$
 DECLARE
   v_item_id UUID;
   v_borrower_id UUID;
+  v_record_id UUID;
 BEGIN
-  -- 获取借用记录信息
-  SELECT item_id, borrower_id INTO v_item_id, v_borrower_id
+  -- 先按 borrow_record_id 查找
+  SELECT id, item_id, borrower_id INTO v_record_id, v_item_id, v_borrower_id
   FROM public.borrow_records
   WHERE id = p_borrow_record_id;
 
-  IF v_item_id IS NULL THEN
-    RAISE EXCEPTION '借用记录不存在';
+  -- 如果没找到，尝试按 request_id 查找
+  IF v_record_id IS NULL THEN
+    SELECT id, item_id, borrower_id INTO v_record_id, v_item_id, v_borrower_id
+    FROM public.borrow_records
+    WHERE request_id = p_borrow_record_id;
+  END IF;
+
+  IF v_record_id IS NULL THEN
+    RAISE EXCEPTION '借用记录不存在 (传入ID: %)', p_borrow_record_id;
   END IF;
 
   -- 验证必须提供照片
@@ -35,14 +47,14 @@ BEGIN
       return_date = CURRENT_DATE,
       notes = COALESCE(p_notes, notes),
       updated_at = now()
-  WHERE id = p_borrow_record_id;
+  WHERE id = v_record_id;
 
   -- 插入照片记录
   INSERT INTO public.return_photos (
     borrow_record_id, uploader_id, storage_path,
     captured_at, latitude, longitude, address
   ) VALUES (
-    p_borrow_record_id, v_borrower_id, p_photo_storage_path,
+    v_record_id, v_borrower_id, p_photo_storage_path,
     COALESCE(p_photo_captured_at, now()),
     p_photo_latitude, p_photo_longitude, p_photo_address
   );
