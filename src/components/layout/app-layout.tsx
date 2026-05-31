@@ -141,7 +141,7 @@ export function AppLayout() {
           <Outlet />
         </main>
         <div className="text-right px-4 py-1 text-[10px] text-muted-foreground/40 select-none">
-          v1.13
+          v1.14
         </div>
       </div>
     </SidebarProvider>
