@@ -5,7 +5,7 @@ import { Spinner } from '@/components/ui/spinner'
 import { drawWatermark } from '@/lib/photo-watermark'
 import { getCurrentLocation, formatCoordinates } from '@/lib/geolocation'
 import type { GeoLocation } from '@/lib/geolocation'
-import { Camera, RotateCcw, Check, MapPin, Clock } from 'lucide-react'
+import { Camera, RotateCcw, MapPin, Clock } from 'lucide-react'
 
 export interface PhotoData {
   blob: Blob
