@@ -34,13 +34,13 @@ function BarcodeLabel({ barcode, itemName, model, categoryName, location }: Barc
   }, [barcode])
 
   return (
-    <div className="barcode-label">
-      <div className="label-header">
-        <span className="label-name">{itemName}{location ? ` (${location})` : ''}</span>
-        <span className="label-category">{categoryName || ''}</span>
+    <div className="barcode-label w-full h-full flex flex-col items-center justify-center">
+      <div className="label-header flex justify-between items-center w-full gap-[2mm]">
+        <span className="label-name text-[6pt] font-bold truncate flex-1">{itemName}{location ? ` (${location})` : ''}</span>
+        <span className="label-category text-[5pt] text-gray-500 whitespace-nowrap">{categoryName || ''}</span>
       </div>
-      <div className="label-model">{model}</div>
-      <svg ref={svgRef} />
+      <div className="label-model text-[5pt] text-gray-400 mb-[0.5mm]">{model}</div>
+      <svg ref={svgRef} className="max-w-full" style={{ maxHeight: '55%' }} />
     </div>
   )
 }
@@ -320,14 +320,9 @@ export function BatchBarcodePrint({ items, selectedIds, onClose }: BatchBarcodeP
                     {page.map(label => (
                       <div
                         key={label.id}
-                        className="border border-gray-200 flex flex-col items-center justify-center p-1"
-                        style={{ width: `${preset.width}mm`, height: `${preset.height}mm` }}
+                        className="border border-gray-200 flex flex-col items-center justify-center overflow-hidden"
+                        style={{ width: `${preset.width}mm`, height: `${preset.height}mm`, padding: '1mm 2mm' }}
                       >
-                        <div className="flex justify-between items-center w-full gap-1">
-                          <span className="text-[6pt] font-bold truncate">{label.itemName}{label.location ? ` (${label.location})` : ''}</span>
-                          <span className="text-[5pt] text-gray-500 whitespace-nowrap">{label.categoryName}</span>
-                        </div>
-                        <div className="text-[5pt] text-gray-400">{label.model}</div>
                         <BarcodeLabel
                           barcode={label.barcode}
                           itemName={label.itemName}
@@ -355,20 +350,14 @@ export function BatchBarcodePrint({ items, selectedIds, onClose }: BatchBarcodeP
         {pages.map((page, pageIdx) => (
           <div key={pageIdx} className="page">
             {page.map(label => (
-              <div key={label.id} className="barcode-label">
-                <div className="label-header">
-                  <span className="label-name">{label.itemName}{label.location ? ` (${label.location})` : ''}</span>
-                  <span className="label-category">{label.categoryName}</span>
-                </div>
-                <div className="label-model">{label.model}</div>
-                <BarcodeLabel
-                  barcode={label.barcode}
-                  itemName={label.itemName}
-                  model={label.model}
-                  categoryName={label.categoryName}
-                  location={label.location}
-                />
-              </div>
+              <BarcodeLabel
+                key={label.id}
+                barcode={label.barcode}
+                itemName={label.itemName}
+                model={label.model}
+                categoryName={label.categoryName}
+                location={label.location}
+              />
             ))}
           </div>
         ))}
