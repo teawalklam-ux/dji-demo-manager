@@ -15,9 +15,10 @@ interface BarcodeLabelProps {
   itemName: string
   model: string
   categoryName?: string
+  location?: string | null
 }
 
-function BarcodeLabel({ barcode, itemName, model, categoryName }: BarcodeLabelProps) {
+function BarcodeLabel({ barcode, itemName, model, categoryName, location }: BarcodeLabelProps) {
   const svgRef = useRef<SVGSVGElement>(null)
 
   useEffect(() => {
@@ -35,7 +36,7 @@ function BarcodeLabel({ barcode, itemName, model, categoryName }: BarcodeLabelPr
   return (
     <div className="barcode-label">
       <div className="label-header">
-        <span className="label-name">{itemName}</span>
+        <span className="label-name">{itemName}{location ? ` (${location})` : ''}</span>
         <span className="label-category">{categoryName || ''}</span>
       </div>
       <div className="label-model">{model}</div>
@@ -92,6 +93,7 @@ export function BatchBarcodePrint({ items, selectedIds, onClose }: BatchBarcodeP
       itemName: item.name,
       model: item.model,
       categoryName: item.category?.name,
+      location: item.location,
     }))
   )
 
@@ -322,7 +324,7 @@ export function BatchBarcodePrint({ items, selectedIds, onClose }: BatchBarcodeP
                         style={{ width: `${preset.width}mm`, height: `${preset.height}mm` }}
                       >
                         <div className="flex justify-between items-center w-full gap-1">
-                          <span className="text-[6pt] font-bold truncate">{label.itemName}</span>
+                          <span className="text-[6pt] font-bold truncate">{label.itemName}{label.location ? ` (${label.location})` : ''}</span>
                           <span className="text-[5pt] text-gray-500 whitespace-nowrap">{label.categoryName}</span>
                         </div>
                         <div className="text-[5pt] text-gray-400">{label.model}</div>
@@ -331,6 +333,7 @@ export function BatchBarcodePrint({ items, selectedIds, onClose }: BatchBarcodeP
                           itemName={label.itemName}
                           model={label.model}
                           categoryName={label.categoryName}
+                          location={label.location}
                         />
                       </div>
                     ))}
@@ -354,7 +357,7 @@ export function BatchBarcodePrint({ items, selectedIds, onClose }: BatchBarcodeP
             {page.map(label => (
               <div key={label.id} className="barcode-label">
                 <div className="label-header">
-                  <span className="label-name">{label.itemName}</span>
+                  <span className="label-name">{label.itemName}{label.location ? ` (${label.location})` : ''}</span>
                   <span className="label-category">{label.categoryName}</span>
                 </div>
                 <div className="label-model">{label.model}</div>
@@ -363,6 +366,7 @@ export function BatchBarcodePrint({ items, selectedIds, onClose }: BatchBarcodeP
                   itemName={label.itemName}
                   model={label.model}
                   categoryName={label.categoryName}
+                  location={label.location}
                 />
               </div>
             ))}
@@ -378,9 +382,10 @@ interface BarcodePrintProps {
   barcode: string
   itemName: string
   model: string
+  location?: string | null
 }
 
-export function BarcodePrint({ barcode, itemName, model }: BarcodePrintProps) {
+export function BarcodePrint({ barcode, itemName, model, location }: BarcodePrintProps) {
   const handlePrint = () => {
     const printWindow = window.open('', '_blank')
     if (!printWindow) return
@@ -408,8 +413,8 @@ export function BarcodePrint({ barcode, itemName, model }: BarcodePrintProps) {
   </style>
 </head>
 <body>
-  <div class="label">
-    <div class="label-name">${itemName}</div>
+    <div class="label">
+    <div class="label-name">${itemName}${location ? ` (${location})` : ''}</div>
     <div class="label-model">${model}</div>
     <svg id="barcode"></svg>
   </div>
