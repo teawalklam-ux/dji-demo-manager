@@ -1,6 +1,6 @@
 # DJI Demo Manager / DJI 样机管理系统
 
-[English](#english) | [中文](#chinese)
+[English](#english) | [中文](#中文)
 
 ---
 
