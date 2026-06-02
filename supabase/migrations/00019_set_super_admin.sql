@@ -1,5 +1,6 @@
 -- ===== 将指定用户设为超级管理员 =====
--- 目标用户: redacted@example.invalid (UID: <SUPER_ADMIN_UID>)
+-- 用法：将下方占位符替换为实际的目标用户邮箱和 UID
+-- 目标用户: <SUPER_ADMIN_EMAIL> (UID: <SUPER_ADMIN_UID>)
 
 -- 1. 先将所有现有的 super_admin 降级为 admin（确保只有一个 super_admin）
 UPDATE public.profiles
@@ -16,8 +17,8 @@ WHERE id = '<SUPER_ADMIN_UID>';
 INSERT INTO public.profiles (id, display_name, email, role, status, created_at, updated_at)
 SELECT
   '<SUPER_ADMIN_UID>',
-  'redacted@example.invalid',
-  'redacted@example.invalid',
+  '<SUPER_ADMIN_EMAIL>',
+  '<SUPER_ADMIN_EMAIL>',
   'super_admin',
   'active',
   now(),
