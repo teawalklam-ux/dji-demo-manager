@@ -1,6 +1,6 @@
 # Equipment Loan Manager / 设备借用管理系统
 
-[English](#english) | [中文](#chinese)
+[English](#english) | [中文](#中文)
 
 ---
 
