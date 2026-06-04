@@ -92,8 +92,8 @@ export function BorrowApply() {
       toast.error('请选择预计归还日期')
       return
     }
-    if (expectedReturnDate <= expectedBorrowDate) {
-      toast.error('归还日期必须晚于借用日期')
+    if (expectedReturnDate < expectedBorrowDate) {
+      toast.error('归还日期不能早于借用日期')
       return
     }
     if (borrowType === 'customer') {

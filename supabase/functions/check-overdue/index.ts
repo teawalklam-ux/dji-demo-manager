@@ -6,7 +6,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// 短借期阈值（天）：借出时间低于此值的不提前触发逾期提醒
+// 短借期阈值（天）：借出时间≤此值的标记为「短借逾期」，>此值的标记为「长借逾期」
 const SHORT_BORROW_THRESHOLD_DAYS = 3
 
 serve(async (req) => {
@@ -29,80 +29,119 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // 1. Find overdue borrow records (expected_return_date < today, still 'borrowed' or 'active')
     const today = new Date().toISOString().split('T')[0]
-    const { data: overdueRecords, error: fetchError } = await supabase
+
+    // ========================================
+    // Part A: 新逾期 — status='active' 且 due_date < today
+    // ========================================
+    const { data: newOverdueRecords, error: fetchNewError } = await supabase
       .from('borrow_records')
       .select(`
         id,
+        item_id,
         borrower_id,
         borrow_date,
-        expected_return_date,
+        due_date,
         items (name, barcode),
-        profiles:borrower_id (display_name)
+        profiles:borrower_id (display_name, email)
       `)
-      .in('status', ['borrowed', 'active'])
-      .lt('expected_return_date', today)
+      .eq('status', 'active')
+      .lt('due_date', today)
 
-    if (fetchError) {
-      throw new Error(`Failed to fetch overdue records: ${fetchError.message}`)
+    if (fetchNewError) {
+      throw new Error(`Failed to fetch new overdue records: ${fetchNewError.message}`)
     }
 
-    if (!overdueRecords || overdueRecords.length === 0) {
+    // Update newly overdue records to 'overdue' status
+    if (newOverdueRecords && newOverdueRecords.length > 0) {
+      const newRecordIds = newOverdueRecords.map((r: any) => r.id)
+      await supabase
+        .from('borrow_records')
+        .update({ status: 'overdue', updated_at: new Date().toISOString() })
+        .in('id', newRecordIds)
+
+      const newItemIds = [...new Set(newOverdueRecords.map((r: any) => r.item_id))]
+      if (newItemIds.length > 0) {
+        await supabase
+          .from('items')
+          .update({ status: 'overdue', updated_at: new Date().toISOString() })
+          .in('id', newItemIds)
+      }
+    }
+
+    // ========================================
+    // Part B: 持续逾期 — status='overdue'（每日催还提醒）
+    // ========================================
+    const { data: existingOverdueRecords, error: fetchExistingError } = await supabase
+      .from('borrow_records')
+      .select(`
+        id,
+        item_id,
+        borrower_id,
+        borrow_date,
+        due_date,
+        items (name, barcode),
+        profiles:borrower_id (display_name, email)
+      `)
+      .eq('status', 'overdue')
+      .lt('due_date', today)
+
+    if (fetchExistingError) {
+      throw new Error(`Failed to fetch existing overdue records: ${fetchExistingError.message}`)
+    }
+
+    // 合并所有逾期记录（新逾期 + 持续逾期）
+    const allOverdueRecords = [
+      ...(newOverdueRecords || []),
+      ...(existingOverdueRecords || []),
+    ]
+
+    // 去重（按 id）
+    const seenIds = new Set<string>()
+    const uniqueRecords = allOverdueRecords.filter((r: any) => {
+      if (seenIds.has(r.id)) return false
+      seenIds.add(r.id)
+      return true
+    })
+
+    if (uniqueRecords.length === 0) {
       return new Response(
         JSON.stringify({ message: 'No overdue records found', count: 0 }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    // 2. Update item status to 'overdue'
-    const recordIds = overdueRecords.map((r: any) => r.id)
-    await supabase
-      .from('borrow_records')
-      .update({ status: 'overdue', updated_at: new Date().toISOString() })
-      .in('id', recordIds)
-
-    // Update items status
-    const { data: borrowItems } = await supabase
-      .from('borrow_records')
-      .select('item_id')
-      .in('id', recordIds)
-
-    if (borrowItems && borrowItems.length > 0) {
-      const itemIds = borrowItems.map((b: any) => b.item_id)
-      await supabase
-        .from('items')
-        .update({ status: 'overdue', updated_at: new Date().toISOString() })
-        .in('id', itemIds)
-    }
-
-    // 3. 区分通知策略：短借期（≤3天）只在正式逾期后通知，长借期立即通知
+    // ========================================
+    // Part C: 发送通知
+    // ========================================
     const notifications: any[] = []
     const wecomItems: string[] = []
 
-    for (const r of overdueRecords) {
+    for (const r of uniqueRecords) {
       const borrowDate = new Date(r.borrow_date)
-      const returnDate = new Date(r.expected_return_date)
-      const borrowDays = Math.ceil((returnDate.getTime() - borrowDate.getTime()) / (1000 * 60 * 60 * 24))
+      const dueDate = new Date(r.due_date)
+      const borrowDays = Math.ceil((dueDate.getTime() - borrowDate.getTime()) / (1000 * 60 * 60 * 24))
+      const overdueDays = Math.ceil((new Date(today).getTime() - dueDate.getTime()) / (1000 * 60 * 60 * 24))
+      const label = borrowDays <= SHORT_BORROW_THRESHOLD_DAYS ? '短借' : '长借'
 
-      // 所有逾期记录都发送通知（正式逾期后才到这里）
-      // 但短借期的不发送企业微信提醒，只发站内通知
+      // 站内通知
       notifications.push({
         borrow_record_id: r.id,
         borrower_id: r.borrower_id,
         notification_type: 'push',
-        message: `您借用的样机「${r.items?.name || '未知'}」已逾期，预期归还日期为 ${r.expected_return_date}，请尽快归还。`,
+        message: overdueDays > 1
+          ? `您借用的样机「${r.items?.name || '未知'}」已逾期 ${overdueDays} 天（应还 ${r.due_date}），请尽快归还。`
+          : `您借用的样机「${r.items?.name || '未知'}」已逾期，预期归还日期为 ${r.due_date}，请尽快归还。`,
         is_read: false,
       })
 
-      // 长借期（>3天）才发送企业微信提醒
-      if (borrowDays > SHORT_BORROW_THRESHOLD_DAYS) {
-        wecomItems.push(
-          `- ${r.profiles?.display_name || '未知用户'}：「${r.items?.name || '未知'}」逾期，应还 ${r.expected_return_date}`
-        )
-      }
+      // 企业微信提醒
+      wecomItems.push(
+        `- ${r.profiles?.display_name || '未知用户'}：「${r.items?.name || '未知'}」逾期 ${overdueDays} 天（${label}），应还 ${r.due_date}`
+      )
     }
 
+    // Insert in-app notifications
     const { error: notifError } = await supabase
       .from('overdue_notifications')
       .insert(notifications)
@@ -111,13 +150,13 @@ serve(async (req) => {
       console.error('Failed to insert notifications:', notifError)
     }
 
-    // 4. Send WeCom webhook notification (only for long-borrow overdue)
+    // Send WeCom webhook notification
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
     if (wecomUrl && wecomItems.length > 0) {
       const overdueList = wecomItems.join('\n')
 
       try {
-        await fetch(wecomUrl, {
+        const wecomResponse = await fetch(wecomUrl, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -128,17 +167,22 @@ serve(async (req) => {
             },
           }),
         })
+        const wecomResult = await wecomResponse.json()
+        console.log('WeCom webhook response:', JSON.stringify(wecomResult))
       } catch (wecomError) {
         console.error('WeCom webhook failed:', wecomError)
       }
+    } else if (!wecomUrl) {
+      console.log('WECOM_WEBHOOK_URL not configured, skipping WeCom notification')
     }
 
     return new Response(
       JSON.stringify({
         message: 'Overdue check completed',
-        overdueCount: overdueRecords.length,
+        totalOverdueCount: uniqueRecords.length,
+        newlyOverdueCount: newOverdueRecords?.length || 0,
+        existingOverdueCount: existingOverdueRecords?.length || 0,
         wecomNotifiedCount: wecomItems.length,
-        shortBorrowSkipped: overdueRecords.length - wecomItems.length,
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
