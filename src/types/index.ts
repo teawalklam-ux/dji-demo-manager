@@ -204,17 +204,24 @@ export interface StockMovement {
   operator?: Profile
 }
 
-// ===== 逾期通知 =====
+// ===== 通知 =====
+export type NotificationCategory = 'overdue' | 'approval'
+
 export interface OverdueNotification {
   id: string
-  borrow_record_id: string
-  borrower_id: string
+  borrow_record_id: string | null
+  borrower_id: string | null
   notification_type: NotificationType
+  notification_category: NotificationCategory
+  recipient_id: string | null
+  borrow_request_id: string | null
   message: string
   sent_at: string
   is_read: boolean
   // Joined
   borrow_record?: BorrowRecord
+  borrow_request?: BorrowRequest
+  recipient?: Profile
 }
 
 // ===== 归还照片 =====
