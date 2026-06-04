@@ -24,7 +24,31 @@ export const borrowService = {
     })
 
     if (error) throw error
+
+    // 异步触发企业微信审批通知（不阻塞前端）
+    this.triggerApprovalNotification(requestId).catch(console.error)
+
     return requestId
+  },
+
+  /** 异步调用 Edge Function 发送企业微信审批通知 */
+  async triggerApprovalNotification(requestId: string): Promise<void> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      await fetch(`${supabaseUrl}/functions/v1/notify-approval`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ request_id: requestId }),
+      })
+    } catch (err) {
+      console.error('Failed to trigger approval notification:', err)
+    }
   },
 
   async cancelRequest(id: string): Promise<void> {
@@ -137,10 +161,10 @@ export const borrowService = {
   },
 
   async getBorrowRecords(filters?: { status?: string; borrower_id?: string }): Promise<BorrowRecord[]> {
-    // 简化查询，避免复杂 join 超时
+    // 关联 borrower 和 item 以支持导出借用人/样机名称/样机型号
     let query = supabase
       .from('borrow_records')
-      .select('*')
+      .select('*, borrower:profiles(*), item:items(*)')
       .order('created_at', { ascending: false })
 
     if (filters?.status) query = query.eq('status', filters.status)
