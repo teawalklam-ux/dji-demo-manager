@@ -1,11 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
-import { Html5Qrcode, type Html5QrcodeResult } from 'html5-qrcode'
+import QrScanner from 'qr-scanner'
 import {
   getBarcodeScanProfile,
   getSelectableScanModes,
   isAcceptedScanResult,
+  isSystemBarcode,
   type BarcodeScanMode,
 } from './barcode-scan-profile'
 import { ScanLine, Camera, QrCode } from 'lucide-react'
@@ -17,9 +18,6 @@ interface BarcodeScannerProps {
   mode?: BarcodeScanMode
 }
 
-// Unique ID counter to avoid duplicate DOM IDs
-let idCounter = 0
-
 export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }: BarcodeScannerProps) {
   const [activeMode, setActiveMode] = useState<BarcodeScanMode>(mode)
   const [error, setError] = useState('')
@@ -27,20 +25,16 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   const [scanning, setScanning] = useState(false)
   const [lastScanResult, setLastScanResult] = useState('')
   const [scanNotice, setScanNotice] = useState('')
-  const scannerRef = useRef<Html5Qrcode | null>(null)
-  const readerIdRef = useRef(`barcode-reader-${++idCounter}`)
+  const scannerRef = useRef<QrScanner | null>(null)
+  const videoRef = useRef<HTMLVideoElement | null>(null)
   const mountedRef = useRef(false)
   const scanProfile = getBarcodeScanProfile(activeMode)
   const selectableModes = getSelectableScanModes()
 
-  const stopScanning = useCallback(async () => {
+  const stopScanning = useCallback(() => {
     if (scannerRef.current) {
       try {
-        const state = scannerRef.current.getState()
-        if (state === 2) { // SCANNING state
-          await scannerRef.current.stop()
-        }
-        scannerRef.current.clear()
+        scannerRef.current.destroy()
       } catch {
         // Ignore cleanup errors
       }
@@ -50,9 +44,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   }, [])
 
   const startScanning = useCallback(async () => {
-    const readerId = readerIdRef.current
-    const readerEl = document.getElementById(readerId)
-    if (!readerEl) {
+    const video = videoRef.current
+    if (!video) {
       setError('扫描器初始化失败，请重试')
       return
     }
@@ -62,27 +55,20 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       setError('')
       setScanNotice('')
 
-      // 只配置系统使用的条码格式，CODE128 优先
-      const scanner = new Html5Qrcode(readerId, {
-        verbose: false,
-        formatsToSupport: [...scanProfile.formatsToSupport],
-      })
-      scannerRef.current = scanner
+      // qr-scanner 会自动检测并使用浏览器 BarcodeDetector API（支持条形码）
+      // 无需手动干预，它会 fallback 到自带的 jsQR worker
 
-      await scanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: scanProfile.fps,
-          qrbox: { ...scanProfile.qrbox },
-          aspectRatio: scanProfile.aspectRatio,
-          disableFlip: true,   // 禁用翻转，提高识别速度
-        },
-        (decodedText, decodedResult: Html5QrcodeResult) => {
-          // 成功识别
-          const text = decodedText.trim()
-          const format = decodedResult.result.format?.format
+      const scanner = new QrScanner(
+        video,
+        (result: QrScanner.ScanResult) => {
+          const text = result.data.trim()
+          if (!text) return
 
-          if (!isAcceptedScanResult(activeMode, text, format)) {
+          // 判断来源：匹配系统条码格式的视为条形码，否则视为二维码
+          const isLikelyBarcode = isSystemBarcode(text)
+          const source = isLikelyBarcode ? 'barcode' : 'qr'
+
+          if (!isAcceptedScanResult(activeMode, text, source)) {
             setScanNotice(scanProfile.mismatchMessage)
             return
           }
@@ -90,13 +76,26 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
           setLastScanResult(text)
           setScanNotice('')
           onScan(text)
-          void stopScanning()
+          stopScanning()
           onOpenChange(false)
         },
-        () => {
-          // 每帧未识别到，忽略
+        {
+          onDecodeError: () => {
+            // 每帧未识别到，忽略
+          },
+          preferredCamera: 'environment',
+          maxScansPerSecond: scanProfile.maxScansPerSecond,
+          highlightScanRegion: true,
+          highlightCodeOutline: true,
+          returnDetailedScanResult: true,
         }
       )
+
+      // 关键：设置反色模式，支持正常+反色二维码
+      scanner.setInversionMode(scanProfile.inversionMode)
+
+      scannerRef.current = scanner
+      await scanner.start()
     } catch (err: unknown) {
       setScanning(false)
       const msg = err instanceof Error ? err.message : String(err)
@@ -128,7 +127,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   // Handle dialog open/close
   useEffect(() => {
     if (!open) {
-      void stopScanning()
+      stopScanning()
       setManualValue('')
       setLastScanResult('')
       setScanNotice('')
@@ -141,7 +140,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     const timer = setTimeout(() => {
       if (mountedRef.current) {
         void (async () => {
-          await stopScanning()
+          stopScanning()
           if (mountedRef.current && !cancelled) {
             await startScanning()
           }
@@ -163,7 +162,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     setLastScanResult('')
     setScanNotice('')
     setError('')
-    void stopScanning()
+    stopScanning()
   }
 
   const handleManualSubmit = () => {
@@ -215,8 +214,13 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
             </div>
           ) : (
             <div className="relative overflow-hidden rounded-md bg-black">
-              {/* html5-qrcode will render video inside this div */}
-              <div id={readerIdRef.current} style={{ width: '100%' }} />
+              <video
+                ref={videoRef}
+                className="w-full"
+                style={{ objectFit: 'cover' }}
+                muted
+                playsInline
+              />
               {!scanning && (
                 <div className="flex flex-col items-center justify-center py-12 text-white/50">
                   <ScanLine className="size-10 mb-2" />
