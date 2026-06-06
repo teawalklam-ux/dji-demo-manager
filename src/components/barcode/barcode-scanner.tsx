@@ -1,12 +1,12 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import QrScanner from 'qr-scanner'
 import {
   getBarcodeScanProfile,
   getSelectableScanModes,
   isAcceptedScanResult,
-  isSystemBarcode,
   type BarcodeScanMode,
 } from './barcode-scan-profile'
 import { ScanLine, Camera, QrCode } from 'lucide-react'
@@ -25,25 +25,111 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   const [scanning, setScanning] = useState(false)
   const [lastScanResult, setLastScanResult] = useState('')
   const [scanNotice, setScanNotice] = useState('')
-  const scannerRef = useRef<QrScanner | null>(null)
+  // html5-qrcode 实例（条形码/mixed 模式）
+  const html5Ref = useRef<Html5Qrcode | null>(null)
+  // qr-scanner 实例（二维码模式）
+  const qrRef = useRef<QrScanner | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const mountedRef = useRef(false)
   const scanProfile = getBarcodeScanProfile(activeMode)
   const selectableModes = getSelectableScanModes()
 
   const stopScanning = useCallback(() => {
-    if (scannerRef.current) {
+    // 清理 html5-qrcode
+    if (html5Ref.current) {
       try {
-        scannerRef.current.destroy()
+        html5Ref.current.stop()
       } catch {
-        // Ignore cleanup errors
+        // Ignore
       }
-      scannerRef.current = null
+      try {
+        html5Ref.current.clear()
+      } catch {
+        // Ignore
+      }
+      html5Ref.current = null
+    }
+    // 清理 qr-scanner
+    if (qrRef.current) {
+      try {
+        qrRef.current.destroy()
+      } catch {
+        // Ignore
+      }
+      qrRef.current = null
     }
     setScanning(false)
   }, [])
 
-  const startScanning = useCallback(async () => {
+  const onScanSuccess = useCallback((text: string, source: 'qr' | 'barcode') => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+
+    if (!isAcceptedScanResult(activeMode, trimmed, source)) {
+      setScanNotice(scanProfile.mismatchMessage)
+      return
+    }
+
+    setLastScanResult(trimmed)
+    setScanNotice('')
+    onScan(trimmed)
+    stopScanning()
+    onOpenChange(false)
+  }, [activeMode, onScan, onOpenChange, scanProfile.mismatchMessage, stopScanning])
+
+  /** 条形码/mixed 模式：使用 html5-qrcode */
+  const startHtml5Scanning = useCallback(async () => {
+    const containerId = 'html5-qr-reader'
+    // 确保容器存在
+    const container = document.getElementById(containerId)
+    if (!container) {
+      setError('扫描器初始化失败，请重试')
+      return
+    }
+
+    try {
+      setScanning(true)
+      setError('')
+      setScanNotice('')
+
+      const scanner = new Html5Qrcode(containerId, {
+        formatsToSupport: scanProfile.html5Formats ?? [Html5QrcodeSupportedFormats.CODE_128],
+        verbose: false,
+      })
+      html5Ref.current = scanner
+
+      await scanner.start(
+        { facingMode: 'environment' },
+        {
+          fps: scanProfile.html5Fps ?? 20,
+          qrbox: scanProfile.html5Qrbox ?? { width: 280, height: 160 },
+        },
+        (decodedText, decodedResult) => {
+          // 判断是条形码还是二维码
+          const format = decodedResult?.result?.format?.format
+          const isBarcode = format === Html5QrcodeSupportedFormats.CODE_128
+          onScanSuccess(decodedText, isBarcode ? 'barcode' : 'qr')
+        },
+        () => {
+          // 每帧未识别，忽略
+        }
+      )
+    } catch (err: unknown) {
+      setScanning(false)
+      const msg = err instanceof Error ? err.message : String(err)
+      if (msg.includes('Permission') || msg.includes('NotAllowedError')) {
+        setError('摄像头权限被拒绝，请在浏览器设置中允许访问摄像头')
+      } else if (msg.includes('NotFound') || msg.includes('Requested device not found')) {
+        setError('未找到摄像头设备，请手动输入')
+      } else {
+        setError('无法启动扫描，请手动输入')
+      }
+      console.error('html5-qrcode error:', err)
+    }
+  }, [scanProfile, onScanSuccess])
+
+  /** 二维码模式：使用 qr-scanner（支持反色） */
+  const startQrScanning = useCallback(async () => {
     const video = videoRef.current
     if (!video) {
       setError('扫描器初始化失败，请重试')
@@ -55,46 +141,25 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       setError('')
       setScanNotice('')
 
-      // qr-scanner 会自动检测并使用浏览器 BarcodeDetector API（支持条形码）
-      // 无需手动干预，它会 fallback 到自带的 jsQR worker
-
       const scanner = new QrScanner(
         video,
         (result: QrScanner.ScanResult) => {
-          const text = result.data.trim()
-          if (!text) return
-
-          // 判断来源：匹配系统条码格式的视为条形码，否则视为二维码
-          const isLikelyBarcode = isSystemBarcode(text)
-          const source = isLikelyBarcode ? 'barcode' : 'qr'
-
-          if (!isAcceptedScanResult(activeMode, text, source)) {
-            setScanNotice(scanProfile.mismatchMessage)
-            return
-          }
-
-          setLastScanResult(text)
-          setScanNotice('')
-          onScan(text)
-          stopScanning()
-          onOpenChange(false)
+          onScanSuccess(result.data, 'qr')
         },
         {
-          onDecodeError: () => {
-            // 每帧未识别到，忽略
-          },
+          onDecodeError: () => {},
           preferredCamera: 'environment',
-          maxScansPerSecond: scanProfile.maxScansPerSecond,
+          maxScansPerSecond: scanProfile.qrMaxScansPerSecond ?? 15,
           highlightScanRegion: true,
           highlightCodeOutline: true,
           returnDetailedScanResult: true,
         }
       )
 
-      // 关键：设置反色模式，支持正常+反色二维码
-      scanner.setInversionMode(scanProfile.inversionMode)
+      // 支持正常+反色二维码
+      scanner.setInversionMode(scanProfile.qrInversionMode ?? 'both')
 
-      scannerRef.current = scanner
+      qrRef.current = scanner
       await scanner.start()
     } catch (err: unknown) {
       setScanning(false)
@@ -106,9 +171,18 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       } else {
         setError('无法启动扫描，请手动输入')
       }
-      console.error('Scanner error:', err)
+      console.error('qr-scanner error:', err)
     }
-  }, [activeMode, onScan, onOpenChange, scanProfile, stopScanning])
+  }, [scanProfile, onScanSuccess])
+
+  const startScanning = useCallback(async () => {
+    stopScanning()
+    if (scanProfile.engine === 'html5-qrcode') {
+      await startHtml5Scanning()
+    } else {
+      await startQrScanning()
+    }
+  }, [scanProfile.engine, startHtml5Scanning, startQrScanning, stopScanning])
 
   useEffect(() => {
     mountedRef.current = true
@@ -124,7 +198,6 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     }
   }, [mode, open])
 
-  // Handle dialog open/close
   useEffect(() => {
     if (!open) {
       stopScanning()
@@ -135,12 +208,10 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       return
     }
 
-    // Wait for dialog DOM to be fully rendered before starting
     let cancelled = false
     const timer = setTimeout(() => {
       if (mountedRef.current) {
         void (async () => {
-          stopScanning()
           if (mountedRef.current && !cancelled) {
             await startScanning()
           }
@@ -156,7 +227,6 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
 
   const handleModeChange = (nextMode: BarcodeScanMode) => {
     if (nextMode === activeMode) return
-
     setActiveMode(nextMode)
     setManualValue('')
     setLastScanResult('')
@@ -172,6 +242,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     }
   }
 
+  const isQrMode = scanProfile.engine === 'qr-scanner'
+
   return (
     <Dialog open={open} onOpenChange={(v) => {
       if (!v) stopScanning()
@@ -186,7 +258,6 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
             {selectableModes.map((scanMode) => {
               const active = scanMode === activeMode
               const Icon = scanMode === 'qrcode' ? QrCode : ScanLine
-
               return (
                 <Button
                   key={scanMode}
@@ -212,7 +283,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
                 重新尝试扫描
               </Button>
             </div>
-          ) : (
+          ) : isQrMode ? (
+            /* qr-scanner 渲染：直接使用 video 元素 */
             <div className="relative overflow-hidden rounded-md bg-black">
               <video
                 ref={videoRef}
@@ -221,6 +293,17 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
                 muted
                 playsInline
               />
+              {!scanning && (
+                <div className="flex flex-col items-center justify-center py-12 text-white/50">
+                  <ScanLine className="size-10 mb-2" />
+                  <p className="text-sm">正在启动摄像头...</p>
+                </div>
+              )}
+            </div>
+          ) : (
+            /* html5-qrcode 渲染：使用容器 div */
+            <div className="relative overflow-hidden rounded-md bg-black">
+              <div id="html5-qr-reader" className="w-full" />
               {!scanning && (
                 <div className="flex flex-col items-center justify-center py-12 text-white/50">
                   <ScanLine className="size-10 mb-2" />
