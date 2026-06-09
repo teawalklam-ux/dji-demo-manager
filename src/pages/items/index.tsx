@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { categoriesService } from '@/services/categories.service'
@@ -15,8 +15,12 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { BatchBarcodePrint } from '@/components/barcode/barcode-print'
 import { BarcodeScanner } from '@/components/barcode/barcode-scanner'
 import { ITEM_STATUS_MAP } from '@/lib/constants'
-import { Plus, Download, ScanLine, Search, Printer } from 'lucide-react'
+import { BatchImport } from '@/components/import/batch-import'
+import { Plus, Download, ScanLine, Search, Printer, Upload, ArrowUpDown } from 'lucide-react'
 import type { Item, Category, ItemStatus } from '@/types'
+
+type SortField = 'barcode' | 'name' | 'model' | 'category' | 'status' | 'location'
+type SortOrder = 'asc' | 'desc'
 
 export function ItemsList() {
   const { isAdmin } = useAuth()
@@ -34,6 +38,13 @@ export function ItemsList() {
   // 批量打印相关状态
   const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
   const [batchPrintOpen, setBatchPrintOpen] = useState(false)
+
+  // 批量导入相关状态
+  const [batchImportOpen, setBatchImportOpen] = useState(false)
+
+  // 排序状态
+  const [sortField, setSortField] = useState<SortField | null>(null)
+  const [sortOrder, setSortOrder] = useState<SortOrder>('asc')
 
   const loadItems = useCallback(async () => {
     try {
@@ -106,9 +117,74 @@ export function ItemsList() {
     }
   }
 
+  // 排序逻辑
+  function handleSort(field: SortField) {
+    if (sortField === field) {
+      // 同一列: asc → desc → 取消
+      if (sortOrder === 'asc') {
+        setSortOrder('desc')
+      } else {
+        setSortField(null)
+        setSortOrder('asc')
+      }
+    } else {
+      setSortField(field)
+      setSortOrder('asc')
+    }
+  }
+
+  const sortedItems = useMemo(() => {
+    if (!sortField) return items
+    const sorted = [...items].sort((a, b) => {
+      let valA: string = ''
+      let valB: string = ''
+      switch (sortField) {
+        case 'barcode':
+          valA = a.barcode || ''
+          valB = b.barcode || ''
+          break
+        case 'name':
+          valA = a.name || ''
+          valB = b.name || ''
+          break
+        case 'model':
+          valA = a.model || ''
+          valB = b.model || ''
+          break
+        case 'category':
+          valA = a.category?.name || ''
+          valB = b.category?.name || ''
+          break
+        case 'status':
+          valA = a.status || ''
+          valB = b.status || ''
+          break
+        case 'location':
+          valA = a.location || ''
+          valB = b.location || ''
+          break
+      }
+      const cmp = valA.localeCompare(valB, 'zh-CN')
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+    return sorted
+  }, [items, sortField, sortOrder])
+
   function openBatchPrint() {
     if (selectedIds.size === 0) return
     setBatchPrintOpen(true)
+  }
+
+  // 可排序表头渲染
+  function sortIndicator(field: SortField) {
+    if (sortField !== field) {
+      return <ArrowUpDown className="ml-1 size-3 text-muted-foreground/40 inline-block" />
+    }
+    return (
+      <span className={`ml-1 inline-block text-xs font-bold ${sortOrder === 'asc' ? 'text-primary' : 'text-orange-500'}`}>
+        {sortOrder === 'asc' ? '↑' : '↓'}
+      </span>
+    )
   }
 
   return (
@@ -124,6 +200,18 @@ export function ItemsList() {
                 <span className="sr-only sm:hidden">新增</span>
               </Button>
             </Link>
+          )}
+          {isAdmin && (
+            <Button
+              variant="outline"
+              size="sm"
+              className="sm:size-default"
+              onClick={() => setBatchImportOpen(true)}
+            >
+              <Upload className="size-4" />
+              <span className="hidden sm:inline ml-1">批量导入</span>
+              <span className="sr-only sm:hidden">导入</span>
+            </Button>
           )}
           <Button
             variant="outline"
@@ -202,7 +290,7 @@ export function ItemsList() {
             <div className="flex items-center justify-center py-8">
               <Spinner className="size-6" />
             </div>
-          ) : items.length === 0 ? (
+          ) : sortedItems.length === 0 ? (
             <p className="text-center text-muted-foreground py-8">暂无样机数据</p>
           ) : (
             <>
@@ -213,21 +301,51 @@ export function ItemsList() {
                     <TableRow>
                       <TableHead className="w-10">
                         <Checkbox
-                          checked={items.length > 0 && selectedIds.size === items.length}
+                          checked={sortedItems.length > 0 && selectedIds.size === sortedItems.length}
                           onCheckedChange={toggleSelectAll}
                         />
                       </TableHead>
-                      <TableHead>条码</TableHead>
-                      <TableHead>名称</TableHead>
-                      <TableHead>型号</TableHead>
-                      <TableHead>分类</TableHead>
-                      <TableHead>状态</TableHead>
-                      <TableHead>存放位置</TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSort('barcode')}
+                      >
+                        条码{sortIndicator('barcode')}
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSort('name')}
+                      >
+                        名称{sortIndicator('name')}
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSort('model')}
+                      >
+                        型号{sortIndicator('model')}
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSort('category')}
+                      >
+                        分类{sortIndicator('category')}
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSort('status')}
+                      >
+                        状态{sortIndicator('status')}
+                      </TableHead>
+                      <TableHead
+                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        onClick={() => handleSort('location')}
+                      >
+                        存放位置{sortIndicator('location')}
+                      </TableHead>
                       <TableHead>操作</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {items.map(item => (
+                    {sortedItems.map(item => (
                       <TableRow key={item.id} className={selectedIds.has(item.id) ? 'bg-accent/50' : ''}>
                         <TableCell>
                           <Checkbox
@@ -258,7 +376,7 @@ export function ItemsList() {
 
               {/* 移动端卡片 */}
               <div className="sm:hidden space-y-3">
-                {items.map(item => (
+                {sortedItems.map(item => (
                   <div
                     key={item.id}
                     className={`border rounded-lg p-3 ${selectedIds.has(item.id) ? 'bg-accent/50 border-primary' : 'bg-card'}`}
@@ -319,6 +437,14 @@ export function ItemsList() {
           onClose={() => setBatchPrintOpen(false)}
         />
       )}
+
+      {/* 批量导入弹窗 */}
+      <BatchImport
+        open={batchImportOpen}
+        onOpenChange={setBatchImportOpen}
+        categories={categories}
+        onSuccess={loadItems}
+      />
     </div>
   )
 }
