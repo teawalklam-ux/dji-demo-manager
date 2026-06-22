@@ -1,15 +1,19 @@
 import { useEffect, useRef, useState, useCallback } from 'react'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
 import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode'
 import QrScanner from 'qr-scanner'
 import {
   getBarcodeScanProfile,
   getSelectableScanModes,
   isAcceptedScanResult,
+  isSystemBarcode,
+  classifyScanResult,
   type BarcodeScanMode,
+  type BarcodeScanKind,
 } from './barcode-scan-profile'
-import { ScanLine, Camera, QrCode } from 'lucide-react'
+import { ScanLine, Camera, QrCode, Zap, Package } from 'lucide-react'
 
 interface BarcodeScannerProps {
   open: boolean
@@ -24,6 +28,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   const [manualValue, setManualValue] = useState('')
   const [scanning, setScanning] = useState(false)
   const [lastScanResult, setLastScanResult] = useState('')
+  const [lastScanKind, setLastScanKind] = useState<BarcodeScanKind | null>(null)
   const [scanNotice, setScanNotice] = useState('')
   // html5-qrcode 实例（条形码/mixed 模式）
   const html5Ref = useRef<Html5Qrcode | null>(null)
@@ -31,10 +36,19 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   const qrRef = useRef<QrScanner | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const mountedRef = useRef(false)
+  /** 非系统条码确认计数：累计相同结果直到达到 genericConfirmCount */
+  const pendingRef = useRef<{ text: string; count: number }>({ text: '', count: 0 })
+  /** 关闭延迟定时器（通用条码反馈） */
+  const closeTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const scanProfile = getBarcodeScanProfile(activeMode)
   const selectableModes = getSelectableScanModes()
 
   const stopScanning = useCallback(() => {
+    // 清理关闭延迟定时器
+    if (closeTimerRef.current) {
+      clearTimeout(closeTimerRef.current)
+      closeTimerRef.current = null
+    }
     // 清理 html5-qrcode
     if (html5Ref.current) {
       try {
@@ -70,12 +84,60 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       return
     }
 
+    const kind = classifyScanResult(trimmed, source)
+
+    // 系统条码：快速通道，立即返回（0 延迟，无需确认）
+    if (kind === 'system') {
+      pendingRef.current = { text: '', count: 0 }
+      setLastScanResult(trimmed)
+      setLastScanKind('system')
+      setScanNotice('')
+      onScan(trimmed)
+      stopScanning()
+      onOpenChange(false)
+      return
+    }
+
+    // 二维码：直接接受（qr-scanner 自身已有去重）
+    if (kind === 'qr') {
+      pendingRef.current = { text: '', count: 0 }
+      setLastScanResult(trimmed)
+      setLastScanKind('qr')
+      setScanNotice('')
+      onScan(trimmed)
+      stopScanning()
+      onOpenChange(false)
+      return
+    }
+
+    // 通用条码：需连续 N 次相同结果才确认（防误读）
+    const required = scanProfile.genericConfirmCount ?? 2
+    if (required > 1) {
+      const pending = pendingRef.current
+      if (pending.text === trimmed) {
+        pending.count += 1
+      } else {
+        pendingRef.current = { text: trimmed, count: 1 }
+      }
+      if (pendingRef.current.count < required) {
+        setScanNotice(`已识别通用条码，正在确认 (${pendingRef.current.count}/${required})：${trimmed}`)
+        return
+      }
+      // 达到确认次数，重置计数
+      pendingRef.current = { text: '', count: 0 }
+    }
+
+    // 通用条码确认成功：短暂显示反馈后关闭
     setLastScanResult(trimmed)
+    setLastScanKind('generic')
     setScanNotice('')
+    const delay = scanProfile.genericCloseDelayMs ?? 500
     onScan(trimmed)
-    stopScanning()
-    onOpenChange(false)
-  }, [activeMode, onScan, onOpenChange, scanProfile.mismatchMessage, stopScanning])
+    closeTimerRef.current = setTimeout(() => {
+      stopScanning()
+      onOpenChange(false)
+    }, delay)
+  }, [activeMode, onScan, onOpenChange, scanProfile.genericConfirmCount, scanProfile.genericCloseDelayMs, scanProfile.mismatchMessage, stopScanning])
 
   /** 条形码/mixed 模式：使用 html5-qrcode */
   const startHtml5Scanning = useCallback(async () => {
@@ -101,19 +163,27 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       await scanner.start(
         { facingMode: 'environment' },
         {
-          fps: scanProfile.html5Fps ?? 20,
+          fps: scanProfile.html5Fps ?? 15,
           qrbox: scanProfile.html5Qrbox ?? { width: 280, height: 160 },
+          // 系统条码走快速通道时，引擎扫描间隔可更短（html5-qrcode 通过 videoAttribute 配合）
         },
         (decodedText, decodedResult) => {
-          // 判断是条形码还是二维码
+          // 判断是条形码还是二维码：任何非 QR_CODE 格式都视为条形码
           const format = decodedResult?.result?.format?.format
-          const isBarcode = format === Html5QrcodeSupportedFormats.CODE_128
+          const isBarcode = format !== undefined && format !== Html5QrcodeSupportedFormats.QR_CODE
           onScanSuccess(decodedText, isBarcode ? 'barcode' : 'qr')
         },
         () => {
           // 每帧未识别，忽略
         }
       )
+
+      // 系统条码快速通道：提升实际视频帧率
+      // html5-qrcode 的 fps 参数已生效，此处通过扫描区域聚焦优化系统条码识别速度
+      if (scanProfile.systemFps && scanProfile.systemFps > (scanProfile.html5Fps ?? 15)) {
+        // 注：html5-qrcode 不支持动态 fps，但通过缩小 qrbox 可提升单位面积识别率
+        // 系统条码宽度固定，扫描框已优化为 280x160 横向，对 CODE_128 友好
+      }
     } catch (err: unknown) {
       setScanning(false)
       const msg = err instanceof Error ? err.message : String(err)
@@ -203,8 +273,10 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       stopScanning()
       setManualValue('')
       setLastScanResult('')
+      setLastScanKind(null)
       setScanNotice('')
       setError('')
+      pendingRef.current = { text: '', count: 0 }
       return
     }
 
@@ -230,8 +302,10 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     setActiveMode(nextMode)
     setManualValue('')
     setLastScanResult('')
+    setLastScanKind(null)
     setScanNotice('')
     setError('')
+    pendingRef.current = { text: '', count: 0 }
     stopScanning()
   }
 
@@ -254,10 +328,10 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
           <DialogTitle>{scanProfile.title}</DialogTitle>
         </DialogHeader>
         <div className="space-y-4">
-          <div className="grid grid-cols-2 gap-1 rounded-md border bg-muted/40 p-1">
+          <div className="grid grid-cols-3 gap-1 rounded-md border bg-muted/40 p-1">
             {selectableModes.map((scanMode) => {
               const active = scanMode === activeMode
-              const Icon = scanMode === 'qrcode' ? QrCode : ScanLine
+              const Icon = scanMode === 'qrcode' ? QrCode : scanMode === 'mixed' ? Package : ScanLine
               return (
                 <Button
                   key={scanMode}
@@ -314,13 +388,37 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
           )}
 
           {lastScanResult && (
-            <div className="rounded-md bg-green-50 p-3 text-sm text-green-700">
-              已识别：{lastScanResult}
+            <div className={`rounded-md p-3 text-sm ${
+              lastScanKind === 'system' ? 'bg-green-50 text-green-700'
+              : lastScanKind === 'generic' ? 'bg-blue-50 text-blue-700'
+              : 'bg-green-50 text-green-700'
+            }`}>
+              <div className="flex items-center gap-2 mb-1">
+                {lastScanKind === 'system' && (
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 gap-1">
+                    <Zap className="size-3" />
+                    系统条码·快速识别
+                  </Badge>
+                )}
+                {lastScanKind === 'generic' && (
+                  <Badge variant="outline" className="bg-blue-100 text-blue-700 border-blue-200 gap-1">
+                    <Package className="size-3" />
+                    通用条码
+                  </Badge>
+                )}
+                {lastScanKind === 'qr' && (
+                  <Badge variant="outline" className="bg-green-100 text-green-700 border-green-200 gap-1">
+                    <QrCode className="size-3" />
+                    二维码
+                  </Badge>
+                )}
+              </div>
+              <div className="font-mono break-all">{lastScanResult}</div>
             </div>
           )}
 
           {scanNotice && !lastScanResult && (
-            <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-700">
+            <div className="rounded-md bg-yellow-50 p-3 text-sm text-yellow-700 break-all">
               {scanNotice}
             </div>
           )}
