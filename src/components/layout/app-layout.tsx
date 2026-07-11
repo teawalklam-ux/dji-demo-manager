@@ -21,6 +21,7 @@ import {
   AlertCircle,
 } from 'lucide-react'
 import { ROLE_MAP } from '@/lib/constants'
+import { APP_VERSION } from '@/lib/version'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useState, useRef, useEffect } from 'react'
 import type { OverdueNotification } from '@/types'
@@ -265,7 +266,7 @@ export function AppLayout() {
           <Outlet />
         </main>
         <div className="text-right px-4 py-1 text-[10px] text-muted-foreground/40 select-none">
-          v1.14
+          v{APP_VERSION}
         </div>
       </div>
     </SidebarProvider>
