@@ -1,0 +1,96 @@
+# 版本更新记录 (Changelog)
+
+本文件记录 DJI 样机管理系统的所有版本更新。格式参考 [Keep a Changelog](https://keepachangelog.com/)，
+版本号遵循 [语义化版本](https://semver.org/lang/zh-CN/)。
+
+> **约定**：页面右下角显示的版本号由 `src/lib/version.ts` 中的 `APP_VERSION` 单一驱动，
+> 每次发版必须让它与本文档顶部版本号保持一致（由 `pre-commit` 钩子强制校验）。
+
+---
+
+## [1.15] - 2026-07-11
+
+本轮集中补齐了用户管理、审批链与扫码体验，并修复了若干导出 / 注册 / 权限问题。
+
+### 新增 (Features)
+- **审批链最大借用天数限制**：审批链配置支持设置单次借用的最大天数，超限申请将被拦截。（`94eefcaf`）
+- **分类管理与审批链配置对 admin 开放**：admin 角色现在可直接管理分类与审批链，无需 super_admin。（`16b615d6`）
+- **注册邮箱预检**：注册前校验邮箱是否已存在，避免重复注册覆盖已有账号。（`cbca76a7`）
+- **条码扫描通用识别 + 系统条码快速通道**：扫描器支持通用条码（EAN/UPC/Code39/ITF/CODABAR 等）识别，
+  系统条码（DJI-YYYYMMDD-XXXX）走快速通道即时返回，通用条码需连续两次确认防误读。（`e2a024ba`）
+- **样机管理表头排序**：条码 / 名称 / 型号 / 分类 / 状态 / 存放位置支持正序 / 倒序排序。（`2439a8f4`）
+- **二维码反色支持**：用 `qr-scanner` 替换 `html5-qrcode`，支持反色二维码识别（`setInversionMode('both')`）。（`31efeeb8`）
+- **条码标签打印增加存放位置**：打印条码标签时在名称后附带样机存放位置。（`0743bab0`）
+
+### 修复 (Fixes)
+- **审批列表重复显示 / 取消申请 RLS / array_lower 错误**：修复审批列表重复条目、取消申请后审批记录未自动关闭，
+  以及 `create_borrow_request` 中 `array_lower(v_approver_ids)` 缺维度参数导致的运行时报错。（`8e8d61c7`）
+- **邀请用户支持已注册用户的角色更新**：邀请已存在用户时改为更新其角色而非报错。（`94a80db0`）
+- **profiles 表 RLS 策略修复**：修复 super_admin 无法查看用户列表的问题。（`de8e0c45`）
+- **注册邮箱验证 404 与邀请用户失败**：注册验证邮件跳转地址修正（`emailRedirectTo`），
+  邀请改用 Edge Function（`invite-user` + service role）避免登录态冲突。（`9b87888c`）
+- **启用原生 BarcodeDetector + 错误态卡片过长修复**：优先使用浏览器原生 `BarcodeDetector`，并修正扫码错误态卡片样式。（`377cf5e2`）
+- **混合扫码器修复**：条形码走 `html5-qrcode`、二维码走 `qr-scanner` 的混合模式修复。（`1f3bd848`）
+- **借用记录导出字段缺失**：修复导出缺少借用人 / 样机名称 / 样机型号的问题。（`4755d48b`）
+- **条码标签重复文本渲染**：移除条码标签中重复的文本渲染，并补充预览 Tailwind 样式。（`f8bcdbf7`）
+
+### 文档 (Docs)
+- **README 中英文化**：补全中英双语文档，移除 SQL 迁移中的敏感信息，强化 `.gitignore`。（`d416481c`）
+- **修正 README 中文锚点链接**。（`c04c164f`）
+
+---
+
+## [1.14] - 2026-05-31
+
+### 修复 (Fixes)
+- 归还照片改为可选：无照片也允许归还（`process_return` 照片参数可选）。（`f31230dd`）
+- 新增迁移 `00024`：更新 `process_return` 支持照片参数。（`415699e8`）
+- 移除未使用的 `Check` 导入导致构建失败的问题。（`1b086a34`）
+- `process_return` 同时支持 `borrow_record_id` 与 `request_id` 查找。（`e0220f4d`）
+- 归还流程传入 `borrow_record.id` 而非 `request_id`。（`fda2bb14`）
+
+---
+
+## [1.13] - 2026-05-29
+
+### 修复 (Fixes)
+- `process_return` 同时支持 `borrow_record_id` 与 `request_id` 查找路径对齐。（`e0220f4d`）
+- 归还流程统一传入 `borrow_record.id`。（`fda2bb14`）
+
+---
+
+## [1.12] - 2026-05-27
+
+### 新增 (Features)
+- **归还拍照 + 水印**：后置摄像头现拍，Canvas 将时间戳与 GPS 烧入图片；照片 30 天自动清理，元数据保留 1 年。（`1597a719`）
+
+### 修复 (Fixes)
+- 续借 / 归还页面路由参数名统一为 `:id`（修复 `requestId` / `recordId` 不匹配）。（`5b340c78`、`2668afcb`）
+- GitHub Pages 子路由刷新 404：新增 SPA 重定向（`2b41d3b2`）与内容哈希强制刷新（`58d6a4e3`）。
+- `borrow_records` 查询简化避免 join 超时；super_admin RLS 修复与归还页加载简化。（`fd6a87ed`、`8475fb25`）
+- `process_approval` 对 admin / super_admin 自动通过全部步骤，新增「部分通过」Tab。（`2621eacb`）
+- `approval_records.approver_id` 改为可空；`create_borrow_request` 找不到指定审批人时回退到 admin / super_admin。（`e8d846c7`）
+- `create_borrow_request` 字段名修正（`status` → `is_active`）。（`06463f0a`）
+
+---
+
+## [1.0] - 2026-05-21
+
+初始正式版本，包含完整前端与部署能力（v1.0 – v1.11 的开发成果汇总）。
+
+### 新增 (Features)
+- **样机管理**：样机增删改查、分类管理、条码生成与打印。
+- **借用流程**：申请、审批队列、审批链、归还、续借、仪表盘快捷操作。
+- **用户与权限**：四级角色（super_admin > admin > approver > user）、注册 + 管理员审批、用户管理、super_admin 保护与会转移。
+- **扫码能力**：摄像头识别条形码 / 二维码，多种扫描模式（barcode / mixed / qrcode）切换。
+- **通知**：站内通知 + 企业微信 Webhook + Realtime 订阅；逾期与审批通知。
+- **导出 / 导入**：SheetJS 导出借用记录；Excel / CSV 模板批量导入样机。
+- **部署**：GitHub Pages 自动部署（GitHub Actions），移动端响应式适配。
+
+---
+
+[1.15]: #115---2026-07-11
+[1.14]: #114---2026-05-31
+[1.13]: #113---2026-05-29
+[1.12]: #112---2026-05-27
+[1.0]: #10---2026-05-21
