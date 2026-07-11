@@ -35,14 +35,14 @@ const mainNavItems = [
 ]
 
 const adminNavItems = [
-  { title: '用户管理', href: '/admin/users', icon: Users },
-  { title: '分类管理', href: '/admin/categories', icon: Tags },
-  { title: '审批链配置', href: '/admin/approval-chains', icon: GitBranch },
-  { title: '系统设置', href: '/admin/settings', icon: Settings },
+  { title: '用户管理', href: '/admin/users', icon: Users, superAdminOnly: true },
+  { title: '分类管理', href: '/admin/categories', icon: Tags, superAdminOnly: false },
+  { title: '审批链配置', href: '/admin/approval-chains', icon: GitBranch, superAdminOnly: false },
+  { title: '系统设置', href: '/admin/settings', icon: Settings, superAdminOnly: true },
 ]
 
 function AppSidebar() {
-  const { profile, signOut, isSuperAdmin, hasRole } = useAuth()
+  const { profile, signOut, isSuperAdmin, isAdmin, hasRole } = useAuth()
   const location = useLocation()
 
   const filteredMainNav = mainNavItems.filter(
@@ -82,11 +82,13 @@ function AppSidebar() {
           </SidebarMenu>
         </div>
 
-        {isSuperAdmin && (
+        {isAdmin && (
           <div className="px-3 py-2">
             <p className="mb-1 px-2 text-xs font-semibold text-muted-foreground">管理后台</p>
             <SidebarMenu>
-              {adminNavItems.map((item) => (
+              {adminNavItems
+                .filter(item => !item.superAdminOnly || isSuperAdmin)
+                .map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton asChild isActive={location.pathname.startsWith(item.href)}>
                     <Link to={item.href}>

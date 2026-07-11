@@ -70,12 +70,12 @@ function App() {
               </AuthGuard>
             } />
             <Route path="admin/categories" element={
-              <AuthGuard requireRole={['super_admin']}>
+              <AuthGuard requireRole={['super_admin', 'admin']}>
                 <CategoriesPage />
               </AuthGuard>
             } />
             <Route path="admin/approval-chains" element={
-              <AuthGuard requireRole={['super_admin']}>
+              <AuthGuard requireRole={['super_admin', 'admin']}>
                 <ApprovalChainsPage />
               </AuthGuard>
             } />
