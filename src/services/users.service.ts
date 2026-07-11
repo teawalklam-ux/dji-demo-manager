@@ -77,17 +77,27 @@ export const usersService = {
   },
 
   async inviteUser(email: string, displayName: string, role: UserRole, password: string): Promise<void> {
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          display_name: displayName,
-          role,
-          invite_by_admin: 'true',
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      throw new Error('未登录，无法邀请用户')
+    }
+
+    const response = await fetch(
+      `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/invite-user`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
-      },
-    })
-    if (error) throw error
+        body: JSON.stringify({ email, displayName, role, password }),
+      }
+    )
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.error || '创建用户失败')
+    }
   },
 }

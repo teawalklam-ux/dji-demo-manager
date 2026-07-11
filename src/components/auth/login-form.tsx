@@ -24,9 +24,13 @@ export function LoginForm() {
 
     const { error } = await signIn(email, password)
     if (error) {
-      setError(error.message === 'Invalid login credentials'
-        ? '邮箱或密码错误'
-        : error.message)
+      setError(
+        error.message === 'Invalid login credentials'
+          ? '邮箱或密码错误'
+          : error.message === 'Email not confirmed'
+          ? '邮箱未验证，请查收注册邮件中的验证链接'
+          : error.message
+      )
     } else {
       navigate('/')
     }
@@ -84,7 +88,8 @@ export function LoginForm() {
           {registerSuccess ? (
             <div className="space-y-4 text-center">
               <div className="rounded-md bg-green-50 p-4 text-sm text-green-800">
-                注册成功！请等待管理员审批后即可登录使用。
+                注册成功！我们已向您的邮箱发送了验证邮件。<br />
+                请点击邮件中的链接完成邮箱验证，然后等待管理员审批后即可登录。
               </div>
               <Button variant="outline" className="w-full" onClick={() => {
                 setMode('login')
