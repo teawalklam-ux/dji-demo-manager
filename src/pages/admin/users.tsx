@@ -155,25 +155,25 @@ export function UsersPage() {
   }
 
   async function handleInvite() {
-    if (!inviteForm.email || !inviteForm.display_name || !inviteForm.password) {
-      toast.error('请填写所有必填项')
+    if (!inviteForm.email || !inviteForm.display_name) {
+      toast.error('请填写邮箱和姓名')
       return
     }
-    if (inviteForm.password.length < 6) {
+    if (inviteForm.password && inviteForm.password.length < 6) {
       toast.error('密码至少6位')
       return
     }
     try {
       setInviteLoading(true)
-      await usersService.inviteUser(inviteForm.email, inviteForm.display_name, inviteForm.role, inviteForm.password)
-      toast.success('用户已创建')
+      const result = await usersService.inviteUser(inviteForm.email, inviteForm.display_name, inviteForm.role, inviteForm.password)
+      toast.success(result.message)
       setDialogOpen(false)
       setInviteForm({ email: '', display_name: '', role: 'user', password: '' })
       fetchUsers()
     } catch (err: any) {
-      const msg = err?.message || '创建用户失败'
+      const msg = err?.message || '操作失败'
       if (msg.includes('已注册') || msg.includes('already')) {
-        toast.error('该邮箱已注册')
+        toast.error('该邮箱已注册，请在用户列表中查找并编辑')
       } else if (msg.includes('rate limit') || msg.includes('429')) {
         toast.error('操作过于频繁，请稍后再试')
       } else {
@@ -304,10 +304,10 @@ export function UsersPage() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <label className="text-sm font-medium">初始密码 *</label>
+                <label className="text-sm font-medium">初始密码（已注册用户留空则不修改）</label>
                 <Input
                   type="password"
-                  placeholder="至少6位密码"
+                  placeholder="新用户必填，至少6位"
                   value={inviteForm.password}
                   onChange={e => setInviteForm(prev => ({ ...prev, password: e.target.value }))}
                 />
