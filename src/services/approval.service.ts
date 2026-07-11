@@ -78,7 +78,7 @@ export const approvalService = {
     return data || []
   },
 
-  async createChain(data: { name: string; borrow_type: string; steps: ApprovalChain['steps'] }): Promise<ApprovalChain> {
+  async createChain(data: { name: string; borrow_type: string; steps: ApprovalChain['steps']; max_borrow_days?: number | null }): Promise<ApprovalChain> {
     const { data: chain, error } = await supabase
       .from('approval_chains')
       .insert(data)
@@ -88,7 +88,7 @@ export const approvalService = {
     return chain
   },
 
-  async updateChain(id: string, data: Partial<{ name: string; borrow_type: string; steps: ApprovalChain['steps']; is_active: boolean }>): Promise<ApprovalChain> {
+  async updateChain(id: string, data: Partial<{ name: string; borrow_type: string; steps: ApprovalChain['steps']; max_borrow_days: number | null; is_active: boolean }>): Promise<ApprovalChain> {
     const { data: chain, error } = await supabase
       .from('approval_chains')
       .update(data)

@@ -147,6 +147,7 @@ export interface ApprovalChain {
   name: string
   borrow_type: BorrowType | 'all'
   steps: ApprovalStep[]
+  max_borrow_days: number | null
   is_active: boolean
   created_at: string
   updated_at: string
