@@ -87,6 +87,29 @@ export const approvalService = {
       p_comment: comment || null,
     })
     if (error) throw error
+
+    // 审批后触发企业微信通知（通知下一步审批人 / 通知申请人审批结果）
+    this.triggerApprovalNotification(requestId).catch(console.error)
+  },
+
+  /** 异步调用 Edge Function 发送企业微信审批通知 */
+  async triggerApprovalNotification(requestId: string): Promise<void> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) return
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      await fetch(`${supabaseUrl}/functions/v1/notify-approval`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ request_id: requestId }),
+      })
+    } catch (err) {
+      console.error('Failed to trigger approval notification:', err)
+    }
   },
 
   async getChains(): Promise<ApprovalChain[]> {
