@@ -208,6 +208,7 @@ export function ApprovalDetail() {
                   const isPending = record.action === null
                   const isApproved = record.action === 'approved'
                   const isRejected = record.action === 'rejected'
+                  const isCancelled = record.action === 'cancelled'
 
                   let statusBadge = null
                   if (isPending) {
@@ -221,6 +222,10 @@ export function ApprovalDetail() {
                   } else if (isRejected) {
                     statusBadge = (
                       <Badge className="bg-red-100 text-red-800">已拒绝</Badge>
+                    )
+                  } else if (isCancelled) {
+                    statusBadge = (
+                      <Badge className="bg-gray-100 text-gray-600">已取消</Badge>
                     )
                   }
 
@@ -237,6 +242,8 @@ export function ApprovalDetail() {
                             ? 'bg-yellow-100 text-yellow-800'
                             : isApproved
                             ? 'bg-green-100 text-green-800'
+                            : isCancelled
+                            ? 'bg-gray-100 text-gray-600'
                             : 'bg-red-100 text-red-800'
                         }`}
                       >

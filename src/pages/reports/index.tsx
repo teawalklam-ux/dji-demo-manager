@@ -284,9 +284,10 @@ export function ReportsPage() {
                         <span className={`inline-block px-2 py-0.5 rounded text-xs ${
                           record.action === 'approved' ? 'bg-green-100 text-green-800' :
                           record.action === 'rejected' ? 'bg-red-100 text-red-800' :
+                          record.action === 'cancelled' ? 'bg-gray-100 text-gray-600' :
                           'bg-yellow-100 text-yellow-800'
                         }`}>
-                          {record.action === 'approved' ? '同意' : record.action === 'rejected' ? '拒绝' : '待审批'}
+                          {record.action === 'approved' ? '同意' : record.action === 'rejected' ? '拒绝' : record.action === 'cancelled' ? '已取消' : '待审批'}
                         </span>
                       </TableCell>
                       <TableCell>{record.acted_at || '-'}</TableCell>

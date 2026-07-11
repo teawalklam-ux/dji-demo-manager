@@ -1,5 +1,7 @@
--- 修改 create_borrow_request：在创建审批记录后，向所有有审批权限的人发送站内通知
--- 同时调用 Edge Function 发送企业微信通知
+-- 修复 create_borrow_request 函数中 array_lower/array_upper 缺少维度参数的 bug
+-- 错误: function array_lower(uuid[]) does not exist
+-- 原因: PostgreSQL 中 array_lower(anyarray, int) 需要第二个参数指定维度(1=第一维)
+-- PL/pgSQL 是解释型语言, 函数创建时不检查函数体, 运行到该行才报错, 导致整个事务回滚(申请创建失败)
 
 CREATE OR REPLACE FUNCTION public.create_borrow_request(
   p_requester_id UUID,
@@ -98,7 +100,7 @@ BEGIN
     );
   END LOOP;
 
-  -- ===== 新增：审批通知逻辑 =====
+  -- ===== 审批通知逻辑 =====
 
   -- 获取申请人名称
   SELECT display_name INTO v_requester_name
@@ -127,7 +129,7 @@ BEGIN
   );
 
   -- 1) 向审批链中确定的审批人发送站内通知
-  -- 注意: array_lower/array_upper 需要第二个参数(维度), 空数组返回 NULL 时 FOR 循环不执行
+  -- 修复: array_lower/array_upper 需要第二个参数(维度=1); 空数组返回 NULL 时 FOR 循环不执行
   FOR i IN array_lower(v_approver_ids, 1) .. array_upper(v_approver_ids, 1) LOOP
     INSERT INTO public.overdue_notifications (
       borrow_record_id, borrower_id, notification_type,

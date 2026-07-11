@@ -28,7 +28,17 @@ export const approvalService = {
 
     const { data, error } = await query
     if (error) throw error
-    return data || []
+
+    // 按 request_id 去重：多步审批链会为同一申请创建多条记录，
+    // 审批列表中每个申请只显示当前待审批的第一步（step_level 最小的未处理记录）
+    const seen = new Map<string, ApprovalRecord>()
+    for (const record of (data || [])) {
+      const existing = seen.get(record.request_id)
+      if (!existing || record.step_level < existing.step_level) {
+        seen.set(record.request_id, record)
+      }
+    }
+    return Array.from(seen.values())
   },
 
   async getProcessedApprovals(): Promise<ApprovalRecord[]> {
@@ -57,7 +67,17 @@ export const approvalService = {
 
     const { data, error } = await query
     if (error) throw error
-    return data || []
+
+    // 按 request_id 去重：多步审批链会为同一申请创建多条记录，
+    // 已审批列表中每个申请只显示最后一步（step_level 最大的），反映最终审批结果
+    const seen = new Map<string, ApprovalRecord>()
+    for (const record of (data || [])) {
+      const existing = seen.get(record.request_id)
+      if (!existing || record.step_level > existing.step_level) {
+        seen.set(record.request_id, record)
+      }
+    }
+    return Array.from(seen.values())
   },
 
   async processApproval(requestId: string, action: 'approved' | 'rejected', comment?: string): Promise<void> {

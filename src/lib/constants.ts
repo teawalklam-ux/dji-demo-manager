@@ -32,7 +32,7 @@ export type MovementType = 'borrow_out' | 'return_in' | 'new_entry' | 'maintenan
 export type NotificationType = 'email' | 'push' | 'sms' | 'wecom'
 
 // 审批动作
-export type ApprovalAction = 'approved' | 'rejected'
+export type ApprovalAction = 'approved' | 'rejected' | 'cancelled'
 
 // 审批步骤类型
 export type ApprovalStepType = 'role' | 'person'

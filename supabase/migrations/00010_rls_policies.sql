@@ -65,9 +65,13 @@ CREATE POLICY "用户可创建申请"
   ON public.borrow_requests FOR INSERT
   WITH CHECK (requester_id = (select auth.uid()));
 
-CREATE POLICY "申请人可取消自己的申请"
+CREATE POLICY "申请人可更新自己的申请"
   ON public.borrow_requests FOR UPDATE
-  USING (requester_id = (select auth.uid()) AND status = 'pending');
+  USING (requester_id = (select auth.uid()))
+  WITH CHECK (
+    requester_id = (select auth.uid())
+    AND status IN ('pending', 'cancelled', 'renewal_requested')
+  );
 
 -- ===== approval_chains =====
 ALTER TABLE public.approval_chains ENABLE ROW LEVEL SECURITY;

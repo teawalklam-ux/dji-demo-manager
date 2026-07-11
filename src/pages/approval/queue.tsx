@@ -267,11 +267,15 @@ export function ApprovalQueue() {
               if (!request) return null
               const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
               const actionLabel =
-                record.action === 'approved' ? '通过' : '拒绝'
+                record.action === 'approved' ? '通过'
+                : record.action === 'rejected' ? '拒绝'
+                : '已取消'
               const actionColor =
                 record.action === 'approved'
                   ? 'bg-green-100 text-green-800'
-                  : 'bg-red-100 text-red-800'
+                  : record.action === 'rejected'
+                  ? 'bg-red-100 text-red-800'
+                  : 'bg-gray-100 text-gray-600'
               return (
                 <Card key={record.id}>
                   <CardHeader className="pb-3">
