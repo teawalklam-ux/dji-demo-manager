@@ -52,9 +52,9 @@ serve(async (req) => {
       )
     }
 
-    if (!['super_admin', 'admin'].includes(profile.role) || profile.status !== 'active') {
+    if (profile.role !== 'super_admin' || profile.status !== 'active') {
       return new Response(
-        JSON.stringify({ error: '仅管理员可邀请或管理用户' }),
+        JSON.stringify({ error: '仅超级管理员可邀请或管理用户' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
