@@ -38,7 +38,7 @@ serve(async (req) => {
       )
     }
 
-    // 验证调用者是 super_admin
+    // 验证调用者是 super_admin 或 admin
     const { data: profile, error: profileError } = await userClient
       .from('profiles')
       .select('role, status')
@@ -52,9 +52,9 @@ serve(async (req) => {
       )
     }
 
-    if (profile.role !== 'super_admin' || profile.status !== 'active') {
+    if (!['super_admin', 'admin'].includes(profile.role) || profile.status !== 'active') {
       return new Response(
-        JSON.stringify({ error: '仅超级管理员可邀请用户' }),
+        JSON.stringify({ error: '仅管理员可邀请或管理用户' }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -62,14 +62,14 @@ serve(async (req) => {
     // 解析请求体
     const { email, displayName, role, password } = await req.json()
 
-    if (!email || !displayName || !password) {
+    if (!email || !displayName) {
       return new Response(
-        JSON.stringify({ error: '邮箱、姓名和密码为必填项' }),
+        JSON.stringify({ error: '邮箱和姓名为必填项' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
-    if (password.length < 6) {
+    if (password && password.length < 6) {
       return new Response(
         JSON.stringify({ error: '密码至少6位' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -93,14 +93,131 @@ serve(async (req) => {
       )
     }
 
-    const emailExists = existingUsers.users.some((u: any) =>
+    const existingUser = existingUsers.users.find((u: any) =>
       u.email.toLowerCase() === email.toLowerCase()
     )
 
-    if (emailExists) {
+    if (existingUser) {
+      // ===== 邮箱已存在 → 更新模式 =====
+
+      // 检查 profile 是否存在
+      const { data: existingProfile, error: profileFetchError } = await adminClient
+        .from('profiles')
+        .select('id, display_name, role, status')
+        .eq('id', existingUser.id)
+        .single()
+
+      if (profileFetchError || !existingProfile) {
+        // auth.users 有但 profiles 没有 → 补建 profile
+        const { error: insertError } = await adminClient
+          .from('profiles')
+          .insert({
+            id: existingUser.id,
+            display_name: displayName,
+            email: email,
+            role: userRole,
+            status: 'pending_approval',
+            is_active: true,
+          })
+
+        if (insertError) {
+          console.error('insert profile error:', insertError)
+          return new Response(
+            JSON.stringify({ error: '补建用户资料失败: ' + insertError.message }),
+            { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+          )
+        }
+
+        // 可选：更新 auth.user_metadata
+        await adminClient.auth.admin.updateUserById(existingUser.id, {
+          user_metadata: {
+            ...existingUser.user_metadata,
+            display_name: displayName,
+            role: userRole,
+            invite_by_admin: 'true',
+          },
+        })
+
+        return new Response(
+          JSON.stringify({
+            action: 'profile_created',
+            message: '用户资料已补充完成，请在待审批中通过',
+            userId: existingUser.id,
+            email: existingUser.email,
+          }),
+          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // profile 已存在 → 更新角色和显示名
+      const updateData: Record<string, any> = {
+        display_name: displayName,
+        role: userRole,
+        updated_at: new Date().toISOString(),
+      }
+
+      // 如果当前是 pending_approval 且调用者是 super_admin，可以直接激活
+      if (existingProfile.status === 'pending_approval' && profile.role === 'super_admin') {
+        updateData.status = 'active'
+      }
+
+      const { error: updateError } = await adminClient
+        .from('profiles')
+        .update(updateData)
+        .eq('id', existingUser.id)
+
+      if (updateError) {
+        console.error('update profile error:', updateError)
+        return new Response(
+          JSON.stringify({ error: '更新用户失败: ' + updateError.message }),
+          { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
+      }
+
+      // 如果提供了新密码，更新 auth 用户密码
+      if (password) {
+        const { error: pwdError } = await adminClient.auth.admin.updateUserById(existingUser.id, {
+          password: password,
+        })
+        if (pwdError) {
+          console.error('update password warning:', pwdError)
+          // 密码更新失败不阻断主流程
+        }
+      }
+
+      // 更新 auth metadata
+      await adminClient.auth.admin.updateUserById(existingUser.id, {
+        user_metadata: {
+          ...existingUser.user_metadata,
+          display_name: displayName,
+          role: userRole,
+        },
+      })
+
+      const wasPending = existingProfile.status === 'pending_approval'
+      const isNowActive = updateData.status === 'active'
+
       return new Response(
-        JSON.stringify({ error: '该邮箱已注册' }),
-        { status: 409, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        JSON.stringify({
+          action: wasPending ? 'approved' : 'updated',
+          message: isNowActive
+            ? '用户已更新并自动审批通过'
+            : wasPending
+              ? '用户信息已更新（待审批状态不变，请手动通过）'
+              : '用户信息已更新',
+          userId: existingUser.id,
+          email: existingUser.email,
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    // ===== 邮箱不存在 → 创建新模式 =====
+
+    if (!password) {
+      return new Response(
+        JSON.stringify({ error: '新用户必须设置初始密码' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
 
@@ -108,7 +225,7 @@ serve(async (req) => {
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
-      email_confirm: true, // 直接标记邮箱已验证，无需用户验证
+      email_confirm: true,
       user_metadata: {
         display_name: displayName,
         role: userRole,
@@ -126,6 +243,7 @@ serve(async (req) => {
 
     return new Response(
       JSON.stringify({
+        action: 'created',
         message: '用户创建成功',
         userId: newUser.user.id,
         email: newUser.user.email,
