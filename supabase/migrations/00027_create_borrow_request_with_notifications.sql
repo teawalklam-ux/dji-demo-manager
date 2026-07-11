@@ -127,7 +127,8 @@ BEGIN
   );
 
   -- 1) 向审批链中确定的审批人发送站内通知
-  FOR i IN array_lower(v_approver_ids) .. array_upper(v_approver_ids) LOOP
+  -- 注意: array_lower/array_upper 需要第二个参数(维度), 空数组返回 NULL 时 FOR 循环不执行
+  FOR i IN array_lower(v_approver_ids, 1) .. array_upper(v_approver_ids, 1) LOOP
     INSERT INTO public.overdue_notifications (
       borrow_record_id, borrower_id, notification_type,
       notification_category, recipient_id, borrow_request_id,
