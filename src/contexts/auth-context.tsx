@@ -106,6 +106,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           data: {
             display_name: displayName,
           },
+          emailRedirectTo: `${window.location.origin}/dji-demo-manager/login`,
         },
       })
       return { error: error ? new Error(error.message) : null }
