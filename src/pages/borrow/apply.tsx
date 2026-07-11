@@ -75,6 +75,14 @@ export function BorrowApply() {
     (c) => c.borrow_type === borrowType || c.borrow_type === 'all'
   )
 
+  const maxBorrowDays = currentChain?.max_borrow_days ?? null
+
+  const borrowDays = expectedBorrowDate && expectedReturnDate
+    ? Math.ceil((new Date(expectedReturnDate).getTime() - new Date(expectedBorrowDate).getTime()) / (1000 * 60 * 60 * 24)) + 1
+    : 0
+
+  const exceedsMaxDays = maxBorrowDays !== null && borrowDays > maxBorrowDays
+
   const handleSubmit = async () => {
     if (!selectedItemId) {
       toast.error('请选择样机')
@@ -94,6 +102,10 @@ export function BorrowApply() {
     }
     if (expectedReturnDate < expectedBorrowDate) {
       toast.error('归还日期不能早于借用日期')
+      return
+    }
+    if (exceedsMaxDays) {
+      toast.error(`${BORROW_TYPE_MAP[borrowType].label}最多可申请 ${maxBorrowDays} 天，当前为 ${borrowDays} 天`)
       return
     }
     if (borrowType === 'customer') {
@@ -280,6 +292,17 @@ export function BorrowApply() {
               />
             </div>
           </div>
+          {maxBorrowDays !== null && (
+            <div className={`rounded-md p-3 text-sm ${exceedsMaxDays ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
+              {BORROW_TYPE_MAP[borrowType].label}最多可申请 <strong>{maxBorrowDays}</strong> 天
+              {borrowDays > 0 && (
+                <span className="ml-2">
+                  当前: <strong>{borrowDays}</strong> 天
+                  {exceedsMaxDays && ' (已超出)'}
+                </span>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
 

@@ -31,6 +31,7 @@ export function ApprovalChainsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [chainName, setChainName] = useState('')
   const [borrowType, setBorrowType] = useState<string>('all')
+  const [maxBorrowDays, setMaxBorrowDays] = useState<string>('')
   const [steps, setSteps] = useState<StepForm[]>([{ ...emptyStep }])
   const [submitting, setSubmitting] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
@@ -60,6 +61,7 @@ export function ApprovalChainsPage() {
     setEditingId(null)
     setChainName('')
     setBorrowType('all')
+    setMaxBorrowDays('')
     setSteps([{ ...emptyStep }])
     setDialogOpen(true)
   }
@@ -68,6 +70,7 @@ export function ApprovalChainsPage() {
     setEditingId(chain.id)
     setChainName(chain.name)
     setBorrowType(chain.borrow_type)
+    setMaxBorrowDays(chain.max_borrow_days ? String(chain.max_borrow_days) : '')
     setSteps(
       chain.steps.map(s => ({
         type: s.type,
@@ -112,6 +115,8 @@ export function ApprovalChainsPage() {
       label: s.label,
     }))
 
+    const maxDays = maxBorrowDays ? parseInt(maxBorrowDays, 10) : null
+
     try {
       setSubmitting(true)
       if (editingId) {
@@ -119,6 +124,7 @@ export function ApprovalChainsPage() {
           name: chainName,
           borrow_type: borrowType,
           steps: chainSteps,
+          max_borrow_days: maxDays,
         })
         toast.success('审批链已更新')
       } else {
@@ -126,6 +132,7 @@ export function ApprovalChainsPage() {
           name: chainName,
           borrow_type: borrowType,
           steps: chainSteps,
+          max_borrow_days: maxDays,
         })
         toast.success('审批链已创建')
       }
@@ -195,6 +202,7 @@ export function ApprovalChainsPage() {
               <TableRow>
                 <TableHead>名称</TableHead>
                 <TableHead>借用类型</TableHead>
+                <TableHead>最大天数</TableHead>
                 <TableHead>审批步骤</TableHead>
                 <TableHead>状态</TableHead>
                 <TableHead>操作</TableHead>
@@ -203,7 +211,7 @@ export function ApprovalChainsPage() {
             <TableBody>
               {chains.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                  <TableCell colSpan={6} className="text-center text-muted-foreground py-8">
                     暂无审批链
                   </TableCell>
                 </TableRow>
@@ -217,6 +225,9 @@ export function ApprovalChainsPage() {
                           ? '全部'
                           : BORROW_TYPE_MAP[chain.borrow_type as keyof typeof BORROW_TYPE_MAP]?.label || chain.borrow_type}
                       </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {chain.max_borrow_days ? `${chain.max_borrow_days} 天` : '不限'}
                     </TableCell>
                     <TableCell className="max-w-xs truncate">{getStepsPreview(chain)}</TableCell>
                     <TableCell>
@@ -282,6 +293,18 @@ export function ApprovalChainsPage() {
                   ))}
                 </SelectContent>
               </Select>
+            </div>
+
+            <div className="space-y-2">
+              <label className="text-sm font-medium">最大借用天数（留空不限制）</label>
+              <Input
+                type="number"
+                min="1"
+                placeholder="例如：3"
+                value={maxBorrowDays}
+                onChange={e => setMaxBorrowDays(e.target.value)}
+              />
+              <p className="text-xs text-muted-foreground">设置后，用户申请该类型借用时归还日期不能超过此天数</p>
             </div>
 
             <div className="space-y-3">
