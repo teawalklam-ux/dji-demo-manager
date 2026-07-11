@@ -72,20 +72,24 @@ serve(async (req) => {
       )
     }
 
-    // 查询已发送过企业微信的审批申请ID，用于去重
+    // 查询已发送过企业微信的记录，用于去重
+    // 去重维度：borrow_request_id + recipient_id（同一申请在不同审批步骤给不同审批人推送，每人只收1次）
     const pendingRequestIds = [...new Set(pendingNotifications.map((n: any) => n.borrow_request_id))]
     const { data: wecomSentRecords } = await supabase
       .from('overdue_notifications')
-      .select('borrow_request_id')
+      .select('borrow_request_id, recipient_id')
       .eq('notification_category', 'approval')
       .eq('notification_type', 'wecom')
       .in('borrow_request_id', pendingRequestIds)
 
-    const wecomSentRequestIds = new Set((wecomSentRecords || []).map((r: any) => r.borrow_request_id))
+    // 构建 "request_id:recipient_id" 去重集合
+    const wecomSentKeys = new Set(
+      (wecomSentRecords || []).map((r: any) => `${r.borrow_request_id}:${r.recipient_id}`)
+    )
 
-    // 过滤掉已发送企业微信的申请
+    // 过滤掉已发送企业微信的申请+收件人组合
     const unsentNotifications = pendingNotifications.filter(
-      (n: any) => !wecomSentRequestIds.has(n.borrow_request_id)
+      (n: any) => !wecomSentKeys.has(`${n.borrow_request_id}:${n.recipient_id}`)
     )
 
     if (unsentNotifications.length === 0) {
@@ -95,48 +99,60 @@ serve(async (req) => {
       )
     }
 
-    // 按借用申请分组，避免重复发送
-    const requestMap = new Map<string, any>()
-    for (const n of unsentNotifications) {
-      if (!requestMap.has(n.borrow_request_id)) {
-        requestMap.set(n.borrow_request_id, {
-          request: n.borrow_requests,
-          recipients: [],
-          notificationIds: [],
-        })
-      }
-      const entry = requestMap.get(n.borrow_request_id)
-      entry.recipients.push(n.recipient)
-      entry.notificationIds.push(n.id)
-    }
-
+    // 每条通知单独处理：区分"待审批提醒"（发给审批人）和"审批通过/拒绝通知"（发给申请人）
+    // recipient_id == requester_id → 审批结果通知（申请人收）
+    // recipient_id != requester_id → 待审批提醒（审批人收，待审批人只显示自己）
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
     let wecomSentCount = 0
 
     if (wecomUrl) {
-      for (const [requestId, data] of requestMap) {
-        const req = data.request
+      for (const n of unsentNotifications) {
+        const req = n.borrow_requests
+        const recipient = n.recipient
+        const requestId = n.borrow_request_id
+
+        if (!req || !recipient) continue
+
         const borrowTypeLabel = req.borrow_type === 'customer' ? '客户试用' :
           req.borrow_type === 'marketing' ? '营销演示' : req.borrow_type
 
-        // 收集审批人名称
-        const approverNames = data.recipients
-          .map((r: any) => r.display_name || r.email || '未知')
-          .join('、')
+        const recipientName = recipient.display_name || recipient.email || '未知'
+        const requesterName = req.requester?.display_name || '未知'
+        const isApprover = n.recipient_id !== req.requester_id
 
-        const content = [
-          `【新审批申请】`,
-          `申请单号：${req.request_number}`,
-          `申请人：${req.requester?.display_name || '未知'}`,
-          `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
-          `条码：${req.items?.barcode || '-'}`,
-          `借用类型：${borrowTypeLabel}`,
-          `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
-          `用途：${req.purpose || '-'}`,
-          `待审批人：${approverNames}`,
-          ``,
-          `请及时处理审批，谢谢！`,
-        ].join('\n')
+        let content: string
+        if (isApprover) {
+          // 待审批提醒：发给审批人，"待审批人"只显示该审批人自己
+          content = [
+            `【新审批申请】`,
+            `申请单号：${req.request_number}`,
+            `申请人：${requesterName}`,
+            `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
+            `条码：${req.items?.barcode || '-'}`,
+            `借用类型：${borrowTypeLabel}`,
+            `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
+            `用途：${req.purpose || '-'}`,
+            `待审批人：${recipientName}`,
+            ``,
+            `请及时处理审批，谢谢！`,
+          ].join('\n')
+        } else {
+          // 审批结果通知：发给申请人
+          // 根据消息内容判断是"通过"还是"拒绝"
+          const isRejected = (n.message || '').includes('审批拒绝')
+          const title = isRejected ? '【审批拒绝】' : '【审批通过】'
+          content = [
+            title,
+            `申请单号：${req.request_number}`,
+            `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
+            `条码：${req.items?.barcode || '-'}`,
+            `借用类型：${borrowTypeLabel}`,
+            `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
+            isRejected
+              ? `您的申请已被拒绝，请查看详情`
+              : `您的申请已全部审批通过，请前往领取样机`,
+          ].join('\n')
+        }
 
         try {
           const wecomResponse = await fetch(wecomUrl, {
@@ -151,7 +167,7 @@ serve(async (req) => {
             }),
           })
           const result = await wecomResponse.json()
-          console.log(`WeCom notification sent for request ${requestId}:`, JSON.stringify(result))
+          console.log(`WeCom notification sent for request ${requestId} to ${recipientName}:`, JSON.stringify(result))
 
           if (wecomResponse.ok) {
             wecomSentCount++
@@ -167,18 +183,16 @@ serve(async (req) => {
     // 标记这些通知为已发送企业微信
     // 插入 wecom 类型的通知记录，既作为标记也作为记录
     const wecomNotifications: any[] = []
-    for (const [reqId, data] of requestMap) {
-      for (const recipient of data.recipients) {
-        wecomNotifications.push({
-          borrower_id: data.request?.requester_id || null,
-          notification_type: 'wecom',
-          notification_category: 'approval',
-          recipient_id: recipient.id,
-          borrow_request_id: reqId,
-          message: `企业微信已通知：${data.request?.request_number || reqId}`,
-          is_read: true, // wecom 通知不需要在站内标记未读
-        })
-      }
+    for (const n of unsentNotifications) {
+      wecomNotifications.push({
+        borrower_id: n.borrow_requests?.requester_id || null,
+        notification_type: 'wecom',
+        notification_category: 'approval',
+        recipient_id: n.recipient_id,
+        borrow_request_id: n.borrow_request_id,
+        message: `企业微信已通知：${n.borrow_requests?.request_number || n.borrow_request_id}`,
+        is_read: true,
+      })
     }
 
     if (wecomNotifications.length > 0) {
@@ -194,7 +208,7 @@ serve(async (req) => {
       JSON.stringify({
         message: 'Approval notifications processed',
         totalPendingCount: unsentNotifications.length,
-        uniqueRequestCount: requestMap.size,
+        uniqueRequestCount: new Set(unsentNotifications.map((n: any) => n.borrow_request_id)).size,
         wecomSentCount,
         skippedAlreadySent: pendingNotifications.length - unsentNotifications.length,
       }),
