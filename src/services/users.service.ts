@@ -76,7 +76,7 @@ export const usersService = {
     if (error) throw error
   },
 
-  async inviteUser(email: string, displayName: string, role: UserRole, password: string): Promise<void> {
+  async inviteUser(email: string, displayName: string, role: UserRole, password: string): Promise<{ action: string; message: string }> {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) {
       throw new Error('未登录，无法邀请用户')
@@ -97,7 +97,9 @@ export const usersService = {
     const result = await response.json()
 
     if (!response.ok) {
-      throw new Error(result.error || '创建用户失败')
+      throw new Error(result.error || '操作失败')
     }
+
+    return { action: result.action || 'created', message: result.message || '成功' }
   },
 }
