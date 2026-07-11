@@ -170,8 +170,15 @@ export function UsersPage() {
       setDialogOpen(false)
       setInviteForm({ email: '', display_name: '', role: 'user', password: '' })
       fetchUsers()
-    } catch (err) {
-      toast.error('创建用户失败')
+    } catch (err: any) {
+      const msg = err?.message || '创建用户失败'
+      if (msg.includes('已注册') || msg.includes('already')) {
+        toast.error('该邮箱已注册')
+      } else if (msg.includes('rate limit') || msg.includes('429')) {
+        toast.error('操作过于频繁，请稍后再试')
+      } else {
+        toast.error(msg)
+      }
       console.error(err)
     } finally {
       setInviteLoading(false)

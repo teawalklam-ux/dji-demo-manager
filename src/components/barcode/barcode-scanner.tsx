@@ -8,7 +8,6 @@ import {
   getBarcodeScanProfile,
   getSelectableScanModes,
   isAcceptedScanResult,
-  isSystemBarcode,
   classifyScanResult,
   type BarcodeScanMode,
   type BarcodeScanKind,
@@ -174,10 +173,6 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
             const h = Math.min(viewfinderHeight * 0.6, 180)
             return { width: Math.floor(w), height: Math.floor(h) }
           },
-          experimentalFeatures: {
-            // 启用原生 BarcodeDetector（与构造参数双保险，确保生效）
-            useBarCodeDetectorIfSupported: true,
-          } as never,
         },
         (decodedText, decodedResult) => {
           // 判断是条形码还是二维码：任何非 QR_CODE 格式都视为条形码
