@@ -2,7 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { approvalService } from '@/services/approval.service'
 import { useAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
-import type { ApprovalRecord } from '@/types'
+import type { ApprovalRecord, ApprovalProgress } from '@/types'
 import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -30,6 +30,9 @@ export function ApprovalQueue() {
   const [rejectReason, setRejectReason] = useState('')
   const [revokeDialogOpen, setRevokeDialogOpen] = useState<string | null>(null)
   const [revokeReason, setRevokeReason] = useState('')
+  const [detailDialogOpen, setDetailDialogOpen] = useState<string | null>(null)
+  const [approvalProgress, setApprovalProgress] = useState<ApprovalProgress | null>(null)
+  const [progressLoading, setProgressLoading] = useState(false)
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -100,6 +103,20 @@ export function ApprovalQueue() {
       toast.error(error.message || '撤销操作失败')
     } finally {
       setProcessingId(null)
+    }
+  }
+
+  const openApprovalDetail = async (recordId: string, requestId: string) => {
+    setDetailDialogOpen(recordId)
+    setApprovalProgress(null)
+    setProgressLoading(true)
+    try {
+      setApprovalProgress(await approvalService.getCurrentApprovalProgress(requestId))
+    } catch (error: any) {
+      setDetailDialogOpen(null)
+      toast.error(error.message || '无权查看该审批流程详情')
+    } finally {
+      setProgressLoading(false)
     }
   }
 
@@ -198,6 +215,66 @@ export function ApprovalQueue() {
                       </div>
                     )}
                     <div className="flex items-center gap-2 pt-2">
+                      <Dialog
+                        open={detailDialogOpen === record.id}
+                        onOpenChange={(open) => {
+                          if (!open) {
+                            setDetailDialogOpen(null)
+                            setApprovalProgress(null)
+                          }
+                        }}
+                      >
+                        <DialogTrigger asChild>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => openApprovalDetail(record.id, request.id)}
+                          >
+                            查看详情
+                          </Button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>审批流程详情</DialogTitle>
+                          </DialogHeader>
+                          {progressLoading ? (
+                            <div className="flex justify-center py-8">
+                              <Spinner className="size-5" />
+                            </div>
+                          ) : approvalProgress ? (
+                            <div className="space-y-4 text-sm">
+                              <div className="rounded-md border bg-muted/30 p-3">
+                                <p className="text-muted-foreground">目前审批环节</p>
+                                <p className="mt-1 font-medium">
+                                  {approvalProgress.current_step.step_label || `第 ${approvalProgress.current_step.step_level} 步审批`}
+                                </p>
+                                <p className="mt-2 text-muted-foreground">
+                                  当前审批人：<span className="text-foreground">{approvalProgress.current_step.approver_name || '-'}</span>
+                                </p>
+                              </div>
+                              <div className="rounded-md border p-3">
+                                <p className="text-muted-foreground">上一级审批意见</p>
+                                {approvalProgress.previous_step ? (
+                                  <div className="mt-2 space-y-1">
+                                    <p>
+                                      {approvalProgress.previous_step.approver_name}（{approvalProgress.previous_step.action === 'approved' ? '已同意' : '已拒绝'}）
+                                    </p>
+                                    <p>{approvalProgress.previous_step.comment || '未填写审批意见'}</p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {formatDateTime(approvalProgress.previous_step.acted_at)}
+                                    </p>
+                                  </div>
+                                ) : (
+                                  <p className="mt-2">这是第一步审批，暂无上一级意见。</p>
+                                )}
+                              </div>
+                              <p className="text-xs text-muted-foreground">
+                                上一级审批意见仅向当前有审批权限的用户展示。
+                              </p>
+                            </div>
+                          ) : null}
+                        </DialogContent>
+                      </Dialog>
                       <Button
                         size="sm"
                         className="bg-green-600 hover:bg-green-700"

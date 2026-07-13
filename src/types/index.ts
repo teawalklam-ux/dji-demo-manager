@@ -183,6 +183,22 @@ export interface ApprovalRecord {
   request?: BorrowRequest
 }
 
+export interface ApprovalProgress {
+  current_step: {
+    step_level: number
+    approver_id: string
+    approver_name: string
+    step_label: string | null
+  }
+  previous_step: {
+    step_level: number
+    approver_name: string
+    action: ApprovalAction
+    comment: string | null
+    acted_at: string | null
+  } | null
+}
+
 // ===== 借用记录 =====
 export interface BorrowRecord {
   id: string
