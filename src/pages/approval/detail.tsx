@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams } from 'react-router-dom'
 import { borrowService } from '@/services/borrow.service'
 import { approvalService } from '@/services/approval.service'
+import { useAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
 import type { BorrowRequest } from '@/types'
 import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
@@ -22,12 +23,15 @@ import {
 
 export function ApprovalDetail() {
   const { requestId } = useParams<{ requestId: string }>()
+  const { isSuperAdmin } = useAuth()
 
   const [loading, setLoading] = useState(true)
   const [processing, setProcessing] = useState(false)
   const [request, setRequest] = useState<BorrowRequest | null>(null)
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false)
   const [rejectReason, setRejectReason] = useState('')
+  const [revokeDialogOpen, setRevokeDialogOpen] = useState(false)
+  const [revokeReason, setRevokeReason] = useState('')
 
   const loadRequest = useCallback(async () => {
     if (!requestId) return
@@ -76,6 +80,26 @@ export function ApprovalDetail() {
       loadRequest()
     } catch (error: any) {
       toast.error(error.message || '审批操作失败')
+    } finally {
+      setProcessing(false)
+    }
+  }
+
+  const handleRevoke = async () => {
+    if (!requestId) return
+    if (!revokeReason.trim()) {
+      toast.error('请填写撤销原因')
+      return
+    }
+    setProcessing(true)
+    try {
+      await approvalService.revokeApproval(requestId, revokeReason.trim())
+      toast.success('审批已撤销')
+      setRevokeDialogOpen(false)
+      setRevokeReason('')
+      loadRequest()
+    } catch (error: any) {
+      toast.error(error.message || '撤销操作失败')
     } finally {
       setProcessing(false)
     }
@@ -184,8 +208,10 @@ export function ApprovalDetail() {
             </div>
           )}
           {request.rejection_reason && (
-            <div className="text-sm text-red-600">
-              <span className="text-muted-foreground">拒绝原因: </span>
+            <div className={`text-sm ${request.status === 'revoked' ? 'text-orange-700' : 'text-red-600'}`}>
+              <span className="text-muted-foreground">
+                {request.status === 'revoked' ? '撤销原因: ' : '拒绝原因: '}
+              </span>
               {request.rejection_reason}
             </div>
           )}
@@ -209,6 +235,7 @@ export function ApprovalDetail() {
                   const isApproved = record.action === 'approved'
                   const isRejected = record.action === 'rejected'
                   const isCancelled = record.action === 'cancelled'
+                  const isRevoked = record.action === 'revoked'
 
                   let statusBadge = null
                   if (isPending) {
@@ -222,6 +249,10 @@ export function ApprovalDetail() {
                   } else if (isRejected) {
                     statusBadge = (
                       <Badge className="bg-red-100 text-red-800">已拒绝</Badge>
+                    )
+                  } else if (isRevoked) {
+                    statusBadge = (
+                      <Badge className="bg-orange-100 text-orange-800">已撤销</Badge>
                     )
                   } else if (isCancelled) {
                     statusBadge = (
@@ -242,6 +273,8 @@ export function ApprovalDetail() {
                             ? 'bg-yellow-100 text-yellow-800'
                             : isApproved
                             ? 'bg-green-100 text-green-800'
+                            : isRevoked
+                            ? 'bg-orange-100 text-orange-800'
                             : isCancelled
                             ? 'bg-gray-100 text-gray-600'
                             : 'bg-red-100 text-red-800'
@@ -337,6 +370,74 @@ export function ApprovalDetail() {
                 </DialogContent>
               </Dialog>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* 撤销审批操作 (仅超级管理员，且状态为借用中/逾期/已归还) */}
+      {isSuperAdmin && ['borrowed', 'overdue', 'returned'].includes(request.status) && (
+        <Card className="border-orange-300">
+          <CardHeader>
+            <CardTitle className="text-orange-700">撤销审批</CardTitle>
+            <CardDescription>
+              超级管理员可撤销已通过的审批
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4 rounded-md bg-orange-50 p-3 text-sm text-orange-800">
+              撤销后：
+              {request.status === 'returned'
+                ? '该申请将标记为已撤销，样机已归还不受影响，借用记录保留。'
+                : '借用记录将被删除，样机状态恢复为在库。'}
+              此操作不可逆，且会通知申请人。
+            </div>
+            <Dialog open={revokeDialogOpen} onOpenChange={setRevokeDialogOpen}>
+              <DialogTrigger asChild>
+                <Button
+                  variant="outline"
+                  className="border-orange-400 text-orange-700 hover:bg-orange-50"
+                  disabled={processing}
+                >
+                  撤销审批
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>撤销审批</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label htmlFor="revokeReason">撤销原因 *</Label>
+                    <Textarea
+                      id="revokeReason"
+                      placeholder="请输入撤销原因"
+                      value={revokeReason}
+                      onChange={(e) => setRevokeReason(e.target.value)}
+                      rows={3}
+                    />
+                  </div>
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setRevokeDialogOpen(false)
+                        setRevokeReason('')
+                      }}
+                    >
+                      取消
+                    </Button>
+                    <Button
+                      variant="destructive"
+                      onClick={handleRevoke}
+                      disabled={processing}
+                    >
+                      {processing && <Spinner className="mr-1 size-3" />}
+                      确认撤销
+                    </Button>
+                  </div>
+                </div>
+              </DialogContent>
+            </Dialog>
           </CardContent>
         </Card>
       )}
