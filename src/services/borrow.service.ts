@@ -14,7 +14,7 @@ export const borrowService = {
 
     const { data: requestId, error } = await supabase.rpc('create_borrow_request', {
       p_requester_id: user.id,
-      p_item_id: data.item_id,
+      p_item_ids: data.item_ids,
       p_borrow_type: data.borrow_type,
       p_purpose: data.purpose,
       p_customer_name: data.customer_name || null,
@@ -66,7 +66,7 @@ export const borrowService = {
 
     const { data, error } = await supabase
       .from('borrow_requests')
-      .select('*, item:items(*, category:categories(*)), requester:profiles(*)')
+      .select('*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))')
       .eq('requester_id', user.id)
       .order('created_at', { ascending: false })
     if (error) throw error
@@ -76,7 +76,7 @@ export const borrowService = {
   async getRequestById(id: string): Promise<BorrowRequest | null> {
     const { data, error } = await supabase
       .from('borrow_requests')
-      .select('*')
+      .select('*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*))), approval_records(*, approver:profiles(*), chain:approval_chains(*))')
       .eq('id', id)
       .single()
     if (error) {
@@ -129,7 +129,7 @@ export const borrowService = {
     // 获取原申请信息
     const { data: originalRequest } = await supabase
       .from('borrow_requests')
-      .select('*')
+      .select('*, request_items:borrow_request_items(item_id)')
       .eq('id', parentRequestId)
       .single()
 
@@ -140,31 +140,36 @@ export const borrowService = {
 
     const { data: requestId, error } = await supabase.rpc('create_borrow_request', {
       p_requester_id: user.id,
-      p_item_id: originalRequest.item_id,
+      p_item_ids: (originalRequest.request_items || []).map((line: { item_id: string }) => line.item_id),
       p_borrow_type: originalRequest.borrow_type,
       p_purpose: data.purpose || `续借申请 (原申请: ${originalRequest.request_number})`,
       p_customer_name: originalRequest.customer_name,
       p_customer_contact: originalRequest.customer_contact,
       p_expected_borrow_date: new Date().toISOString().split('T')[0],
       p_expected_return_date: data.expected_return_date,
+      p_parent_request_id: parentRequestId,
     })
 
     if (error) throw error
 
-    // 关联续借
-    await supabase
-      .from('borrow_requests')
-      .update({ parent_request_id: parentRequestId, status: 'renewal_requested' })
-      .eq('id', requestId)
-
     return requestId
+  },
+
+  async checkAvailability(itemIds: string[], expectedBorrowDate: string, expectedReturnDate: string) {
+    const { data, error } = await supabase.rpc('check_borrow_availability', {
+      p_item_ids: itemIds,
+      p_expected_borrow_date: expectedBorrowDate,
+      p_expected_return_date: expectedReturnDate,
+    })
+    if (error) throw error
+    return data as Array<{ item_id: string; item_name: string; occupied_start_date: string; occupied_end_date: string; occupied_status: string }>
   },
 
   async getBorrowRecords(filters?: { status?: string; borrower_id?: string }): Promise<BorrowRecord[]> {
     // 关联 borrower 和 item 以支持导出借用人/样机名称/样机型号
     let query = supabase
       .from('borrow_records')
-      .select('*, borrower:profiles(*), item:items(*)')
+      .select('*, borrower:profiles(*), item:items(*), request_item:borrow_request_items(*)')
       .order('created_at', { ascending: false })
 
     if (filters?.status) query = query.eq('status', filters.status)

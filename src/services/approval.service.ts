@@ -18,7 +18,7 @@ export const approvalService = {
     // super_admin/admin 能看到所有未审批记录，其他角色只能看到自己的
     let query = supabase
       .from('approval_records')
-      .select('*, approver:profiles(*), request:borrow_requests(*, item:items(*, category:categories(*)), requester:profiles(*)), chain:approval_chains(*)')
+      .select('*, approver:profiles(*), request:borrow_requests(*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))), chain:approval_chains(*)')
       .is('acted_at', null)
       .order('created_at', { ascending: false })
 
@@ -57,7 +57,7 @@ export const approvalService = {
     // super_admin/admin 能看到所有已审批记录，其他角色只能看到自己的
     let query = supabase
       .from('approval_records')
-      .select('*, approver:profiles(*), request:borrow_requests(*, item:items(*, category:categories(*)), requester:profiles(*)), chain:approval_chains(*)')
+      .select('*, approver:profiles(*), request:borrow_requests(*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))), chain:approval_chains(*)')
       .not('acted_at', 'is', null)
       .order('acted_at', { ascending: false })
 
