@@ -8,6 +8,17 @@
 
 ---
 
+## [1.18] - 2026-07-13
+
+修复撤销审批时外键约束冲突。
+
+### 修复 (Fixes)
+- **撤销审批外键冲突**：修复 `revoke_approval` 函数在删除 `borrow_records` 后插入 `stock_movements` 时，
+  因 `borrow_record_id` 外键引用已删除记录导致的约束冲突。将对冲库存变动的 `borrow_record_id` 改为 NULL，
+  原借用记录 ID 记入 `notes` 保留审计信息。
+
+---
+
 ## [1.17] - 2026-07-13
 
 超级管理员可撤销已通过的审批。
