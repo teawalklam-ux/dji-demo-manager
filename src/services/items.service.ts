@@ -111,6 +111,17 @@ export const itemsService = {
     return data || []
   },
 
+  /** 可预约样机：借出/逾期样机也可选择未来无冲突日期，维修与退役样机不可申请。 */
+  async getBorrowableItems(): Promise<Item[]> {
+    const { data, error } = await supabase
+      .from('items')
+      .select('*, category:categories(*)')
+      .in('status', ['in_stock', 'borrowed', 'overdue'])
+      .order('name')
+    if (error) throw error
+    return data || []
+  },
+
   async getStats() {
     const { count: total } = await supabase.from('items').select('*', { count: 'exact', head: true })
     const { count: inStock } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'in_stock')

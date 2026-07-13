@@ -21,6 +21,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'approved', label: '已通过' },
   { key: 'rejected', label: '已拒绝' },
   { key: 'borrowed', label: '借用中' },
+  { key: 'partially_returned', label: '部分归还' },
   { key: 'returned', label: '已归还' },
   { key: 'overdue', label: '逾期' },
 ]
@@ -125,13 +126,9 @@ export function MyRequests() {
                   </CardHeader>
                   <CardContent className="space-y-3">
                     <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div>
-                        <span className="text-muted-foreground">样机: </span>
-                        {request.item?.name || '-'}
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">型号: </span>
-                        {request.item?.model || '-'}
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">样机（{request.request_items?.length || 0} 台）: </span>
+                        {request.request_items?.map((line) => line.item?.name || line.item_id).join('、') || '-'}
                       </div>
                       <div>
                         <span className="text-muted-foreground">借用日期: </span>
@@ -168,16 +165,7 @@ export function MyRequests() {
                           取消申请
                         </Button>
                       )}
-                      {(request.status === 'approved' || request.status === 'partially_approved') && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => handleApplyReturn(request.id)}
-                        >
-                          申请归还
-                        </Button>
-                      )}
-                      {request.status === 'borrowed' && (
+                      {(request.status === 'borrowed' || request.status === 'partially_returned') && (
                         <>
                           <Button
                             size="sm"
@@ -185,13 +173,13 @@ export function MyRequests() {
                           >
                             申请归还
                           </Button>
-                          <Button
+                          {request.status === 'borrowed' && <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleRenewal(request.id)}
                           >
                             申请续借
-                          </Button>
+                          </Button>}
                         </>
                       )}
                       {request.status === 'overdue' && (

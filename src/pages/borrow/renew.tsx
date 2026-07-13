@@ -149,21 +149,13 @@ export function BorrowRenew() {
               <span className="text-muted-foreground">状态: </span>
               <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
             </div>
-            <div>
-              <span className="text-muted-foreground">样机名称: </span>
-              {request.item?.name || '-'}
-            </div>
-            <div>
-              <span className="text-muted-foreground">型号: </span>
-              {request.item?.model || '-'}
+            <div className="col-span-2">
+              <span className="text-muted-foreground">样机（{request.request_items?.length || 0} 台）: </span>
+              {request.request_items?.map((line) => `${line.item?.name || line.item_id}（${line.item?.model || '-'}）`).join('、') || '-'}
             </div>
             <div>
               <span className="text-muted-foreground">借用类型: </span>
               <Badge className={typeInfo.color}>{typeInfo.label}</Badge>
-            </div>
-            <div>
-              <span className="text-muted-foreground">条码: </span>
-              {request.item?.barcode || '-'}
             </div>
             <div>
               <span className="text-muted-foreground">借用日期: </span>

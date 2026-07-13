@@ -35,7 +35,7 @@ export function BorrowApply() {
   const [items, setItems] = useState<Item[]>([])
   const [chains, setChains] = useState<ApprovalChain[]>([])
 
-  const [selectedItemId, setSelectedItemId] = useState(itemId || '')
+  const [selectedItemIds, setSelectedItemIds] = useState<string[]>(itemId ? [itemId] : [])
   const [searchQuery, setSearchQuery] = useState('')
   const [borrowType, setBorrowType] = useState<BorrowType>('customer')
   const [customerName, setCustomerName] = useState('')
@@ -46,6 +46,7 @@ export function BorrowApply() {
   const [purpose, setPurpose] = useState('')
   const [expectedBorrowDate, setExpectedBorrowDate] = useState('')
   const [expectedReturnDate, setExpectedReturnDate] = useState('')
+  const [availabilityConflicts, setAvailabilityConflicts] = useState<Array<{ item_id: string; item_name: string; occupied_start_date: string; occupied_end_date: string }>>([])
 
   const filteredItems = items.filter(
     (item) =>
@@ -59,7 +60,7 @@ export function BorrowApply() {
     setLoading(true)
     try {
       const [itemsData, chainsData, customersData] = await Promise.all([
-        itemsService.getInStockItems(),
+        itemsService.getBorrowableItems(),
         approvalService.getChains(),
         customerService.getMine(),
       ])
@@ -77,6 +78,25 @@ export function BorrowApply() {
   useEffect(() => {
     loadInitialData()
   }, [loadInitialData])
+
+  useEffect(() => {
+    if (!expectedBorrowDate || !expectedReturnDate || expectedReturnDate < expectedBorrowDate || selectedItemIds.length === 0) {
+      setAvailabilityConflicts([])
+      return
+    }
+    let cancelled = false
+    borrowService.checkAvailability(selectedItemIds, expectedBorrowDate, expectedReturnDate)
+      .then((conflicts) => {
+        if (!cancelled) setAvailabilityConflicts(conflicts)
+      })
+      .catch((error) => {
+        if (!cancelled) {
+          setAvailabilityConflicts([])
+          console.error('预检样机可用性失败:', error)
+        }
+      })
+    return () => { cancelled = true }
+  }, [selectedItemIds, expectedBorrowDate, expectedReturnDate])
 
   const currentChain = chains.find(
     (c) => c.borrow_type === borrowType || c.borrow_type === 'all'
@@ -104,9 +124,17 @@ export function BorrowApply() {
     }
   }
 
+  const addItem = (id: string) => {
+    setSelectedItemIds((current) => current.includes(id) ? current : [...current, id])
+  }
+
+  const removeItem = (id: string) => {
+    setSelectedItemIds((current) => current.filter((itemId) => itemId !== id))
+  }
+
   const handleSubmit = async () => {
-    if (!selectedItemId) {
-      toast.error('请选择样机')
+    if (selectedItemIds.length === 0) {
+      toast.error('请至少选择一台样机')
       return
     }
     if (!purpose.trim()) {
@@ -129,6 +157,10 @@ export function BorrowApply() {
       toast.error(`${BORROW_TYPE_MAP[borrowType].label}最多可申请 ${maxBorrowDays} 天，当前为 ${borrowDays} 天`)
       return
     }
+    if (availabilityConflicts.length > 0) {
+      toast.error('所选日期已有审批通过的样机预约，请调整样机或日期')
+      return
+    }
     if (borrowType === 'customer') {
       if (!customerName.trim()) {
         toast.error('请填写客户名称')
@@ -143,7 +175,7 @@ export function BorrowApply() {
     setSubmitting(true)
     try {
       const input: BorrowRequestInput = {
-        item_id: selectedItemId,
+        item_ids: selectedItemIds,
         borrow_type: borrowType,
         purpose: purpose.trim(),
         customer_name: borrowType === 'customer' ? customerName.trim() : undefined,
@@ -193,12 +225,12 @@ export function BorrowApply() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
-          <Select value={selectedItemId} onValueChange={setSelectedItemId}>
+          <Select onValueChange={addItem}>
             <SelectTrigger>
               <SelectValue placeholder="请选择样机" />
             </SelectTrigger>
             <SelectContent>
-              {filteredItems.map((item) => (
+              {filteredItems.filter((item) => !selectedItemIds.includes(item.id)).map((item) => (
                 <SelectItem key={item.id} value={item.id}>
                   {item.name} - {item.model}
                   {item.category ? ` (${item.category.name})` : ''}
@@ -206,26 +238,27 @@ export function BorrowApply() {
               ))}
               {filteredItems.length === 0 && (
                 <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  未找到在库样机
+                  未找到可预约样机
                 </div>
               )}
             </SelectContent>
           </Select>
-          {selectedItemId && (
-            <div className="rounded-md bg-muted/50 p-3">
-              {(() => {
-                const selectedItem = items.find((i) => i.id === selectedItemId)
+          {selectedItemIds.length > 0 && (
+            <div className="space-y-2 rounded-md bg-muted/50 p-3">
+              <div className="text-sm font-medium">已选 {selectedItemIds.length} 台样机</div>
+              {selectedItemIds.map((id) => {
+                const selectedItem = items.find((item) => item.id === id)
                 if (!selectedItem) return null
                 return (
-                  <div className="space-y-1 text-sm">
-                    <div className="font-medium">{selectedItem.name}</div>
-                    <div className="text-muted-foreground">
-                      型号: {selectedItem.model} | 条码: {selectedItem.barcode}
-                      {selectedItem.location && ` | 位置: ${selectedItem.location}`}
+                  <div key={id} className="flex items-center justify-between gap-3 rounded border bg-background px-3 py-2 text-sm">
+                    <div>
+                      <span className="font-medium">{selectedItem.name}</span>
+                      <span className="ml-2 text-muted-foreground">{selectedItem.model} · {selectedItem.barcode}</span>
                     </div>
+                    <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(id)}>移除</Button>
                   </div>
                 )
-              })()}
+              })}
             </div>
           )}
         </CardContent>
@@ -351,6 +384,16 @@ export function BorrowApply() {
               />
             </div>
           </div>
+          {availabilityConflicts.length > 0 && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+              <div className="font-medium">以下样机在所选日期已审批通过，无法申请：</div>
+              <ul className="mt-1 list-disc pl-5">
+                {availabilityConflicts.map((conflict) => (
+                  <li key={conflict.item_id}>{conflict.item_name}（{conflict.occupied_start_date} 至 {conflict.occupied_end_date}）</li>
+                ))}
+              </ul>
+            </div>
+          )}
           {maxBorrowDays !== null && (
             <div className={`rounded-md p-3 text-sm ${exceedsMaxDays ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
               {BORROW_TYPE_MAP[borrowType].label}最多可申请 <strong>{maxBorrowDays}</strong> 天
@@ -404,7 +447,7 @@ export function BorrowApply() {
         <Button variant="outline" onClick={() => navigate(-1)}>
           取消
         </Button>
-        <Button onClick={handleSubmit} disabled={submitting}>
+        <Button onClick={handleSubmit} disabled={submitting || availabilityConflicts.length > 0}>
           {submitting && <Spinner className="mr-2 size-4" />}
           提交申请
         </Button>
