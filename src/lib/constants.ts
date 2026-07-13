@@ -21,18 +21,19 @@ export type BorrowRequestStatus =
   | 'returned'
   | 'overdue'
   | 'renewal_requested'
+  | 'revoked'
 
 // 借用记录状态
 export type BorrowRecordStatus = 'active' | 'returned' | 'overdue'
 
 // 库存变动类型
-export type MovementType = 'borrow_out' | 'return_in' | 'new_entry' | 'maintenance' | 'retire'
+export type MovementType = 'borrow_out' | 'return_in' | 'new_entry' | 'maintenance' | 'retire' | 'revoke'
 
 // 通知类型
 export type NotificationType = 'email' | 'push' | 'sms' | 'wecom'
 
 // 审批动作
-export type ApprovalAction = 'approved' | 'rejected' | 'cancelled'
+export type ApprovalAction = 'approved' | 'rejected' | 'cancelled' | 'revoked'
 
 // 审批步骤类型
 export type ApprovalStepType = 'role' | 'person'
@@ -64,6 +65,7 @@ export const REQUEST_STATUS_MAP: Record<string, StatusInfo> = {
   returned: { label: '已归还', color: 'bg-green-100 text-green-800' },
   overdue: { label: '已逾期', color: 'bg-red-100 text-red-800' },
   renewal_requested: { label: '续借申请', color: 'bg-orange-100 text-orange-800' },
+  revoked: { label: '已撤销', color: 'bg-orange-100 text-orange-800' },
 }
 
 export const ROLE_MAP: Record<string, StatusInfo> = {
