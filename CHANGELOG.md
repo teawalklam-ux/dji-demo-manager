@@ -8,6 +8,22 @@
 
 ---
 
+## [1.17] - 2026-07-13
+
+超级管理员可撤销已通过的审批。
+
+### 新增 (Features)
+- **超级管理员撤销审批**：新增 `revoke_approval` RPC 函数（SECURITY DEFINER），仅 super_admin 可调用，
+  支持撤销借用中 / 逾期 / 已归还状态的已通过审批。
+  - 借用中 / 逾期：恢复样机为在库、删除借用记录、插入对冲库存变动记录（`movement_type='revoke'`）
+  - 已归还：保留借用记录和归还照片，仅标记审批撤销
+  - 扩展 CHECK 约束：`borrow_requests.status` 增加 `revoked`、`approval_records.action` 增加 `revoked`、
+    `stock_movements.movement_type` 增加 `revoke`
+  - 扩展 `handle_request_status_changed` 触发器：`revoked` 状态也自动关闭未处理审批记录
+  - 前端审批列表页（已审批 Tab）和审批详情页增加撤销入口（仅 super_admin 可见），撤销后自动通知申请人
+
+---
+
 ## [1.16] - 2026-07-11
 
 企业微信审批通知改为按审批链顺序逐步推送。

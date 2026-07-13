@@ -92,6 +92,15 @@ export const approvalService = {
     this.triggerApprovalNotification(requestId).catch(console.error)
   },
 
+  /** 超级管理员撤销已通过的审批（仅 super_admin 可用） */
+  async revokeApproval(requestId: string, reason: string): Promise<void> {
+    const { error } = await supabase.rpc('revoke_approval', {
+      p_request_id: requestId,
+      p_reason: reason,
+    })
+    if (error) throw error
+  },
+
   /** 异步调用 Edge Function 发送企业微信审批通知 */
   async triggerApprovalNotification(requestId: string): Promise<void> {
     try {
