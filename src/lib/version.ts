@@ -8,4 +8,4 @@
  *      3) 页面右下角版本号由本常量驱动，自动与 CHANGELOG 保持一致
  *  - .git/hooks/pre-commit 会在提交源码改动时校验三处一致性。
  */
-export const APP_VERSION = '1.22'
+export const APP_VERSION = '1.23'
