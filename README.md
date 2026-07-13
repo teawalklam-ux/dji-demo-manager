@@ -160,6 +160,10 @@ Deploy the Edge Functions via Supabase CLI or Dashboard:
 
 Configure pg_cron to schedule `check-overdue` with the appropriate CRON secret.
 
+### Reservation activation
+
+After applying migration `00036_multi_item_reservations.sql`, deploy `activate-reservations` and schedule it once daily after midnight in the `Asia/Shanghai` business timezone. The function calls `activate_due_borrow_requests` with a service-role key and turns fully approved reservations into active borrow records. It uses the existing `CRON_SECRET` protection; do not expose the service-role key to the frontend.
+
 #### CI/CD
 
 The project uses GitHub Actions to deploy to GitHub Pages. Add the following secrets to your repository:

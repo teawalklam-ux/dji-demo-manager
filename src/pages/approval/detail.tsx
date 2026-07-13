@@ -170,21 +170,9 @@ export function ApprovalDetail() {
               <span className="text-muted-foreground">部门: </span>
               {request.requester?.department || '-'}
             </div>
-            <div>
-              <span className="text-muted-foreground">样机名称: </span>
-              {request.item?.name || '-'}
-            </div>
-            <div>
-              <span className="text-muted-foreground">型号: </span>
-              {request.item?.model || '-'}
-            </div>
-            <div>
-              <span className="text-muted-foreground">条码: </span>
-              {request.item?.barcode || '-'}
-            </div>
-            <div>
-              <span className="text-muted-foreground">分类: </span>
-              {request.item?.category?.name || '-'}
+            <div className="col-span-2">
+              <span className="text-muted-foreground">申请样机（{request.request_items?.length || 0} 台）: </span>
+              {request.request_items?.map((line) => `${line.item?.name || line.item_id}（${line.item?.model || '-'}）`).join('、') || '-'}
             </div>
             <div>
               <span className="text-muted-foreground">借用日期: </span>
@@ -375,7 +363,7 @@ export function ApprovalDetail() {
       )}
 
       {/* 撤销审批操作 (仅超级管理员，且状态为借用中/逾期/已归还) */}
-      {isSuperAdmin && ['borrowed', 'overdue', 'returned'].includes(request.status) && (
+      {isSuperAdmin && ['approved', 'borrowed', 'overdue', 'partially_returned', 'returned'].includes(request.status) && (
         <Card className="border-orange-300">
           <CardHeader>
             <CardTitle className="text-orange-700">撤销审批</CardTitle>

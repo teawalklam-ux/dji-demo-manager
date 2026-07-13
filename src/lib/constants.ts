@@ -18,6 +18,7 @@ export type BorrowRequestStatus =
   | 'rejected'
   | 'cancelled'
   | 'borrowed'
+  | 'partially_returned'
   | 'returned'
   | 'overdue'
   | 'renewal_requested'
@@ -62,6 +63,7 @@ export const REQUEST_STATUS_MAP: Record<string, StatusInfo> = {
   rejected: { label: '已拒绝', color: 'bg-red-100 text-red-800' },
   cancelled: { label: '已取消', color: 'bg-gray-100 text-gray-800' },
   borrowed: { label: '借用中', color: 'bg-blue-100 text-blue-800' },
+  partially_returned: { label: '部分归还', color: 'bg-cyan-100 text-cyan-800' },
   returned: { label: '已归还', color: 'bg-green-100 text-green-800' },
   overdue: { label: '已逾期', color: 'bg-red-100 text-red-800' },
   renewal_requested: { label: '续借申请', color: 'bg-orange-100 text-orange-800' },

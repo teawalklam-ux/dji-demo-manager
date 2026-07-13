@@ -1,36 +1,37 @@
+import { lazy, Suspense } from 'react'
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import { AuthProvider } from '@/contexts/auth-context'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { AppLayout } from '@/components/layout/app-layout'
 import { LoginForm } from '@/components/auth/login-form'
 
-// Pages
-import { Dashboard } from '@/pages/dashboard'
-import { ItemsList } from '@/pages/items/index'
-import { NewItem } from '@/pages/items/new'
-import { EditItem } from '@/pages/items/edit'
-import { ItemDetail } from '@/pages/items/detail'
-import { BorrowApply } from '@/pages/borrow/apply'
-import { MyRequests } from '@/pages/borrow/my-requests'
-import { BorrowReturn } from '@/pages/borrow/return'
-import { BorrowRenew } from '@/pages/borrow/renew'
-import { ApprovalQueue } from '@/pages/approval/queue'
-import { ApprovalDetail } from '@/pages/approval/detail'
-import { UsersPage } from '@/pages/admin/users'
-import { CategoriesPage } from '@/pages/admin/categories'
-import { ApprovalChainsPage } from '@/pages/admin/approval-chains'
-import { SettingsPage } from '@/pages/admin/settings'
-import { CustomersPage } from '@/pages/admin/customers'
-import { ReportsPage } from '@/pages/reports/index'
-import { PendingApproval } from '@/pages/pending-approval'
-import { AccountDisabled } from '@/pages/account-disabled'
-import { ResetPassword } from '@/pages/reset-password'
+const Dashboard = lazy(() => import('@/pages/dashboard').then((m) => ({ default: m.Dashboard })))
+const ItemsList = lazy(() => import('@/pages/items/index').then((m) => ({ default: m.ItemsList })))
+const NewItem = lazy(() => import('@/pages/items/new').then((m) => ({ default: m.NewItem })))
+const EditItem = lazy(() => import('@/pages/items/edit').then((m) => ({ default: m.EditItem })))
+const ItemDetail = lazy(() => import('@/pages/items/detail').then((m) => ({ default: m.ItemDetail })))
+const BorrowApply = lazy(() => import('@/pages/borrow/apply').then((m) => ({ default: m.BorrowApply })))
+const MyRequests = lazy(() => import('@/pages/borrow/my-requests').then((m) => ({ default: m.MyRequests })))
+const BorrowReturn = lazy(() => import('@/pages/borrow/return').then((m) => ({ default: m.BorrowReturn })))
+const BorrowRenew = lazy(() => import('@/pages/borrow/renew').then((m) => ({ default: m.BorrowRenew })))
+const ApprovalQueue = lazy(() => import('@/pages/approval/queue').then((m) => ({ default: m.ApprovalQueue })))
+const ApprovalDetail = lazy(() => import('@/pages/approval/detail').then((m) => ({ default: m.ApprovalDetail })))
+const UsersPage = lazy(() => import('@/pages/admin/users').then((m) => ({ default: m.UsersPage })))
+const CategoriesPage = lazy(() => import('@/pages/admin/categories').then((m) => ({ default: m.CategoriesPage })))
+const ApprovalChainsPage = lazy(() => import('@/pages/admin/approval-chains').then((m) => ({ default: m.ApprovalChainsPage })))
+const SettingsPage = lazy(() => import('@/pages/admin/settings').then((m) => ({ default: m.SettingsPage })))
+const CustomersPage = lazy(() => import('@/pages/admin/customers').then((m) => ({ default: m.CustomersPage })))
+const ReportsPage = lazy(() => import('@/pages/reports/index').then((m) => ({ default: m.ReportsPage })))
+const PendingApproval = lazy(() => import('@/pages/pending-approval').then((m) => ({ default: m.PendingApproval })))
+const AccountDisabled = lazy(() => import('@/pages/account-disabled').then((m) => ({ default: m.AccountDisabled })))
+const ResetPassword = lazy(() => import('@/pages/reset-password').then((m) => ({ default: m.ResetPassword })))
 
 function App() {
   return (
     <BrowserRouter basename="/dji-demo-manager">
       <AuthProvider>
-        <Routes>
+        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">加载中...</div>}>
+          <Routes>
           <Route path="/login" element={<LoginForm />} />
           <Route path="/reset-password" element={<ResetPassword />} />
           <Route path="/pending-approval" element={<PendingApproval />} />
@@ -94,7 +95,8 @@ function App() {
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </BrowserRouter>
   )

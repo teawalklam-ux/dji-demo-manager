@@ -115,17 +115,30 @@ export interface BorrowRequest {
   // Joined
   requester?: Profile
   item?: Item
+  request_items?: BorrowRequestItem[]
   approval_records?: ApprovalRecord[]
 }
 
 export interface BorrowRequestInput {
-  item_id: string
+  item_ids: string[]
   borrow_type: BorrowType
   purpose: string
   customer_name?: string
   customer_contact?: string
   expected_borrow_date: string
   expected_return_date: string
+}
+
+export interface BorrowRequestItem {
+  id: string
+  request_id: string
+  item_id: string
+  status: 'pending' | 'reserved' | 'borrowed' | 'returned' | 'cancelled'
+  actual_borrow_date: string | null
+  actual_return_date: string | null
+  created_at: string
+  updated_at: string
+  item?: Item
 }
 
 export interface RenewInput {
@@ -174,6 +187,7 @@ export interface ApprovalRecord {
 export interface BorrowRecord {
   id: string
   request_id: string
+  request_item_id: string | null
   item_id: string
   borrower_id: string
   borrow_type: BorrowType

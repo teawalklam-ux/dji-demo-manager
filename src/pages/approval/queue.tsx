@@ -172,13 +172,9 @@ export function ApprovalQueue() {
                         <span className="text-muted-foreground">部门: </span>
                         {request.requester?.department || '-'}
                       </div>
-                      <div>
-                        <span className="text-muted-foreground">样机: </span>
-                        {request.item?.name || '-'}
-                      </div>
-                      <div>
-                        <span className="text-muted-foreground">型号: </span>
-                        {request.item?.model || '-'}
+                      <div className="col-span-2">
+                        <span className="text-muted-foreground">样机（{request.request_items?.length || 0} 台）: </span>
+                        {request.request_items?.map((line) => line.item?.name || line.item_id).join('、') || '-'}
                       </div>
                       <div>
                         <span className="text-muted-foreground">借用日期: </span>
@@ -331,7 +327,7 @@ export function ApprovalQueue() {
                       </div>
                       <div>
                         <span className="text-muted-foreground">样机: </span>
-                        {request.item?.name || '-'}
+                        {request.request_items?.map((line) => line.item?.name || line.item_id).join('、') || '-'}
                       </div>
                       <div>
                         <span className="text-muted-foreground">借用日期: </span>

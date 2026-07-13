@@ -14,6 +14,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 
 export function BorrowReturn() {
   const navigate = useNavigate()
@@ -23,6 +24,7 @@ export function BorrowReturn() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [record, setRecord] = useState<BorrowRecord | null>(null)
+  const [activeRecords, setActiveRecords] = useState<BorrowRecord[]>([])
   const [notes, setNotes] = useState('')
   const [loadError, setLoadError] = useState<string | null>(null)
   const [photoData, setPhotoData] = useState<PhotoData | null>(null)
@@ -36,11 +38,11 @@ export function BorrowReturn() {
     setLoading(true)
     setLoadError(null)
     try {
-      // 先按 request_id 查找 borrow_records
+      // 先按借用记录 ID 查找；路由也兼容申请单 ID，以便一单多台时选择待归还样机。
       const { data: directData, error: directError } = await supabase
         .from('borrow_records')
-        .select('*')
-        .eq('request_id', recordId)
+        .select('*, item:items(*), borrower:profiles(*)')
+        .eq('id', recordId)
         .maybeSingle()
 
       if (directError) {
@@ -49,21 +51,24 @@ export function BorrowReturn() {
 
       if (directData) {
         setRecord(directData as BorrowRecord)
+        setActiveRecords([directData as BorrowRecord])
         return
       }
 
-      // 按 borrow_record_id 查找
-      const { data: allData, error: allError } = await supabase
+      const { data: requestRecords, error: allError } = await supabase
         .from('borrow_records')
-        .select('*')
+        .select('*, item:items(*), borrower:profiles(*)')
+        .eq('request_id', recordId)
+        .in('status', ['active', 'overdue'])
         .order('created_at', { ascending: false })
 
       if (allError) {
         throw new Error('查询失败: ' + allError.message)
       }
 
-      const found = allData?.find((r) => r.id === recordId || r.request_id === recordId)
-      setRecord(found ? (found as BorrowRecord) : null)
+      const records = (requestRecords || []) as BorrowRecord[]
+      setActiveRecords(records)
+      setRecord(records[0] || null)
     } catch (error: any) {
       setLoadError(error.message || '加载失败')
       toast.error('加载借用记录失败')
@@ -156,6 +161,21 @@ export function BorrowReturn() {
           <CardTitle>借用信息</CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
+          {activeRecords.length > 1 && (
+            <div className="space-y-2">
+              <Label>选择要归还的样机</Label>
+              <Select value={record.id} onValueChange={(id) => setRecord(activeRecords.find((candidate) => candidate.id === id) || null)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {activeRecords.map((candidate) => (
+                    <SelectItem key={candidate.id} value={candidate.id}>
+                      {candidate.item?.name || candidate.item_id} · {candidate.item?.model || '-'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
           <div className="grid grid-cols-2 gap-3 text-sm">
             <div>
               <span className="text-muted-foreground">样机名称: </span>
