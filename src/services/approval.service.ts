@@ -1,7 +1,15 @@
 import { supabase } from '@/lib/supabase'
-import type { ApprovalRecord, ApprovalChain } from '@/types'
+import type { ApprovalRecord, ApprovalChain, ApprovalProgress } from '@/types'
 
 export const approvalService = {
+  async getCurrentApprovalProgress(requestId: string): Promise<ApprovalProgress> {
+    const { data, error } = await supabase.rpc('get_current_approval_progress', {
+      p_request_id: requestId,
+    })
+    if (error) throw error
+    return data as ApprovalProgress
+  },
+
   async getPendingApprovals(): Promise<ApprovalRecord[]> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')
