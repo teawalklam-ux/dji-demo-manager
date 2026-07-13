@@ -50,7 +50,7 @@ serve(async (req) => {
           items (name, model, barcode),
           requester:profiles!borrow_requests_requester_id_fkey (display_name, email)
         ),
-        recipient:profiles!overdue_notifications_recipient_id_fkey (display_name, email, role)
+        recipient:profiles!overdue_notifications_recipient_id_fkey (display_name, email, phone, role)
       `)
       .eq('notification_category', 'approval')
       .eq('notification_type', 'push')
@@ -118,6 +118,9 @@ serve(async (req) => {
 
         const recipientName = recipient.display_name || recipient.email || '未知'
         const requesterName = req.requester?.display_name || '未知'
+        const mentionedRecipientName = `@${recipientName}`
+        const mentionedRequesterName = `@${requesterName}`
+        const recipientMobile = recipient.phone?.trim() || null
         const isApprover = n.recipient_id !== req.requester_id
 
         let content: string
@@ -126,13 +129,13 @@ serve(async (req) => {
           content = [
             `【新审批申请】`,
             `申请单号：${req.request_number}`,
-            `申请人：${requesterName}`,
+            `申请人：${mentionedRequesterName}`,
             `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
             `条码：${req.items?.barcode || '-'}`,
             `借用类型：${borrowTypeLabel}`,
             `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
             `用途：${req.purpose || '-'}`,
-            `待审批人：${recipientName}`,
+            `待审批人：${mentionedRecipientName}`,
             ``,
             `请及时处理审批，谢谢！`,
           ].join('\n')
@@ -144,6 +147,7 @@ serve(async (req) => {
           content = [
             title,
             `申请单号：${req.request_number}`,
+            `申请人：${mentionedRequesterName}`,
             `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
             `条码：${req.items?.barcode || '-'}`,
             `借用类型：${borrowTypeLabel}`,
@@ -162,7 +166,10 @@ serve(async (req) => {
               msgtype: 'text',
               text: {
                 content,
-                mentioned_mobile_list: [],
+                // A visible @name is always included. When the profile has a
+                // verified WeCom-bound mobile number, this also triggers a real
+                // group mention through the webhook API.
+                mentioned_mobile_list: recipientMobile ? [recipientMobile] : [],
               },
             }),
           })
