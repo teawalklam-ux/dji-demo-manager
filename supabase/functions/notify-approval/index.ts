@@ -104,6 +104,7 @@ serve(async (req) => {
     // recipient_id != requester_id → 待审批提醒（审批人收，待审批人只显示自己）
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
     let wecomSentCount = 0
+    const deliveredNotifications: any[] = []
 
     if (wecomUrl) {
       for (const n of unsentNotifications) {
@@ -176,8 +177,11 @@ serve(async (req) => {
           const result = await wecomResponse.json()
           console.log(`WeCom notification sent for request ${requestId} to ${recipientName}:`, JSON.stringify(result))
 
-          if (wecomResponse.ok) {
+          if (wecomResponse.ok && result.errcode === 0) {
             wecomSentCount++
+            deliveredNotifications.push(n)
+          } else {
+            console.error(`WeCom rejected notification for request ${requestId}:`, JSON.stringify(result))
           }
         } catch (wecomError) {
           console.error(`WeCom notification failed for request ${requestId}:`, wecomError)
@@ -190,7 +194,7 @@ serve(async (req) => {
     // 标记这些通知为已发送企业微信
     // 插入 wecom 类型的通知记录，既作为标记也作为记录
     const wecomNotifications: any[] = []
-    for (const n of unsentNotifications) {
+    for (const n of deliveredNotifications) {
       wecomNotifications.push({
         borrower_id: n.borrow_requests?.requester_id || null,
         notification_type: 'wecom',
