@@ -205,6 +205,18 @@ export interface StockMovement {
   operator?: Profile
 }
 
+// ===== 用户客户地址簿 =====
+export interface UserCustomer {
+  id: string
+  user_id: string
+  customer_name: string
+  customer_contact: string | null
+  created_at: string
+  updated_at: string
+  // Joined
+  user?: Profile
+}
+
 // ===== 通知 =====
 export type NotificationCategory = 'overdue' | 'approval'
 

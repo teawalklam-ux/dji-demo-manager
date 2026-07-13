@@ -20,6 +20,7 @@ import { UsersPage } from '@/pages/admin/users'
 import { CategoriesPage } from '@/pages/admin/categories'
 import { ApprovalChainsPage } from '@/pages/admin/approval-chains'
 import { SettingsPage } from '@/pages/admin/settings'
+import { CustomersPage } from '@/pages/admin/customers'
 import { ReportsPage } from '@/pages/reports/index'
 import { PendingApproval } from '@/pages/pending-approval'
 import { AccountDisabled } from '@/pages/account-disabled'
@@ -82,6 +83,11 @@ function App() {
             <Route path="admin/settings" element={
               <AuthGuard requireRole={['super_admin']}>
                 <SettingsPage />
+              </AuthGuard>
+            } />
+            <Route path="admin/customers" element={
+              <AuthGuard requireRole={['super_admin']}>
+                <CustomersPage />
               </AuthGuard>
             } />
             <Route path="reports" element={<ReportsPage />} />

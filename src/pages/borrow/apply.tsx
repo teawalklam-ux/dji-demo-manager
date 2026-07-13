@@ -3,8 +3,9 @@ import { useNavigate, useParams } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { borrowService } from '@/services/borrow.service'
 import { approvalService } from '@/services/approval.service'
+import { customerService } from '@/services/customer.service'
 import { toast } from 'sonner'
-import type { Item, BorrowRequestInput, ApprovalChain } from '@/types'
+import type { Item, BorrowRequestInput, ApprovalChain, UserCustomer } from '@/types'
 import { BORROW_TYPE_MAP } from '@/lib/constants'
 import type { BorrowType } from '@/lib/constants'
 
@@ -16,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
+import { Checkbox } from '@/components/ui/checkbox'
 import {
   Select,
   SelectContent,
@@ -38,6 +40,9 @@ export function BorrowApply() {
   const [borrowType, setBorrowType] = useState<BorrowType>('customer')
   const [customerName, setCustomerName] = useState('')
   const [customerContact, setCustomerContact] = useState('')
+  const [selectedCustomerId, setSelectedCustomerId] = useState('')
+  const [saveCustomer, setSaveCustomer] = useState(true)
+  const [customers, setCustomers] = useState<UserCustomer[]>([])
   const [purpose, setPurpose] = useState('')
   const [expectedBorrowDate, setExpectedBorrowDate] = useState('')
   const [expectedReturnDate, setExpectedReturnDate] = useState('')
@@ -53,12 +58,14 @@ export function BorrowApply() {
   const loadInitialData = useCallback(async () => {
     setLoading(true)
     try {
-      const [itemsData, chainsData] = await Promise.all([
+      const [itemsData, chainsData, customersData] = await Promise.all([
         itemsService.getInStockItems(),
         approvalService.getChains(),
+        customerService.getMine(),
       ])
       setItems(itemsData)
       setChains(chainsData.filter((c) => c.is_active))
+      setCustomers(customersData)
     } catch (error) {
       toast.error('加载数据失败')
       console.error(error)
@@ -82,6 +89,20 @@ export function BorrowApply() {
     : 0
 
   const exceedsMaxDays = maxBorrowDays !== null && borrowDays > maxBorrowDays
+
+  const handleSelectCustomer = (customerId: string) => {
+    setSelectedCustomerId(customerId)
+    if (customerId && customerId !== '__new') {
+      const c = customers.find((c) => c.id === customerId)
+      if (c) {
+        setCustomerName(c.customer_name)
+        setCustomerContact(c.customer_contact || '')
+      }
+    } else {
+      setCustomerName('')
+      setCustomerContact('')
+    }
+  }
 
   const handleSubmit = async () => {
     if (!selectedItemId) {
@@ -131,6 +152,10 @@ export function BorrowApply() {
         expected_return_date: expectedReturnDate,
       }
       await borrowService.createRequest(input)
+      // 保存客户到地址簿（异步，不阻塞跳转）
+      if (borrowType === 'customer' && saveCustomer && customerName.trim()) {
+        customerService.save(customerName.trim(), customerContact.trim()).catch(console.error)
+      }
       toast.success('借用申请已提交')
       navigate(`/borrow/my-requests`)
     } catch (error: any) {
@@ -233,13 +258,34 @@ export function BorrowApply() {
 
           {borrowType === 'customer' && (
             <div className="mt-4 space-y-4">
+              {customers.length > 0 && (
+                <div className="space-y-2">
+                  <Label>从地址簿选择</Label>
+                  <Select value={selectedCustomerId} onValueChange={handleSelectCustomer}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="选择已保存的客户快速填充" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__new">+ 手动输入新客户</SelectItem>
+                      {customers.map((c) => (
+                        <SelectItem key={c.id} value={c.id}>
+                          {c.customer_name}{c.customer_contact ? ` (${c.customer_contact})` : ''}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
               <div className="space-y-2">
                 <Label htmlFor="customerName">客户名称 *</Label>
                 <Input
                   id="customerName"
                   placeholder="请输入客户名称"
                   value={customerName}
-                  onChange={(e) => setCustomerName(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerName(e.target.value)
+                    setSelectedCustomerId('')
+                  }}
                 />
               </div>
               <div className="space-y-2">
@@ -248,8 +294,21 @@ export function BorrowApply() {
                   id="customerContact"
                   placeholder="请输入客户联系方式"
                   value={customerContact}
-                  onChange={(e) => setCustomerContact(e.target.value)}
+                  onChange={(e) => {
+                    setCustomerContact(e.target.value)
+                    setSelectedCustomerId('')
+                  }}
                 />
+              </div>
+              <div className="flex items-center space-x-2">
+                <Checkbox
+                  id="saveCustomer"
+                  checked={saveCustomer}
+                  onCheckedChange={(v) => setSaveCustomer(v === true)}
+                />
+                <Label htmlFor="saveCustomer" className="cursor-pointer text-sm text-muted-foreground">
+                  保存到客户地址簿，下次可直接选择
+                </Label>
               </div>
             </div>
           )}
