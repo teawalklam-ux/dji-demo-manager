@@ -89,12 +89,14 @@ BEGIN
     DELETE FROM public.borrow_records
     WHERE request_id = p_request_id;
 
-    -- 4.4 插入对冲库存变动记录（保留审计痕迹）
+    -- 4.4 插入对冲库存变动记录（borrow_record_id 置 NULL，因借用记录已删除；
+    --     原借用记录 ID 记入 notes 保留审计痕迹）
     INSERT INTO public.stock_movements (
       item_id, movement_type, borrow_record_id, operator_id, notes
     ) VALUES (
-      v_request.item_id, 'revoke', v_borrow_record_id, v_operator_id,
+      v_request.item_id, 'revoke', NULL, v_operator_id,
       '撤销审批 - 申请编号: ' || v_request.request_number ||
+      ' - 原借用记录ID: ' || COALESCE(v_borrow_record_id::TEXT, '无') ||
       ' - 原因: ' || COALESCE(p_reason, '未填写')
     );
   END IF;
