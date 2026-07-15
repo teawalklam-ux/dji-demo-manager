@@ -7,6 +7,9 @@ export type UserStatus = 'pending_approval' | 'active' | 'disabled'
 // 样机状态
 export type ItemStatus = 'in_stock' | 'borrowed' | 'overdue' | 'maintenance' | 'retired'
 
+// “预定”由未来已审批的预约派生，不写入 items.status。
+export type ItemDisplayStatus = ItemStatus | 'reserved'
+
 // 借用类型
 export type BorrowType = 'customer' | 'marketing'
 
@@ -43,8 +46,9 @@ export type ApprovalStepType = 'role' | 'person'
 
 type StatusInfo = { label: string; color: string }
 
-export const ITEM_STATUS_MAP: Record<string, StatusInfo> = {
+export const ITEM_STATUS_MAP: Record<ItemDisplayStatus, StatusInfo> = {
   in_stock: { label: '在库', color: 'bg-green-100 text-green-800' },
+  reserved: { label: '预定', color: 'bg-violet-100 text-violet-800' },
   borrowed: { label: '借出', color: 'bg-blue-100 text-blue-800' },
   overdue: { label: '逾期', color: 'bg-red-100 text-red-800' },
   maintenance: { label: '维修中', color: 'bg-orange-100 text-orange-800' },

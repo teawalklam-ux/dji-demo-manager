@@ -2,6 +2,7 @@ import type {
   UserRole,
   UserStatus,
   ItemStatus,
+  ItemDisplayStatus,
   BorrowType,
   BorrowRequestStatus,
   BorrowRecordStatus,
@@ -15,6 +16,7 @@ export type {
   UserRole,
   UserStatus,
   ItemStatus,
+  ItemDisplayStatus,
   BorrowType,
   BorrowRequestStatus,
   BorrowRecordStatus,
@@ -60,6 +62,8 @@ export interface Item {
   serial_number: string | null
   category_id: string
   status: ItemStatus
+  /** 列表展示状态；“预定”是根据未来已审批预约派生的状态。 */
+  display_status?: ItemDisplayStatus
   specs: Record<string, string>
   purchase_date: string | null
   purchase_price: number | null

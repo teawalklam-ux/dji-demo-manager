@@ -17,7 +17,7 @@ export const exportService = {
       '型号': item.model,
       '序列号': item.serial_number || '',
       '分类': item.category?.name || '',
-      '状态': ITEM_STATUS_MAP[item.status]?.label || item.status,
+      '状态': ITEM_STATUS_MAP[item.display_status || item.status]?.label || item.display_status || item.status,
       '存放位置': item.location || '',
       '当前借用人': item.current_borrower?.display_name || '',
       '购买日期': item.purchase_date || '',
