@@ -64,6 +64,11 @@ export interface Item {
   status: ItemStatus
   /** 列表展示状态；“预定”是根据未来已审批预约派生的状态。 */
   display_status?: ItemDisplayStatus
+  /** 借用申请选择器中的可用状态与日期信息。 */
+  availability_status?: 'in_stock' | 'reserved' | 'borrowed'
+  reservation_start_date?: string | null
+  reservation_end_date?: string | null
+  current_due_date?: string | null
   specs: Record<string, string>
   purchase_date: string | null
   purchase_price: number | null

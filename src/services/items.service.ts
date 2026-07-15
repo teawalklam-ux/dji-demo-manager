@@ -1,6 +1,14 @@
 import { supabase } from '@/lib/supabase'
 import type { Item, ItemCreateInput, ItemFilters, PaginatedResponse } from '@/types'
 
+type BorrowableItemStatusDetail = {
+  item_id: string
+  display_status: 'in_stock' | 'reserved' | 'borrowed'
+  reserved_start_date: string | null
+  reserved_end_date: string | null
+  due_date: string | null
+}
+
 export const itemsService = {
   async getAll(filters?: ItemFilters): Promise<PaginatedResponse<Item>> {
     let query = supabase
@@ -113,13 +121,31 @@ export const itemsService = {
 
   /** 可预约样机：借出/逾期样机也可选择未来无冲突日期，维修与退役样机不可申请。 */
   async getBorrowableItems(): Promise<Item[]> {
-    const { data, error } = await supabase
-      .from('items')
-      .select('*, category:categories(*)')
-      .in('status', ['in_stock', 'borrowed', 'overdue'])
-      .order('name')
-    if (error) throw error
-    return data || []
+    const [itemsResult, statusResult] = await Promise.all([
+      supabase
+        .from('items')
+        .select('*, category:categories(*)')
+        .in('status', ['in_stock', 'borrowed', 'overdue'])
+        .order('name'),
+      supabase.rpc('get_borrowable_item_status_details'),
+    ])
+    if (itemsResult.error) throw itemsResult.error
+    if (statusResult.error) throw statusResult.error
+
+    const statusByItemId = new Map<string, BorrowableItemStatusDetail>(
+      (statusResult.data || []).map((detail: BorrowableItemStatusDetail) => [detail.item_id, detail])
+    )
+
+    return (itemsResult.data || []).map((item) => {
+      const detail = statusByItemId.get(item.id)
+      return {
+        ...item,
+        availability_status: detail?.display_status || (item.status === 'in_stock' ? 'in_stock' : 'borrowed'),
+        reservation_start_date: detail?.reserved_start_date || null,
+        reservation_end_date: detail?.reserved_end_date || null,
+        current_due_date: detail?.due_date || null,
+      }
+    })
   },
 
   /** 获取借出日期尚未到、且已审批预约的在库样机。 */
