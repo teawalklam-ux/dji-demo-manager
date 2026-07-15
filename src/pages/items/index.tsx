@@ -17,7 +17,7 @@ import { BarcodeScanner } from '@/components/barcode/barcode-scanner'
 import { ITEM_STATUS_MAP } from '@/lib/constants'
 import { BatchImport } from '@/components/import/batch-import'
 import { Plus, Download, ScanLine, Search, Printer, Upload, ArrowUpDown } from 'lucide-react'
-import type { Item, Category, ItemStatus } from '@/types'
+import type { Item, Category, ItemStatus, ItemDisplayStatus } from '@/types'
 
 type SortField = 'barcode' | 'name' | 'model' | 'category' | 'status' | 'location'
 type SortOrder = 'asc' | 'desc'
@@ -49,13 +49,28 @@ export function ItemsList() {
   const loadItems = useCallback(async () => {
     try {
       setLoading(true)
-      const result = await itemsService.getAll({
-        search: debouncedSearch || undefined,
-        category_id: categoryFilter || undefined,
-        status: (statusFilter || undefined) as ItemStatus | undefined,
-      })
-      setItems(result.data)
-      setTotalCount(result.count)
+      const physicalStatus = statusFilter && statusFilter !== 'reserved'
+        ? statusFilter as ItemStatus
+        : undefined
+      const [result, reservedItemIds] = await Promise.all([
+        itemsService.getAll({
+          search: debouncedSearch || undefined,
+          category_id: categoryFilter || undefined,
+          status: physicalStatus,
+        }),
+        itemsService.getReservedItemIds(),
+      ])
+      const itemsWithDisplayStatus = result.data.map(item => ({
+        ...item,
+        display_status: item.status === 'in_stock' && reservedItemIds.has(item.id)
+          ? 'reserved' as const
+          : item.status,
+      }))
+      const visibleItems = statusFilter
+        ? itemsWithDisplayStatus.filter(item => item.display_status === statusFilter)
+        : itemsWithDisplayStatus
+      setItems(visibleItems)
+      setTotalCount(statusFilter === 'reserved' || statusFilter === 'in_stock' ? visibleItems.length : result.count)
     } catch (error) {
       console.error('加载样机列表失败:', error)
     } finally {
@@ -156,8 +171,8 @@ export function ItemsList() {
           valB = b.category?.name || ''
           break
         case 'status':
-          valA = a.status || ''
-          valB = b.status || ''
+          valA = a.display_status || a.status || ''
+          valB = b.display_status || b.status || ''
           break
         case 'location':
           valA = a.location || ''
@@ -253,7 +268,7 @@ export function ItemsList() {
               />
             </div>
             <div className="flex gap-2 shrink-0">
-              <Select value={categoryFilter} onValueChange={setCategoryFilter}>
+              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value === 'all' ? '' : value)}>
                 <SelectTrigger className="w-full sm:w-[160px]">
                   <SelectValue placeholder="全部分类" />
                 </SelectTrigger>
@@ -264,13 +279,13 @@ export function ItemsList() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={setStatusFilter}>
+              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value === 'all' ? '' : value)}>
                 <SelectTrigger className="w-full sm:w-[130px]">
                   <SelectValue placeholder="全部状态" />
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">全部状态</SelectItem>
-                  {(Object.entries(ITEM_STATUS_MAP) as [ItemStatus, { label: string }][]).map(([key, val]) => (
+                  {(Object.entries(ITEM_STATUS_MAP) as [ItemDisplayStatus, { label: string }][]).map(([key, val]) => (
                     <SelectItem key={key} value={key}>{val.label}</SelectItem>
                   ))}
                 </SelectContent>
@@ -358,8 +373,8 @@ export function ItemsList() {
                         <TableCell>{item.model}</TableCell>
                         <TableCell>{item.category?.name || '-'}</TableCell>
                         <TableCell>
-                          <Badge className={ITEM_STATUS_MAP[item.status]?.color}>
-                            {ITEM_STATUS_MAP[item.status]?.label || item.status}
+                          <Badge className={ITEM_STATUS_MAP[item.display_status || item.status]?.color}>
+                            {ITEM_STATUS_MAP[item.display_status || item.status]?.label || item.display_status || item.status}
                           </Badge>
                         </TableCell>
                         <TableCell>{item.location || '-'}</TableCell>
@@ -393,8 +408,8 @@ export function ItemsList() {
                       <div className="flex-1 min-w-0 space-y-1.5">
                         <div className="flex items-center justify-between gap-2">
                           <h3 className="font-medium text-sm truncate">{item.name}</h3>
-                          <Badge className={`${ITEM_STATUS_MAP[item.status]?.color} shrink-0 text-xs`}>
-                            {ITEM_STATUS_MAP[item.status]?.label || item.status}
+                          <Badge className={`${ITEM_STATUS_MAP[item.display_status || item.status]?.color} shrink-0 text-xs`}>
+                            {ITEM_STATUS_MAP[item.display_status || item.status]?.label || item.display_status || item.status}
                           </Badge>
                         </div>
                         <div className="text-xs text-muted-foreground font-mono">{item.barcode}</div>

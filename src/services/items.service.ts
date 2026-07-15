@@ -122,6 +122,13 @@ export const itemsService = {
     return data || []
   },
 
+  /** 获取借出日期尚未到、且已审批预约的在库样机。 */
+  async getReservedItemIds(): Promise<Set<string>> {
+    const { data, error } = await supabase.rpc('get_reserved_item_ids')
+    if (error) throw error
+    return new Set((data || []).map((row: { item_id: string }) => row.item_id))
+  },
+
   async getStats() {
     const { count: total } = await supabase.from('items').select('*', { count: 'exact', head: true })
     const { count: inStock } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'in_stock')
