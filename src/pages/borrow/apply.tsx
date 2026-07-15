@@ -26,6 +26,24 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
+function getItemAvailabilityLabel(item: Item) {
+  if (item.availability_status === 'reserved') {
+    return item.reservation_start_date && item.reservation_end_date
+      ? `预定（${item.reservation_start_date} 至 ${item.reservation_end_date}）`
+      : '预定'
+  }
+  if (item.availability_status === 'borrowed') {
+    return item.current_due_date ? `借出（归还 ${item.current_due_date}）` : '借出'
+  }
+  return '在库'
+}
+
+function getItemAvailabilityClass(item: Item) {
+  if (item.availability_status === 'reserved') return 'bg-violet-100 text-violet-800'
+  if (item.availability_status === 'borrowed') return 'bg-blue-100 text-blue-800'
+  return 'bg-green-100 text-green-800'
+}
+
 export function BorrowApply() {
   const navigate = useNavigate()
   const { itemId } = useParams<{ itemId: string }>()
@@ -190,8 +208,8 @@ export function BorrowApply() {
       }
       toast.success('借用申请已提交')
       navigate(`/borrow/my-requests`)
-    } catch (error: any) {
-      toast.error(error.message || '提交失败')
+    } catch (error: unknown) {
+      toast.error(error instanceof Error ? error.message : '提交失败')
       console.error(error)
     } finally {
       setSubmitting(false)
@@ -217,7 +235,7 @@ export function BorrowApply() {
       <Card>
         <CardHeader>
           <CardTitle>选择样机</CardTitle>
-          <CardDescription>从在库样机中选择需要借用的设备</CardDescription>
+          <CardDescription>选择在申请日期内无冲突的样机，预定与借出设备仍可申请未来可用日期</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -232,8 +250,15 @@ export function BorrowApply() {
             <SelectContent>
               {filteredItems.filter((item) => !selectedItemIds.includes(item.id)).map((item) => (
                 <SelectItem key={item.id} value={item.id}>
-                  {item.name} - {item.model}
-                  {item.category ? ` (${item.category.name})` : ''}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <span className="truncate">
+                      {item.name} - {item.model}
+                      {item.category ? ` (${item.category.name})` : ''}
+                    </span>
+                    <Badge className={`${getItemAvailabilityClass(item)} shrink-0 text-xs`}>
+                      {getItemAvailabilityLabel(item)}
+                    </Badge>
+                  </span>
                 </SelectItem>
               ))}
               {filteredItems.length === 0 && (
@@ -251,9 +276,12 @@ export function BorrowApply() {
                 if (!selectedItem) return null
                 return (
                   <div key={id} className="flex items-center justify-between gap-3 rounded border bg-background px-3 py-2 text-sm">
-                    <div>
+                    <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="font-medium">{selectedItem.name}</span>
-                      <span className="ml-2 text-muted-foreground">{selectedItem.model} · {selectedItem.barcode}</span>
+                      <span className="text-muted-foreground">{selectedItem.model} · {selectedItem.barcode}</span>
+                      <Badge className={`${getItemAvailabilityClass(selectedItem)} text-xs`}>
+                        {getItemAvailabilityLabel(selectedItem)}
+                      </Badge>
                     </div>
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(id)}>移除</Button>
                   </div>
