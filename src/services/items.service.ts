@@ -7,6 +7,7 @@ type BorrowableItemStatusDetail = {
   reserved_start_date: string | null
   reserved_end_date: string | null
   due_date: string | null
+  serial_number_last4: string | null
 }
 
 export const itemsService = {
@@ -124,7 +125,24 @@ export const itemsService = {
     const [itemsResult, statusResult] = await Promise.all([
       supabase
         .from('items')
-        .select('*, category:categories(*)')
+        .select(`
+          id,
+          barcode,
+          name,
+          model,
+          category_id,
+          status,
+          specs,
+          purchase_date,
+          purchase_price,
+          notes,
+          image_url,
+          location,
+          current_borrower_id,
+          created_at,
+          updated_at,
+          category:categories(*)
+        `)
         .in('status', ['in_stock', 'borrowed', 'overdue'])
         .order('name'),
       supabase.rpc('get_borrowable_item_status_details'),
@@ -136,10 +154,14 @@ export const itemsService = {
       (statusResult.data || []).map((detail: BorrowableItemStatusDetail) => [detail.item_id, detail])
     )
 
-    return (itemsResult.data || []).map((item) => {
+    const borrowableItems = (itemsResult.data || []) as unknown as Array<Omit<Item, 'serial_number'>>
+
+    return borrowableItems.map((item) => {
       const detail = statusByItemId.get(item.id)
       return {
         ...item,
+        serial_number: null,
+        serial_number_last4: detail?.serial_number_last4 || null,
         availability_status: detail?.display_status || (item.status === 'in_stock' ? 'in_stock' : 'borrowed'),
         reservation_start_date: detail?.reserved_start_date || null,
         reservation_end_date: detail?.reserved_end_date || null,

@@ -44,6 +44,10 @@ function getItemAvailabilityClass(item: Item) {
   return 'bg-green-100 text-green-800'
 }
 
+function getItemSerialLabel(item: Item) {
+  return item.serial_number_last4 ? `SN ****${item.serial_number_last4}` : 'SN ----'
+}
+
 export function BorrowApply() {
   const navigate = useNavigate()
   const { itemId } = useParams<{ itemId: string }>()
@@ -71,7 +75,7 @@ export function BorrowApply() {
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.barcode.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.serial_number && item.serial_number.toLowerCase().includes(searchQuery.toLowerCase()))
+      (item.serial_number_last4 && item.serial_number_last4.toLowerCase().includes(searchQuery.toLowerCase()))
   )
 
   const loadInitialData = useCallback(async () => {
@@ -239,7 +243,7 @@ export function BorrowApply() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
-            placeholder="搜索样机名称、型号、条码或SN码..."
+            placeholder="搜索样机名称、型号、条码或SN码后四位..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
           />
@@ -254,6 +258,9 @@ export function BorrowApply() {
                     <span className="truncate">
                       {item.name} - {item.model}
                       {item.category ? ` (${item.category.name})` : ''}
+                    </span>
+                    <span className="shrink-0 font-mono text-xs text-muted-foreground">
+                      {getItemSerialLabel(item)}
                     </span>
                     <Badge className={`${getItemAvailabilityClass(item)} shrink-0 text-xs`}>
                       {getItemAvailabilityLabel(item)}
@@ -279,6 +286,7 @@ export function BorrowApply() {
                     <div className="flex min-w-0 flex-wrap items-center gap-2">
                       <span className="font-medium">{selectedItem.name}</span>
                       <span className="text-muted-foreground">{selectedItem.model} · {selectedItem.barcode}</span>
+                      <span className="font-mono text-xs text-muted-foreground">{getItemSerialLabel(selectedItem)}</span>
                       <Badge className={`${getItemAvailabilityClass(selectedItem)} text-xs`}>
                         {getItemAvailabilityLabel(selectedItem)}
                       </Badge>

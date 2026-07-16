@@ -69,6 +69,8 @@ export interface Item {
   reservation_start_date?: string | null
   reservation_end_date?: string | null
   current_due_date?: string | null
+  /** 借用申请选择器中展示的 SN 后四位。 */
+  serial_number_last4?: string | null
   specs: Record<string, string>
   purchase_date: string | null
   purchase_price: number | null
