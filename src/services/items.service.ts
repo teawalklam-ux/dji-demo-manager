@@ -179,9 +179,11 @@ export const itemsService = {
 
   async getStats() {
     const { count: total } = await supabase.from('items').select('*', { count: 'exact', head: true })
-    const { count: inStock } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'in_stock')
+    const { count: physicalInStock } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'in_stock')
     const { count: borrowed } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'borrowed')
     const { count: overdue } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'overdue')
-    return { total: total || 0, inStock: inStock || 0, borrowed: borrowed || 0, overdue: overdue || 0 }
+    const reserved = (await this.getReservedItemIds()).size
+    const inStock = Math.max((physicalInStock || 0) - reserved, 0)
+    return { total: total || 0, inStock, reserved, borrowed: borrowed || 0, overdue: overdue || 0 }
   },
 }
