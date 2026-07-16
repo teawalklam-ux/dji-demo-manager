@@ -48,7 +48,7 @@ serve(async (req) => {
           purpose,
           requester_id,
           items (name, model, barcode),
-          requester:profiles!borrow_requests_requester_id_fkey (display_name, email)
+          requester:profiles!borrow_requests_requester_id_fkey (display_name, email, phone)
         ),
         recipient:profiles!overdue_notifications_recipient_id_fkey (display_name, email, phone, role)
       `)
@@ -122,6 +122,7 @@ serve(async (req) => {
         const mentionedRecipientName = `@${recipientName}`
         const mentionedRequesterName = `@${requesterName}`
         const recipientMobile = recipient.phone?.trim() || null
+        const requesterMobile = req.requester?.phone?.trim() || null
         const isApprover = n.recipient_id !== req.requester_id
 
         let content: string
@@ -145,10 +146,13 @@ serve(async (req) => {
           // 根据消息内容判断是"通过"还是"拒绝"
           const isRejected = (n.message || '').includes('审批拒绝')
           const title = isRejected ? '【审批拒绝】' : '【审批通过】'
+          const mentionedNames = isRejected
+            ? mentionedRequesterName
+            : `${mentionedRequesterName} @林芷茵`
           content = [
             title,
             `申请单号：${req.request_number}`,
-            `申请人：${mentionedRequesterName}`,
+            `申请人：${mentionedNames}`,
             `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
             `条码：${req.items?.barcode || '-'}`,
             `借用类型：${borrowTypeLabel}`,
@@ -170,7 +174,17 @@ serve(async (req) => {
                 // A visible @name is always included. When the profile has a
                 // verified WeCom-bound mobile number, this also triggers a real
                 // group mention through the webhook API.
-                mentioned_mobile_list: recipientMobile ? [recipientMobile] : [],
+                mentioned_mobile_list: isApprover
+                  ? (recipientMobile ? [recipientMobile] : [])
+                  : isRejected
+                    ? (recipientMobile ? [recipientMobile] : [])
+                    : [
+                        ...new Set(
+                          [requesterMobile, '15112312781'].filter(
+                            (mobile): mobile is string => Boolean(mobile)
+                          )
+                        ),
+                      ],
               },
             }),
           })
