@@ -11,14 +11,37 @@ import { ITEM_STATUS_MAP, BORROW_TYPE_MAP, BARCODE_GENERATE_OPTIONS } from '@/li
 import { ArrowLeft, Printer, Edit, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import JsBarcode from 'jsbarcode'
-import type { Item, BorrowRecord, StockMovement } from '@/types'
+import type { BorrowRecord, BorrowRequestItem, Item, StockMovement } from '@/types'
+
+type ItemBorrowHistoryRecord = {
+  id: string
+  borrowerName: string
+  borrowType: string | null
+  borrowDate: string
+  dueDate: string
+  returnDate: string | null
+  status: 'reserved' | 'active' | 'returned' | 'overdue'
+  createdAt: string
+}
+
+type ItemReservationLine = BorrowRequestItem & {
+  request?: {
+    requester?: {
+      display_name?: string | null
+    } | null
+    borrow_type?: string | null
+    expected_borrow_date?: string | null
+    expected_return_date?: string | null
+    created_at?: string | null
+  } | null
+}
 
 export function ItemDetail() {
   const { id } = useParams<{ id: string }>()
   const { isAdmin } = useAuth()
   const [loading, setLoading] = useState(true)
   const [item, setItem] = useState<Item | null>(null)
-  const [borrowRecords, setBorrowRecords] = useState<BorrowRecord[]>([])
+  const [borrowRecords, setBorrowRecords] = useState<ItemBorrowHistoryRecord[]>([])
   const [stockMovements, setStockMovements] = useState<StockMovement[]>([])
   const [error, setError] = useState<string | null>(null)
 
@@ -43,12 +66,18 @@ export function ItemDetail() {
   async function loadData(itemId: string) {
     try {
       setLoading(true)
-      const [itemResult, recordsResult, movementsResult] = await Promise.allSettled([
+      const [itemResult, recordsResult, reservationLinesResult, movementsResult] = await Promise.allSettled([
         itemsService.getById(itemId),
         supabase
           .from('borrow_records')
           .select('*, borrower:profiles(*), request:borrow_requests(*)')
           .eq('item_id', itemId)
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('borrow_request_items')
+          .select('*, request:borrow_requests(*, requester:profiles(*))')
+          .eq('item_id', itemId)
+          .in('status', ['reserved', 'borrowed'])
           .order('created_at', { ascending: false }),
         supabase
           .from('stock_movements')
@@ -68,12 +97,16 @@ export function ItemDetail() {
       }
 
       if (recordsResult.status === 'fulfilled') {
-        setBorrowRecords(recordsResult.value.data || [])
+        const records = (recordsResult.value.data || []) as BorrowRecord[]
+        const reservationLines = reservationLinesResult.status === 'fulfilled'
+          ? ((reservationLinesResult.value.data || []) as ItemReservationLine[])
+          : []
+        setBorrowRecords(mergeBorrowHistory(records, reservationLines))
       }
       if (movementsResult.status === 'fulfilled') {
         setStockMovements(movementsResult.value.data || [])
       }
-    } catch (err) {
+    } catch {
       setError('加载数据失败')
     } finally {
       setLoading(false)
@@ -93,6 +126,7 @@ export function ItemDetail() {
   }
 
   const recordStatusLabels: Record<string, { label: string; color: string }> = {
+    reserved: { label: '预定', color: 'bg-violet-100 text-violet-800' },
     active: { label: '借用中', color: 'bg-blue-100 text-blue-800' },
     returned: { label: '已归还', color: 'bg-green-100 text-green-800' },
     overdue: { label: '逾期', color: 'bg-red-100 text-red-800' },
@@ -265,13 +299,13 @@ export function ItemDetail() {
               <TableBody>
                 {borrowRecords.map(record => (
                   <TableRow key={record.id}>
-                    <TableCell>{record.borrower?.display_name || '-'}</TableCell>
+                    <TableCell>{record.borrowerName}</TableCell>
                     <TableCell>
-                      {record.borrow_type ? BORROW_TYPE_MAP[record.borrow_type as keyof typeof BORROW_TYPE_MAP]?.label || record.borrow_type : '-'}
+                      {record.borrowType ? BORROW_TYPE_MAP[record.borrowType as keyof typeof BORROW_TYPE_MAP]?.label || record.borrowType : '-'}
                     </TableCell>
-                    <TableCell>{record.borrow_date}</TableCell>
-                    <TableCell>{record.due_date}</TableCell>
-                    <TableCell>{record.return_date || '-'}</TableCell>
+                    <TableCell>{record.borrowDate}</TableCell>
+                    <TableCell>{record.dueDate}</TableCell>
+                    <TableCell>{record.returnDate || '-'}</TableCell>
                     <TableCell>
                       <Badge className={recordStatusLabels[record.status]?.color}>
                         {recordStatusLabels[record.status]?.label || record.status}
@@ -323,4 +357,41 @@ export function ItemDetail() {
       </Card>
     </div>
   )
+}
+
+function mergeBorrowHistory(
+  records: BorrowRecord[],
+  reservationLines: ItemReservationLine[]
+): ItemBorrowHistoryRecord[] {
+  const recordLineIds = new Set(records.map(record => record.request_item_id).filter(Boolean))
+
+  const historyRecords: ItemBorrowHistoryRecord[] = records.map(record => ({
+    id: record.id,
+    borrowerName: record.borrower?.display_name || '-',
+    borrowType: record.borrow_type,
+    borrowDate: record.borrow_date,
+    dueDate: record.due_date,
+    returnDate: record.return_date,
+    status: record.status,
+    createdAt: record.created_at,
+  }))
+
+  const reservationRecords: ItemBorrowHistoryRecord[] = reservationLines
+    .filter(line => line.status === 'reserved' || !recordLineIds.has(line.id))
+    .map(line => ({
+      id: `request-line-${line.id}`,
+      borrowerName: line.request?.requester?.display_name || '-',
+      borrowType: line.request?.borrow_type || null,
+      borrowDate: line.actual_borrow_date || line.request?.expected_borrow_date || '-',
+      dueDate: line.request?.expected_return_date || '-',
+      returnDate: line.actual_return_date,
+      status: line.status === 'reserved' ? 'reserved' : 'active',
+      createdAt: line.request?.created_at || line.created_at,
+    }))
+
+  return [...historyRecords, ...reservationRecords].sort((a, b) => {
+    const dateA = a.borrowDate === '-' ? a.createdAt : a.borrowDate
+    const dateB = b.borrowDate === '-' ? b.createdAt : b.borrowDate
+    return dateB.localeCompare(dateA)
+  })
 }
