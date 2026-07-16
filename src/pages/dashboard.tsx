@@ -31,7 +31,7 @@ const CHART_COLORS = ['#2E6AB0', '#22C55E', '#EF4444', '#F97316', '#6B7280']
 export function Dashboard() {
   const { isApprover } = useAuth()
   const [loading, setLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, inStock: 0, borrowed: 0, overdue: 0 })
+  const [stats, setStats] = useState({ total: 0, inStock: 0, reserved: 0, borrowed: 0, overdue: 0 })
   const [overdueItems, setOverdueItems] = useState<Item[]>([])
   const [recentMovements, setRecentMovements] = useState<StockMovement[]>([])
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRecord[]>([])
@@ -110,9 +110,10 @@ export function Dashboard() {
 
   const pieData = [
     { name: '在库', value: stats.inStock },
+    { name: '预定', value: stats.reserved },
     { name: '借出', value: stats.borrowed },
     { name: '逾期', value: stats.overdue },
-    { name: '维修中', value: stats.total - stats.inStock - stats.borrowed - stats.overdue },
+    { name: '维修中', value: stats.total - stats.inStock - stats.reserved - stats.borrowed - stats.overdue },
   ].filter(d => d.value > 0)
 
   const movementTypeLabels: Record<string, string> = {
