@@ -10,6 +10,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+// 审批通过抄送人：通过手机号触发真实 @，不在“申请人”字段中展示。
+const APPROVAL_CC_MOBILE = '15112312781'
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
@@ -74,7 +77,7 @@ serve(async (req) => {
 
     // 查询已发送过企业微信的记录，用于去重
     // 去重维度：borrow_request_id + recipient_id（同一申请在不同审批步骤给不同审批人推送，每人只收1次）
-    const pendingRequestIds = [...new Set(pendingNotifications.map((n: any) => n.borrow_request_id))]
+    const pendingRequestIds = [...new Set(pendingNotifications.map((n) => n.borrow_request_id))]
     const { data: wecomSentRecords } = await supabase
       .from('overdue_notifications')
       .select('borrow_request_id, recipient_id')
@@ -84,12 +87,12 @@ serve(async (req) => {
 
     // 构建 "request_id:recipient_id" 去重集合
     const wecomSentKeys = new Set(
-      (wecomSentRecords || []).map((r: any) => `${r.borrow_request_id}:${r.recipient_id}`)
+      (wecomSentRecords || []).map((r) => `${r.borrow_request_id}:${r.recipient_id}`)
     )
 
     // 过滤掉已发送企业微信的申请+收件人组合
     const unsentNotifications = pendingNotifications.filter(
-      (n: any) => !wecomSentKeys.has(`${n.borrow_request_id}:${n.recipient_id}`)
+      (n) => !wecomSentKeys.has(`${n.borrow_request_id}:${n.recipient_id}`)
     )
 
     if (unsentNotifications.length === 0) {
@@ -104,7 +107,7 @@ serve(async (req) => {
     // recipient_id != requester_id → 待审批提醒（审批人收，待审批人只显示自己）
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
     let wecomSentCount = 0
-    const deliveredNotifications: any[] = []
+    const deliveredNotifications: typeof unsentNotifications = []
 
     if (wecomUrl) {
       for (const n of unsentNotifications) {
@@ -119,11 +122,10 @@ serve(async (req) => {
 
         const recipientName = recipient.display_name || recipient.email || '未知'
         const requesterName = req.requester?.display_name || '未知'
-        const mentionedRecipientName = `@${recipientName}`
-        const mentionedRequesterName = `@${requesterName}`
         const recipientMobile = recipient.phone?.trim() || null
         const requesterMobile = req.requester?.phone?.trim() || null
         const isApprover = n.recipient_id !== req.requester_id
+        const isRejected = !isApprover && (n.message || '').includes('审批拒绝')
 
         let content: string
         if (isApprover) {
@@ -131,28 +133,24 @@ serve(async (req) => {
           content = [
             `【新审批申请】`,
             `申请单号：${req.request_number}`,
-            `申请人：${mentionedRequesterName}`,
+            `申请人：${requesterName}`,
             `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
             `条码：${req.items?.barcode || '-'}`,
             `借用类型：${borrowTypeLabel}`,
             `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
             `用途：${req.purpose || '-'}`,
-            `待审批人：${mentionedRecipientName}`,
+            `待审批人：${recipientName}`,
             ``,
             `请及时处理审批，谢谢！`,
           ].join('\n')
         } else {
           // 审批结果通知：发给申请人
           // 根据消息内容判断是"通过"还是"拒绝"
-          const isRejected = (n.message || '').includes('审批拒绝')
           const title = isRejected ? '【审批拒绝】' : '【审批通过】'
-          const mentionedNames = isRejected
-            ? mentionedRequesterName
-            : `${mentionedRequesterName} @林芷茵`
           content = [
             title,
             `申请单号：${req.request_number}`,
-            `申请人：${mentionedNames}`,
+            `申请人：${requesterName}`,
             `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
             `条码：${req.items?.barcode || '-'}`,
             `借用类型：${borrowTypeLabel}`,
@@ -171,16 +169,15 @@ serve(async (req) => {
               msgtype: 'text',
               text: {
                 content,
-                // A visible @name is always included. When the profile has a
-                // verified WeCom-bound mobile number, this also triggers a real
-                // group mention through the webhook API.
+                // 企业微信会为手机号列表生成真正生效的 @；正文中的姓名保持纯文本，
+                // 避免重复 @ 或把未通知的人误写成 @。
                 mentioned_mobile_list: isApprover
                   ? (recipientMobile ? [recipientMobile] : [])
                   : isRejected
                     ? (recipientMobile ? [recipientMobile] : [])
                     : [
                         ...new Set(
-                          [requesterMobile, '15112312781'].filter(
+                          [requesterMobile, APPROVAL_CC_MOBILE].filter(
                             (mobile): mobile is string => Boolean(mobile)
                           )
                         ),
@@ -207,7 +204,15 @@ serve(async (req) => {
 
     // 标记这些通知为已发送企业微信
     // 插入 wecom 类型的通知记录，既作为标记也作为记录
-    const wecomNotifications: any[] = []
+    const wecomNotifications: Array<{
+      borrower_id: string | null
+      notification_type: 'wecom'
+      notification_category: 'approval'
+      recipient_id: string
+      borrow_request_id: string
+      message: string
+      is_read: true
+    }> = []
     for (const n of deliveredNotifications) {
       wecomNotifications.push({
         borrower_id: n.borrow_requests?.requester_id || null,
@@ -233,7 +238,7 @@ serve(async (req) => {
       JSON.stringify({
         message: 'Approval notifications processed',
         totalPendingCount: unsentNotifications.length,
-        uniqueRequestCount: new Set(unsentNotifications.map((n: any) => n.borrow_request_id)).size,
+        uniqueRequestCount: new Set(unsentNotifications.map((n) => n.borrow_request_id)).size,
         wecomSentCount,
         skippedAlreadySent: pendingNotifications.length - unsentNotifications.length,
       }),
