@@ -9,6 +9,14 @@ const corsHeaders = {
 // 短借期阈值（天）：借出时间≤此值的标记为「短借逾期」，>此值的标记为「长借逾期」
 const SHORT_BORROW_THRESHOLD_DAYS = 3
 
+interface OverdueNotificationInsert {
+  borrow_record_id: string
+  borrower_id: string
+  notification_type: 'push'
+  message: string
+  is_read: false
+}
+
 serve(async (req) => {
   // Handle CORS preflight
   if (req.method === 'OPTIONS') {
@@ -43,7 +51,7 @@ serve(async (req) => {
         borrow_date,
         due_date,
         items (name, barcode),
-        profiles:borrower_id (display_name, email)
+        profiles:borrower_id (display_name, email, phone)
       `)
       .eq('status', 'active')
       .lt('due_date', today)
@@ -54,13 +62,13 @@ serve(async (req) => {
 
     // Update newly overdue records to 'overdue' status
     if (newOverdueRecords && newOverdueRecords.length > 0) {
-      const newRecordIds = newOverdueRecords.map((r: any) => r.id)
+      const newRecordIds = newOverdueRecords.map((r) => r.id)
       await supabase
         .from('borrow_records')
         .update({ status: 'overdue', updated_at: new Date().toISOString() })
         .in('id', newRecordIds)
 
-      const newItemIds = [...new Set(newOverdueRecords.map((r: any) => r.item_id))]
+      const newItemIds = [...new Set(newOverdueRecords.map((r) => r.item_id))]
       if (newItemIds.length > 0) {
         await supabase
           .from('items')
@@ -81,7 +89,7 @@ serve(async (req) => {
         borrow_date,
         due_date,
         items (name, barcode),
-        profiles:borrower_id (display_name, email)
+        profiles:borrower_id (display_name, email, phone)
       `)
       .eq('status', 'overdue')
       .lt('due_date', today)
@@ -98,7 +106,7 @@ serve(async (req) => {
 
     // 去重（按 id）
     const seenIds = new Set<string>()
-    const uniqueRecords = allOverdueRecords.filter((r: any) => {
+    const uniqueRecords = allOverdueRecords.filter((r) => {
       if (seenIds.has(r.id)) return false
       seenIds.add(r.id)
       return true
@@ -114,8 +122,9 @@ serve(async (req) => {
     // ========================================
     // Part C: 发送通知
     // ========================================
-    const notifications: any[] = []
+    const notifications: OverdueNotificationInsert[] = []
     const wecomItems: string[] = []
+    const mentionedBorrowerMobiles = new Set<string>()
 
     for (const r of uniqueRecords) {
       const borrowDate = new Date(r.borrow_date)
@@ -136,9 +145,15 @@ serve(async (req) => {
       })
 
       // 企业微信提醒
+      const borrowerName = r.profiles?.display_name || r.profiles?.email || '未知用户'
       wecomItems.push(
-        `- ${r.profiles?.display_name || '未知用户'}：「${r.items?.name || '未知'}」逾期 ${overdueDays} 天（${label}），应还 ${r.due_date}`
+        `- ${borrowerName}：「${r.items?.name || '未知'}」逾期 ${overdueDays} 天（${label}），应还 ${r.due_date}`
       )
+
+      const borrowerMobile = r.profiles?.phone?.trim()
+      if (borrowerMobile) {
+        mentionedBorrowerMobiles.add(borrowerMobile)
+      }
     }
 
     // Insert in-app notifications
@@ -162,8 +177,13 @@ serve(async (req) => {
           body: JSON.stringify({
             msgtype: 'text',
             text: {
-              content: `【样机逾期提醒】\n以下样机已逾期，请跟进处理：\n${overdueList}`,
-              mentioned_mobile_list: [],
+              content: [
+                `【样机逾期提醒】`,
+                `以下样机已逾期，请跟进处理：`,
+                overdueList,
+              ].join('\n'),
+              // 企业微信会为手机号列表生成真正生效的 @，正文不再手工拼接 @姓名。
+              mentioned_mobile_list: [...mentionedBorrowerMobiles],
             },
           }),
         })
