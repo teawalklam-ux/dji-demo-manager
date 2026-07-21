@@ -43,7 +43,7 @@ serve(async (req) => {
         borrow_date,
         due_date,
         items (name, barcode),
-        profiles:borrower_id (display_name, email)
+        profiles:borrower_id (display_name, email, phone)
       `)
       .eq('status', 'active')
       .lt('due_date', today)
@@ -81,7 +81,7 @@ serve(async (req) => {
         borrow_date,
         due_date,
         items (name, barcode),
-        profiles:borrower_id (display_name, email)
+        profiles:borrower_id (display_name, email, phone)
       `)
       .eq('status', 'overdue')
       .lt('due_date', today)
@@ -116,6 +116,8 @@ serve(async (req) => {
     // ========================================
     const notifications: any[] = []
     const wecomItems: string[] = []
+    const mentionedBorrowerNames = new Set<string>()
+    const mentionedBorrowerMobiles = new Set<string>()
 
     for (const r of uniqueRecords) {
       const borrowDate = new Date(r.borrow_date)
@@ -136,9 +138,19 @@ serve(async (req) => {
       })
 
       // 企业微信提醒
+      const borrowerName = r.profiles?.display_name || r.profiles?.email || '未知用户'
       wecomItems.push(
-        `- ${r.profiles?.display_name || '未知用户'}：「${r.items?.name || '未知'}」逾期 ${overdueDays} 天（${label}），应还 ${r.due_date}`
+        `- ${borrowerName}：「${r.items?.name || '未知'}」逾期 ${overdueDays} 天（${label}），应还 ${r.due_date}`
       )
+
+      if (borrowerName !== '未知用户') {
+        mentionedBorrowerNames.add(borrowerName)
+      }
+
+      const borrowerMobile = r.profiles?.phone?.trim()
+      if (borrowerMobile) {
+        mentionedBorrowerMobiles.add(borrowerMobile)
+      }
     }
 
     // Insert in-app notifications
@@ -154,6 +166,9 @@ serve(async (req) => {
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
     if (wecomUrl && wecomItems.length > 0) {
       const overdueList = wecomItems.join('\n')
+      const mentionLine = [...mentionedBorrowerNames]
+        .map((name) => `@${name}`)
+        .join(' ')
 
       try {
         const wecomResponse = await fetch(wecomUrl, {
@@ -162,8 +177,13 @@ serve(async (req) => {
           body: JSON.stringify({
             msgtype: 'text',
             text: {
-              content: `【样机逾期提醒】\n以下样机已逾期，请跟进处理：\n${overdueList}`,
-              mentioned_mobile_list: [],
+              content: [
+                `【样机逾期提醒】`,
+                `以下样机已逾期，请跟进处理：`,
+                overdueList,
+                mentionLine,
+              ].filter(Boolean).join('\n'),
+              mentioned_mobile_list: [...mentionedBorrowerMobiles],
             },
           }),
         })
