@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '@/lib/supabase'
+import { getErrorMessage } from '@/lib/errors'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -34,8 +35,8 @@ export function ResetPassword() {
       const { error: updateError } = await supabase.auth.updateUser({ password })
       if (updateError) throw updateError
       setSuccess(true)
-    } catch (err: any) {
-      setError(err.message || '密码重置失败，请重试')
+    } catch (err: unknown) {
+      setError(getErrorMessage(err, '密码重置失败，请重试'))
     } finally {
       setLoading(false)
     }
