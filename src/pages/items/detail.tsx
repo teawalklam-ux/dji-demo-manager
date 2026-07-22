@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { ITEM_STATUS_MAP, BORROW_TYPE_MAP, BARCODE_GENERATE_OPTIONS } from '@/lib/constants'
+import { ITEM_STATUS_MAP, BARCODE_GENERATE_OPTIONS, getBorrowTypeInfo } from '@/lib/constants'
 import { ArrowLeft, Printer, Edit, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import JsBarcode from 'jsbarcode'
@@ -301,7 +301,7 @@ export function ItemDetail() {
                   <TableRow key={record.id}>
                     <TableCell>{record.borrowerName}</TableCell>
                     <TableCell>
-                      {record.borrowType ? BORROW_TYPE_MAP[record.borrowType as keyof typeof BORROW_TYPE_MAP]?.label || record.borrowType : '-'}
+                      {record.borrowType ? getBorrowTypeInfo(record.borrowType).label : '-'}
                     </TableCell>
                     <TableCell>{record.borrowDate}</TableCell>
                     <TableCell>{record.dueDate}</TableCell>

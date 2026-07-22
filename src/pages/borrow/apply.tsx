@@ -6,7 +6,7 @@ import { approvalService } from '@/services/approval.service'
 import { customerService } from '@/services/customer.service'
 import { toast } from 'sonner'
 import type { Item, BorrowRequestInput, ApprovalChain, UserCustomer } from '@/types'
-import { BORROW_TYPE_MAP } from '@/lib/constants'
+import { getBorrowTypeInfo, getBorrowTypeOptions } from '@/lib/constants'
 import type { BorrowType } from '@/lib/constants'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
@@ -120,9 +120,11 @@ export function BorrowApply() {
     return () => { cancelled = true }
   }, [selectedItemIds, expectedBorrowDate, expectedReturnDate])
 
-  const currentChain = chains.find(
-    (c) => c.borrow_type === borrowType || c.borrow_type === 'all'
-  )
+  const borrowTypeOptions = getBorrowTypeOptions(chains.map(chain => chain.borrow_type))
+
+  const currentChain = chains.find((c) => c.borrow_type === borrowType)
+    || chains.find((c) => c.borrow_type === 'all')
+  const borrowTypeInfo = getBorrowTypeInfo(borrowType)
 
   const maxBorrowDays = currentChain?.max_borrow_days ?? null
 
@@ -176,7 +178,7 @@ export function BorrowApply() {
       return
     }
     if (exceedsMaxDays) {
-      toast.error(`${BORROW_TYPE_MAP[borrowType].label}最多可申请 ${maxBorrowDays} 天，当前为 ${borrowDays} 天`)
+      toast.error(`${borrowTypeInfo.label}最多可申请 ${maxBorrowDays} 天，当前为 ${borrowDays} 天`)
       return
     }
     if (availabilityConflicts.length > 0) {
@@ -309,20 +311,19 @@ export function BorrowApply() {
           <RadioGroup
             value={borrowType}
             onValueChange={(v) => setBorrowType(v as BorrowType)}
-            className="flex gap-6"
+            className="flex flex-wrap gap-x-6 gap-y-3"
           >
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="customer" id="customer" />
-              <Label htmlFor="customer" className="cursor-pointer">
-                客户试用
-              </Label>
-            </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="marketing" id="marketing" />
-              <Label htmlFor="marketing" className="cursor-pointer">
-                营销演示
-              </Label>
-            </div>
+            {borrowTypeOptions.map(option => {
+              const inputId = `borrow-type-${encodeURIComponent(option.value)}`
+              return (
+                <div key={option.value} className="flex items-center space-x-2">
+                  <RadioGroupItem value={option.value} id={inputId} />
+                  <Label htmlFor={inputId} className="cursor-pointer">
+                    {option.label}
+                  </Label>
+                </div>
+              )
+            })}
           </RadioGroup>
 
           {borrowType === 'customer' && (
@@ -432,7 +433,7 @@ export function BorrowApply() {
           )}
           {maxBorrowDays !== null && (
             <div className={`rounded-md p-3 text-sm ${exceedsMaxDays ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
-              {BORROW_TYPE_MAP[borrowType].label}最多可申请 <strong>{maxBorrowDays}</strong> 天
+              {borrowTypeInfo.label}最多可申请 <strong>{maxBorrowDays}</strong> 天
               {borrowDays > 0 && (
                 <span className="ml-2">
                   当前: <strong>{borrowDays}</strong> 天
@@ -449,7 +450,7 @@ export function BorrowApply() {
         <CardHeader>
           <CardTitle>审批流程预览</CardTitle>
           <CardDescription>
-            当前类型: <Badge variant="secondary">{BORROW_TYPE_MAP[borrowType].label}</Badge>
+            当前类型: <Badge variant="secondary">{borrowTypeInfo.label}</Badge>
           </CardDescription>
         </CardHeader>
         <CardContent>

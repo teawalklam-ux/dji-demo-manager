@@ -1,6 +1,6 @@
 import * as XLSX from 'xlsx'
 import type { Item, BorrowRecord, ApprovalRecord } from '@/types'
-import { ITEM_STATUS_MAP, BORROW_TYPE_MAP } from '@/lib/constants'
+import { ITEM_STATUS_MAP, getBorrowTypeInfo } from '@/lib/constants'
 import { getCurrentOverdueDays } from '@/lib/borrow-record'
 
 function saveAsExcel(data: Record<string, string | number>[], filename: string, sheetName: string) {
@@ -34,7 +34,7 @@ export const exportService = {
       '样机名称': record.item?.name || '',
       '样机型号': record.item?.model || '',
       '条码': record.item?.barcode || '',
-      '借用类型': BORROW_TYPE_MAP[record.borrow_type]?.label || record.borrow_type,
+      '借用类型': getBorrowTypeInfo(record.borrow_type).label,
       '借用日期': record.borrow_date,
       '应还日期': record.due_date,
       '实际归还日期': record.return_date || '',

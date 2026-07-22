@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
-import { ROLE_MAP, BORROW_TYPE_MAP } from '@/lib/constants'
+import { ROLE_MAP, BUILT_IN_BORROW_TYPE_OPTIONS, getBorrowTypeInfo, getBorrowTypeOptions } from '@/lib/constants'
 import type { ApprovalChain, ApprovalStep, UserRole, Profile } from '@/types'
 import { Plus, Trash2, X } from 'lucide-react'
 
@@ -22,6 +22,7 @@ interface StepForm {
 }
 
 const emptyStep: StepForm = { type: 'role', role: 'approver', user_id: '', label: '' }
+const NEW_BORROW_TYPE = '__new_borrow_type__'
 
 export function ApprovalChainsPage() {
   const [chains, setChains] = useState<ApprovalChain[]>([])
@@ -31,6 +32,7 @@ export function ApprovalChainsPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [chainName, setChainName] = useState('')
   const [borrowType, setBorrowType] = useState<string>('all')
+  const [newBorrowType, setNewBorrowType] = useState('')
   const [maxBorrowDays, setMaxBorrowDays] = useState<string>('')
   const [steps, setSteps] = useState<StepForm[]>([{ ...emptyStep }])
   const [submitting, setSubmitting] = useState(false)
@@ -61,6 +63,7 @@ export function ApprovalChainsPage() {
     setEditingId(null)
     setChainName('')
     setBorrowType('all')
+    setNewBorrowType('')
     setMaxBorrowDays('')
     setSteps([{ ...emptyStep }])
     setDialogOpen(true)
@@ -70,6 +73,7 @@ export function ApprovalChainsPage() {
     setEditingId(chain.id)
     setChainName(chain.name)
     setBorrowType(chain.borrow_type)
+    setNewBorrowType('')
     setMaxBorrowDays(chain.max_borrow_days ? String(chain.max_borrow_days) : '')
     setSteps(
       chain.steps.map(s => ({
@@ -95,8 +99,44 @@ export function ApprovalChainsPage() {
   }
 
   async function handleSubmit() {
-    if (!chainName) {
+    if (!chainName.trim()) {
       toast.error('请填写审批链名称')
+      return
+    }
+    const resolvedBorrowType = borrowType === NEW_BORROW_TYPE ? newBorrowType.trim() : borrowType
+    if (!resolvedBorrowType) {
+      toast.error('请填写新借用类型名称')
+      return
+    }
+    if (resolvedBorrowType.length > 50) {
+      toast.error('借用类型名称不能超过 50 个字符')
+      return
+    }
+    if (borrowType === NEW_BORROW_TYPE) {
+      const normalizedType = resolvedBorrowType.toLocaleLowerCase('zh-CN')
+      const reservedNames = new Set([
+        'all',
+        ...BUILT_IN_BORROW_TYPE_OPTIONS.flatMap(option => [
+          option.value.toLocaleLowerCase('zh-CN'),
+          option.label.toLocaleLowerCase('zh-CN'),
+        ]),
+      ])
+      const typeAlreadyExists = chains.some(
+        chain => chain.borrow_type.toLocaleLowerCase('zh-CN') === normalizedType
+      )
+      if (reservedNames.has(normalizedType) || typeAlreadyExists) {
+        toast.error('该借用类型已存在，请直接从下拉列表选择')
+        return
+      }
+    }
+    const conflictingChain = chains.find(
+      chain => chain.id !== editingId
+        && chain.is_active
+        && chain.borrow_type === resolvedBorrowType
+        && resolvedBorrowType !== 'all'
+    )
+    if (conflictingChain) {
+      toast.error(`借用类型“${getBorrowTypeInfo(resolvedBorrowType).label}”已有启用中的审批链`)
       return
     }
     if (steps.length === 0 || steps.some(s => !s.label)) {
@@ -121,16 +161,16 @@ export function ApprovalChainsPage() {
       setSubmitting(true)
       if (editingId) {
         await approvalService.updateChain(editingId, {
-          name: chainName,
-          borrow_type: borrowType,
+          name: chainName.trim(),
+          borrow_type: resolvedBorrowType,
           steps: chainSteps,
           max_borrow_days: maxDays,
         })
         toast.success('审批链已更新')
       } else {
         await approvalService.createChain({
-          name: chainName,
-          borrow_type: borrowType,
+          name: chainName.trim(),
+          borrow_type: resolvedBorrowType,
           steps: chainSteps,
           max_borrow_days: maxDays,
         })
@@ -170,8 +210,7 @@ export function ApprovalChainsPage() {
 
   const borrowTypeOptions = [
     { value: 'all', label: '全部' },
-    { value: 'customer', label: BORROW_TYPE_MAP.customer?.label || '客户试用' },
-    { value: 'marketing', label: BORROW_TYPE_MAP.marketing?.label || '营销演示' },
+    ...getBorrowTypeOptions(chains.map(chain => chain.borrow_type)),
   ]
 
   if (loading) {
@@ -223,7 +262,7 @@ export function ApprovalChainsPage() {
                       <Badge variant="outline">
                         {chain.borrow_type === 'all'
                           ? '全部'
-                          : BORROW_TYPE_MAP[chain.borrow_type as keyof typeof BORROW_TYPE_MAP]?.label || chain.borrow_type}
+                          : getBorrowTypeInfo(chain.borrow_type).label}
                       </Badge>
                     </TableCell>
                     <TableCell>
@@ -291,8 +330,30 @@ export function ApprovalChainsPage() {
                       {opt.label}
                     </SelectItem>
                   ))}
+                  {!editingId && (
+                    <SelectItem value={NEW_BORROW_TYPE}>＋ 新建借用类型</SelectItem>
+                  )}
                 </SelectContent>
               </Select>
+              {borrowType === NEW_BORROW_TYPE && (
+                <div className="space-y-2 rounded-md border border-dashed p-3">
+                  <label className="text-sm font-medium">新借用类型名称 *</label>
+                  <Input
+                    placeholder="例如：内部培训"
+                    maxLength={50}
+                    value={newBorrowType}
+                    onChange={e => setNewBorrowType(e.target.value)}
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    创建后会作为独立选项显示在借用申请中，并只匹配这条审批链。
+                  </p>
+                </div>
+              )}
+              {borrowType === 'all' && (
+                <p className="text-xs text-muted-foreground">
+                  “全部”是未匹配到专属类型时使用的兜底流程，不会成为借用申请选项。
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
