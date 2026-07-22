@@ -21,6 +21,7 @@ const CategoriesPage = lazy(() => import('@/pages/admin/categories').then((m) =>
 const ApprovalChainsPage = lazy(() => import('@/pages/admin/approval-chains').then((m) => ({ default: m.ApprovalChainsPage })))
 const SettingsPage = lazy(() => import('@/pages/admin/settings').then((m) => ({ default: m.SettingsPage })))
 const CustomersPage = lazy(() => import('@/pages/admin/customers').then((m) => ({ default: m.CustomersPage })))
+const RequestCleanupPage = lazy(() => import('@/pages/admin/request-cleanup').then((m) => ({ default: m.RequestCleanupPage })))
 const ReportsPage = lazy(() => import('@/pages/reports/index').then((m) => ({ default: m.ReportsPage })))
 const PendingApproval = lazy(() => import('@/pages/pending-approval').then((m) => ({ default: m.PendingApproval })))
 const AccountDisabled = lazy(() => import('@/pages/account-disabled').then((m) => ({ default: m.AccountDisabled })))
@@ -89,6 +90,11 @@ function App() {
             <Route path="admin/customers" element={
               <AuthGuard requireRole={['super_admin']}>
                 <CustomersPage />
+              </AuthGuard>
+            } />
+            <Route path="admin/request-cleanup" element={
+              <AuthGuard requireRole={['super_admin', 'admin']}>
+                <RequestCleanupPage />
               </AuthGuard>
             } />
             <Route path="reports" element={<ReportsPage />} />

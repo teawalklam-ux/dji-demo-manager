@@ -44,6 +44,7 @@ export function BorrowReturn() {
         .from('borrow_records')
         .select('*, item:items(*), borrower:profiles(*)')
         .eq('id', recordId)
+        .in('status', ['active', 'overdue'])
         .maybeSingle()
 
       if (directError) {
@@ -165,7 +166,10 @@ export function BorrowReturn() {
           {activeRecords.length > 1 && (
             <div className="space-y-2">
               <Label>选择要归还的样机</Label>
-              <Select value={record.id} onValueChange={(id) => setRecord(activeRecords.find((candidate) => candidate.id === id) || null)}>
+              <Select value={record.id} onValueChange={(id) => {
+                setRecord(activeRecords.find((candidate) => candidate.id === id) || null)
+                setPhotoData(null)
+              }}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
                   {activeRecords.map((candidate) => (
@@ -222,6 +226,7 @@ export function BorrowReturn() {
 
       {/* 归还拍照（必填） */}
       <ReturnPhotoCapture
+        key={record.id}
         onPhotoCaptured={(data) => setPhotoData(data)}
         onPhotoCleared={() => setPhotoData(null)}
       />

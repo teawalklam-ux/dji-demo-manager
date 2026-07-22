@@ -14,6 +14,7 @@ import {
   Tags,
   GitBranch,
   Contact,
+  Trash2,
   BarChart3,
   LogOut,
   Bell,
@@ -49,6 +50,7 @@ const adminNavItems = [
   { title: '客户地址簿', href: '/admin/customers', icon: Contact, superAdminOnly: true },
   { title: '分类管理', href: '/admin/categories', icon: Tags, superAdminOnly: false },
   { title: '审批链配置', href: '/admin/approval-chains', icon: GitBranch, superAdminOnly: false },
+  { title: '记录清理', href: '/admin/request-cleanup', icon: Trash2, superAdminOnly: false },
   { title: '系统设置', href: '/admin/settings', icon: Settings, superAdminOnly: true },
 ]
 
