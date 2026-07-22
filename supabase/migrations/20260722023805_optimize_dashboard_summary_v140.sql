@@ -1,3 +1,4 @@
+-- Production migration history: 20260722023805_optimize_dashboard_summary_v140.
 -- Collapse the dashboard's sequential count requests into one authenticated RPC.
 -- SECURITY INVOKER preserves the caller's RLS visibility for items and requests.
 CREATE OR REPLACE FUNCTION public.get_dashboard_summary()
