@@ -264,12 +264,15 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
 
   useEffect(() => {
     if (open) {
+      // Opening a controlled scanner session intentionally resets its selected mode.
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setActiveMode(mode)
     }
   }, [mode, open])
 
   useEffect(() => {
     if (!open) {
+      /* eslint-disable react-hooks/set-state-in-effect -- Closing must synchronously release the camera and clear session state. */
       stopScanning()
       setManualValue('')
       setLastScanResult('')
@@ -277,6 +280,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       setScanNotice('')
       setError('')
       pendingRef.current = { text: '', count: 0 }
+      /* eslint-enable react-hooks/set-state-in-effect */
       return
     }
 

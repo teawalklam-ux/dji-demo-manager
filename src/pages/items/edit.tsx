@@ -85,7 +85,7 @@ export function EditItem() {
       if (item.specs) {
         setSpecPairs(Object.entries(item.specs).map(([k, v]) => ({ key: k, value: v as string })))
       }
-    } catch (err) {
+    } catch {
       setError('加载样机信息失败')
     } finally {
       setPageLoading(false)

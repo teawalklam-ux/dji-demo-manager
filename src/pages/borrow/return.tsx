@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { toast } from 'sonner'
 import type { BorrowRecord } from '@/types'
 import { BORROW_TYPE_MAP } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 import { ReturnPhotoCapture } from '@/components/borrow/return-photo-capture'
 import type { PhotoData } from '@/components/borrow/return-photo-capture'
 
@@ -69,8 +70,8 @@ export function BorrowReturn() {
       const records = (requestRecords || []) as BorrowRecord[]
       setActiveRecords(records)
       setRecord(records[0] || null)
-    } catch (error: any) {
-      setLoadError(error.message || '加载失败')
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error, '加载失败'))
       toast.error('加载借用记录失败')
     } finally {
       setLoading(false)
@@ -96,8 +97,8 @@ export function BorrowReturn() {
       })
       toast.success('归还确认成功')
       navigate('/borrow/my-requests')
-    } catch (error: any) {
-      toast.error(error.message || '归还确认失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '归还确认失败'))
     } finally {
       setSubmitting(false)
     }

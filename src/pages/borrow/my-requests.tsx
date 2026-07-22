@@ -5,6 +5,7 @@ import { toast } from 'sonner'
 import type { BorrowRequest } from '@/types'
 import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
 import type { BorrowRequestStatus } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -60,8 +61,8 @@ export function MyRequests() {
       await borrowService.cancelRequest(id)
       toast.success('申请已取消')
       loadRequests()
-    } catch (error: any) {
-      toast.error(error.message || '取消失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '取消失败'))
     }
   }
 

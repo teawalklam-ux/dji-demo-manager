@@ -3,6 +3,7 @@ import { customerService } from '@/services/customer.service'
 import { toast } from 'sonner'
 import type { UserCustomer } from '@/types'
 import { ROLE_MAP } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -40,8 +41,8 @@ export function CustomersPage() {
       await customerService.delete(id)
       toast.success('已删除')
       loadData()
-    } catch (error: any) {
-      toast.error(error.message || '删除失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '删除失败'))
     } finally {
       setDeletingId(null)
     }

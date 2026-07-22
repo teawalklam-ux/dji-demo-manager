@@ -46,7 +46,7 @@ serve(async (req) => {
 
     if (expiredPhotos && expiredPhotos.length > 0) {
       // 批量删除 Storage 文件
-      const storagePaths = expiredPhotos.map((p: any) => p.storage_path)
+      const storagePaths = expiredPhotos.map((p) => p.storage_path)
       const { error: removeError } = await supabase.storage
         .from('return-photos')
         .remove(storagePaths)
@@ -70,7 +70,7 @@ serve(async (req) => {
       }
 
       // 标记照片为已删除（设置 photo_deleted_at）
-      const photoIds = expiredPhotos.map((p: any) => p.id)
+      const photoIds = expiredPhotos.map((p) => p.id)
       const { error: updateError } = await supabase
         .from('return_photos')
         .update({ photo_deleted_at: now.toISOString() })
@@ -114,10 +114,10 @@ serve(async (req) => {
       JSON.stringify(result),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('[cleanup-return-photos] Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : '服务器内部错误' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

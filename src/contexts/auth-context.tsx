@@ -99,12 +99,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, displayName: string) {
     try {
-      // 预检：通过 RPC 函数检查邮箱是否已存在（绕过 RLS，查所有状态的用户）
-      const { data: emailExists } = await supabase.rpc('check_email_exists', { p_email: email })
-      if (emailExists) {
-        return { error: new Error('该邮箱已注册') }
-      }
-
       const { error } = await supabase.auth.signUp({
         email,
         password,

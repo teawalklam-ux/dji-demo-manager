@@ -6,6 +6,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
 import type { BorrowRequest } from '@/types'
 import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -58,8 +59,8 @@ export function ApprovalDetail() {
       await approvalService.processApproval(requestId, 'approved')
       toast.success('审批通过')
       loadRequest()
-    } catch (error: any) {
-      toast.error(error.message || '审批操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
       setProcessing(false)
     }
@@ -78,8 +79,8 @@ export function ApprovalDetail() {
       setRejectDialogOpen(false)
       setRejectReason('')
       loadRequest()
-    } catch (error: any) {
-      toast.error(error.message || '审批操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
       setProcessing(false)
     }
@@ -98,8 +99,8 @@ export function ApprovalDetail() {
       setRevokeDialogOpen(false)
       setRevokeReason('')
       loadRequest()
-    } catch (error: any) {
-      toast.error(error.message || '撤销操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '撤销操作失败'))
     } finally {
       setProcessing(false)
     }
