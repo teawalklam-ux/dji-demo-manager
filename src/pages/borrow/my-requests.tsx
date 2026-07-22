@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Camera } from 'lucide-react'
 
 type TabKey = 'all' | BorrowRequestStatus
 
@@ -25,6 +26,7 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'partially_returned', label: '部分归还' },
   { key: 'returned', label: '已归还' },
   { key: 'overdue', label: '逾期' },
+  { key: 'cancelled', label: '已取消' },
 ]
 
 export function MyRequests() {
@@ -112,6 +114,8 @@ export function MyRequests() {
             filteredRequests.map((request) => {
               const statusInfo = REQUEST_STATUS_MAP[request.status]
               const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
+              const returnableItemCount = request.request_items?.filter((line) => line.status === 'borrowed').length || 0
+              const canReturn = returnableItemCount > 0 || ['borrowed', 'partially_returned', 'overdue'].includes(request.status)
               return (
                 <Card key={request.id}>
                   <CardHeader className="pb-3">
@@ -166,13 +170,14 @@ export function MyRequests() {
                           取消申请
                         </Button>
                       )}
-                      {(request.status === 'borrowed' || request.status === 'partially_returned') && (
+                      {canReturn && (
                         <>
                           <Button
                             size="sm"
                             onClick={() => handleApplyReturn(request.id)}
                           >
-                            申请归还
+                            <Camera className="mr-1 size-4" />
+                            拍照归还{returnableItemCount > 1 ? `（${returnableItemCount} 台待归还）` : ''}
                           </Button>
                           {request.status === 'borrowed' && <Button
                             size="sm"
@@ -182,14 +187,6 @@ export function MyRequests() {
                             申请续借
                           </Button>}
                         </>
-                      )}
-                      {request.status === 'overdue' && (
-                        <Button
-                          size="sm"
-                          onClick={() => handleApplyReturn(request.id)}
-                        >
-                          申请归还
-                        </Button>
                       )}
                     </div>
                   </CardContent>
