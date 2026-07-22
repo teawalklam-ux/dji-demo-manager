@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase'
-import type { Item, ItemCreateInput, ItemFilters, PaginatedResponse } from '@/types'
+import type { Item, ItemCreateInput, ItemDisplayStatus, ItemFilters, PaginatedResponse } from '@/types'
 
 type BorrowableItemStatusDetail = {
   item_id: string
@@ -10,7 +10,85 @@ type BorrowableItemStatusDetail = {
   serial_number_last4: string | null
 }
 
+type DashboardSummaryRow = {
+  total: number
+  in_stock: number
+  reserved: number
+  borrowed: number
+  overdue: number
+  monthly_requests: number
+}
+
+type ItemPageRow = {
+  id: string
+  barcode: string
+  name: string
+  model: string
+  category_id: string
+  status: Item['status']
+  display_status: ItemDisplayStatus
+  location: string | null
+  created_at: string
+  updated_at: string
+  category_name: string | null
+  total_count: number
+}
+
+type ItemPageFilters = ItemFilters & {
+  display_status?: ItemDisplayStatus
+  page?: number
+  page_size?: number
+}
+
 export const itemsService = {
+  async getPage(filters?: ItemPageFilters): Promise<PaginatedResponse<Item>> {
+    const page = Math.max(filters?.page || 1, 1)
+    const pageSize = Math.min(Math.max(filters?.page_size || 50, 1), 100)
+    const { data, error } = await supabase.rpc('get_items_page', {
+      p_search: filters?.search?.trim() || null,
+      p_category_id: filters?.category_id || null,
+      p_status: filters?.display_status || filters?.status || null,
+      p_offset: (page - 1) * pageSize,
+      p_limit: pageSize,
+    })
+    if (error) throw error
+
+    const rows = (data || []) as ItemPageRow[]
+    const items = rows.map((row): Item => ({
+      id: row.id,
+      barcode: row.barcode,
+      name: row.name,
+      model: row.model,
+      serial_number: null,
+      category_id: row.category_id,
+      status: row.status,
+      display_status: row.display_status,
+      specs: {},
+      purchase_date: null,
+      purchase_price: null,
+      notes: null,
+      image_url: null,
+      location: row.location,
+      current_borrower_id: null,
+      created_at: row.created_at,
+      updated_at: row.updated_at,
+      category: row.category_name
+        ? {
+            id: row.category_id,
+            name: row.category_name,
+            code: '',
+            description: null,
+            icon_name: null,
+            sort_order: 0,
+            is_active: true,
+            created_at: '',
+          }
+        : undefined,
+    }))
+
+    return { data: items, count: rows[0]?.total_count || 0 }
+  },
+
   async getAll(filters?: ItemFilters): Promise<PaginatedResponse<Item>> {
     let query = supabase
       .from('items')
@@ -178,12 +256,17 @@ export const itemsService = {
   },
 
   async getStats() {
-    const { count: total } = await supabase.from('items').select('*', { count: 'exact', head: true })
-    const { count: physicalInStock } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'in_stock')
-    const { count: borrowed } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'borrowed')
-    const { count: overdue } = await supabase.from('items').select('*', { count: 'exact', head: true }).eq('status', 'overdue')
-    const reserved = (await this.getReservedItemIds()).size
-    const inStock = Math.max((physicalInStock || 0) - reserved, 0)
-    return { total: total || 0, inStock, reserved, borrowed: borrowed || 0, overdue: overdue || 0 }
+    const { data, error } = await supabase.rpc('get_dashboard_summary')
+    if (error) throw error
+
+    const summary = ((data || []) as DashboardSummaryRow[])[0]
+    return {
+      total: summary?.total || 0,
+      inStock: summary?.in_stock || 0,
+      reserved: summary?.reserved || 0,
+      borrowed: summary?.borrowed || 0,
+      overdue: summary?.overdue || 0,
+      monthlyRequests: summary?.monthly_requests || 0,
+    }
   },
 }

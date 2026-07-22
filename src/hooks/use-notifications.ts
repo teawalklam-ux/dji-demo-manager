@@ -26,7 +26,11 @@ export function useNotifications() {
   }, [user])
 
   useEffect(() => {
-    loadNotifications()
+    const timer = window.setTimeout(() => {
+      void loadNotifications()
+    }, 0)
+
+    return () => window.clearTimeout(timer)
   }, [loadNotifications])
 
   // Realtime 订阅：监听新通知
@@ -43,7 +47,7 @@ export function useNotifications() {
           table: 'overdue_notifications',
         },
         (payload) => {
-          const newNotif = payload.new as any
+          const newNotif = payload.new as Partial<OverdueNotification>
           // 只处理发给当前用户的通知
           if (
             newNotif &&

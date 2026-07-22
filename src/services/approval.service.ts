@@ -49,6 +49,52 @@ export const approvalService = {
     return Array.from(seen.values())
   },
 
+  async getPendingApprovalsForDashboard(userId: string, isAdmin: boolean): Promise<ApprovalRecord[]> {
+    let query = supabase
+      .from('approval_records')
+      .select(`
+        id,
+        request_id,
+        chain_id,
+        approver_id,
+        step_level,
+        action,
+        comment,
+        acted_at,
+        created_at,
+        request:borrow_requests(
+          id,
+          request_number,
+          requester_id,
+          item_id,
+          borrow_type,
+          expected_borrow_date,
+          status,
+          requester:profiles(id, display_name),
+          item:items(id, name, model),
+          request_items:borrow_request_items(id, item_id, item:items(id, name, model))
+        )
+      `)
+      .is('acted_at', null)
+      .order('created_at', { ascending: false })
+
+    if (!isAdmin) {
+      query = query.eq('approver_id', userId)
+    }
+
+    const { data, error } = await query
+    if (error) throw error
+
+    const seen = new Map<string, ApprovalRecord>()
+    for (const record of (data || []) as unknown as ApprovalRecord[]) {
+      const existing = seen.get(record.request_id)
+      if (!existing || record.step_level < existing.step_level) {
+        seen.set(record.request_id, record)
+      }
+    }
+    return Array.from(seen.values())
+  },
+
   async getProcessedApprovals(): Promise<ApprovalRecord[]> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')

@@ -20,14 +20,22 @@ import {
   CheckCheck,
   Clock,
   AlertCircle,
+  type LucideIcon,
 } from 'lucide-react'
 import { ROLE_MAP } from '@/lib/constants'
 import { APP_VERSION } from '@/lib/version'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useState, useRef, useEffect } from 'react'
-import type { OverdueNotification } from '@/types'
+import type { OverdueNotification, UserRole } from '@/types'
 
-const mainNavItems = [
+interface MainNavItem {
+  title: string
+  href: string
+  icon: LucideIcon
+  roles?: UserRole[]
+}
+
+const mainNavItems: MainNavItem[] = [
   { title: '仪表盘', href: '/', icon: LayoutDashboard },
   { title: '样机管理', href: '/items', icon: Package },
   { title: '借用申请', href: '/borrow/apply', icon: FileText },
@@ -49,7 +57,7 @@ function AppSidebar() {
   const location = useLocation()
 
   const filteredMainNav = mainNavItems.filter(
-    item => !item.roles || item.roles.some(r => hasRole(r as any))
+    item => !item.roles || item.roles.some(r => hasRole(r))
   )
 
   return (
