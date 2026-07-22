@@ -62,9 +62,16 @@ serve(async (req) => {
     // 解析请求体
     const { email, displayName, role, password } = await req.json()
 
-    if (!email || !displayName) {
+    if (typeof email !== 'string' || !email.trim() || typeof displayName !== 'string' || !displayName.trim()) {
       return new Response(
         JSON.stringify({ error: '邮箱和姓名为必填项' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    if (password !== undefined && typeof password !== 'string') {
+      return new Response(
+        JSON.stringify({ error: '密码格式无效' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       )
     }
@@ -76,8 +83,12 @@ serve(async (req) => {
       )
     }
 
-    const validRoles = ['user', 'approver', 'admin']
-    const userRole = validRoles.includes(role) ? role : 'user'
+    const normalizedEmail = email.trim().toLowerCase()
+    const normalizedDisplayName = displayName.trim()
+    const validRoles = ['user', 'approver', 'admin'] as const
+    const userRole = typeof role === 'string' && validRoles.includes(role as typeof validRoles[number])
+      ? role as typeof validRoles[number]
+      : 'user'
 
     // 使用 service role key 创建管理员客户端
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
@@ -93,8 +104,8 @@ serve(async (req) => {
       )
     }
 
-    const existingUser = existingUsers.users.find((u: any) =>
-      u.email.toLowerCase() === email.toLowerCase()
+    const existingUser = existingUsers.users.find((u) =>
+      u.email?.toLowerCase() === normalizedEmail
     )
 
     if (existingUser) {
@@ -113,8 +124,8 @@ serve(async (req) => {
           .from('profiles')
           .insert({
             id: existingUser.id,
-            display_name: displayName,
-            email: email,
+            display_name: normalizedDisplayName,
+            email: normalizedEmail,
             role: userRole,
             status: 'pending_approval',
             is_active: true,
@@ -132,7 +143,7 @@ serve(async (req) => {
         await adminClient.auth.admin.updateUserById(existingUser.id, {
           user_metadata: {
             ...existingUser.user_metadata,
-            display_name: displayName,
+            display_name: normalizedDisplayName,
             role: userRole,
             invite_by_admin: 'true',
           },
@@ -150,8 +161,13 @@ serve(async (req) => {
       }
 
       // profile 已存在 → 更新角色和显示名
-      const updateData: Record<string, any> = {
-        display_name: displayName,
+      const updateData: {
+        display_name: string
+        role: string
+        updated_at: string
+        status?: 'active'
+      } = {
+        display_name: normalizedDisplayName,
         role: userRole,
         updated_at: new Date().toISOString(),
       }
@@ -189,7 +205,7 @@ serve(async (req) => {
       await adminClient.auth.admin.updateUserById(existingUser.id, {
         user_metadata: {
           ...existingUser.user_metadata,
-          display_name: displayName,
+          display_name: normalizedDisplayName,
           role: userRole,
         },
       })
@@ -223,11 +239,11 @@ serve(async (req) => {
 
     // 使用 admin.createUser 创建用户（无需邮箱验证）
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
-      email,
+      email: normalizedEmail,
       password,
       email_confirm: true,
       user_metadata: {
-        display_name: displayName,
+        display_name: normalizedDisplayName,
         role: userRole,
         invite_by_admin: 'true',
       },
@@ -250,10 +266,10 @@ serve(async (req) => {
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Error:', error)
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: error instanceof Error ? error.message : '服务器内部错误' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )
   }

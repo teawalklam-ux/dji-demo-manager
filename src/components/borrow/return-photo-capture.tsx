@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Spinner } from '@/components/ui/spinner'
 import { drawWatermark } from '@/lib/photo-watermark'
 import { getCurrentLocation, formatCoordinates } from '@/lib/geolocation'
+import { getErrorMessage } from '@/lib/errors'
 import type { GeoLocation } from '@/lib/geolocation'
 import { Camera, RotateCcw, MapPin, Clock } from 'lucide-react'
 
@@ -64,14 +65,15 @@ export function ReturnPhotoCapture({ onPhotoCaptured, onPhotoCleared }: ReturnPh
       const loc = await getCurrentLocation()
       setGeoLocation(loc)
       setLocating(false)
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('[ReturnPhotoCapture] 摄像头错误:', err)
-      if (err.name === 'NotAllowedError') {
+      const errorName = err instanceof Error ? err.name : ''
+      if (errorName === 'NotAllowedError') {
         setCameraError('请允许使用摄像头权限后重试')
-      } else if (err.name === 'NotFoundError') {
+      } else if (errorName === 'NotFoundError') {
         setCameraError('未检测到摄像头设备')
       } else {
-        setCameraError('摄像头启动失败: ' + (err.message || '未知错误'))
+        setCameraError('摄像头启动失败: ' + getErrorMessage(err, '未知错误'))
       }
     }
   }, [])

@@ -73,6 +73,24 @@ export const borrowService = {
     return data || []
   },
 
+  async getRecentRequestsForDashboard(userId: string, limit = 5): Promise<BorrowRequest[]> {
+    const { data, error } = await supabase
+      .from('borrow_requests')
+      .select(`
+        id,
+        request_number,
+        status,
+        created_at,
+        item:items(id, name, model),
+        request_items:borrow_request_items(item:items(id, name, model))
+      `)
+      .eq('requester_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+    if (error) throw error
+    return (data || []) as unknown as BorrowRequest[]
+  },
+
   async getRequestById(id: string): Promise<BorrowRequest | null> {
     const { data, error } = await supabase
       .from('borrow_requests')

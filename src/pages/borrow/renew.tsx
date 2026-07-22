@@ -4,6 +4,7 @@ import { borrowService } from '@/services/borrow.service'
 import { toast } from 'sonner'
 import type { BorrowRequest } from '@/types'
 import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -42,8 +43,8 @@ export function BorrowRenew() {
         current.setDate(current.getDate() + 14)
         setExpectedReturnDate(current.toISOString().split('T')[0])
       }
-    } catch (error: any) {
-      setLoadError(error.message || '加载失败')
+    } catch (error: unknown) {
+      setLoadError(getErrorMessage(error, '加载失败'))
       toast.error('加载申请信息失败')
     } finally {
       setLoading(false)
@@ -73,8 +74,8 @@ export function BorrowRenew() {
       })
       toast.success('续借申请已提交')
       navigate('/borrow/my-requests')
-    } catch (error: any) {
-      toast.error(error.message || '提交续借失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '提交续借失败'))
       console.error(error)
     } finally {
       setSubmitting(false)
