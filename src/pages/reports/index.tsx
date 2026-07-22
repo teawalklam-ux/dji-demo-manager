@@ -1,6 +1,6 @@
 import { useState, useCallback } from 'react'
 import { itemsService } from '@/services/items.service'
-import { borrowService } from '@/services/borrow.service'
+import { borrowReportService } from '@/services/borrow-report.service'
 import { approvalService } from '@/services/approval.service'
 import { exportService } from '@/services/export.service'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -11,6 +11,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 import { ITEM_STATUS_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
+import { getCurrentOverdueDays } from '@/lib/borrow-record'
 import type { Item, BorrowRecord, ApprovalRecord } from '@/types'
 import { Download, Search } from 'lucide-react'
 
@@ -57,7 +58,7 @@ export function ReportsPage() {
         })
         setItems(result.data.slice(0, 50))
       } else if (reportType === 'borrow_records') {
-        const data = await borrowService.getBorrowRecords({
+        const data = await borrowReportService.getBorrowRecords({
           status: statusFilter || undefined,
         })
         setBorrowRecords(data.slice(0, 50))
@@ -252,7 +253,7 @@ export function ReportsPage() {
                           {record.status === 'active' ? '借用中' : record.status === 'returned' ? '已归还' : '逾期'}
                         </span>
                       </TableCell>
-                      <TableCell>{record.overdue_days || 0}</TableCell>
+                      <TableCell>{getCurrentOverdueDays(record)}</TableCell>
                     </TableRow>
                   ))}
                 </TableBody>
