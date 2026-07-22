@@ -4,6 +4,7 @@ import { useAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
 import type { ApprovalRecord, ApprovalProgress } from '@/types'
 import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -61,8 +62,8 @@ export function ApprovalQueue() {
       await approvalService.processApproval(requestId, 'approved')
       toast.success('审批通过')
       loadData()
-    } catch (error: any) {
-      toast.error(error.message || '审批操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
       setProcessingId(null)
     }
@@ -80,8 +81,8 @@ export function ApprovalQueue() {
       setRejectDialogOpen(null)
       setRejectReason('')
       loadData()
-    } catch (error: any) {
-      toast.error(error.message || '审批操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
       setProcessingId(null)
     }
@@ -99,8 +100,8 @@ export function ApprovalQueue() {
       setRevokeDialogOpen(null)
       setRevokeReason('')
       loadData()
-    } catch (error: any) {
-      toast.error(error.message || '撤销操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '撤销操作失败'))
     } finally {
       setProcessingId(null)
     }
@@ -112,9 +113,9 @@ export function ApprovalQueue() {
     setProgressLoading(true)
     try {
       setApprovalProgress(await approvalService.getCurrentApprovalProgress(requestId))
-    } catch (error: any) {
+    } catch (error: unknown) {
       setDetailDialogOpen(null)
-      toast.error(error.message || '无权查看该审批流程详情')
+      toast.error(getErrorMessage(error, '无权查看该审批流程详情'))
     } finally {
       setProgressLoading(false)
     }
