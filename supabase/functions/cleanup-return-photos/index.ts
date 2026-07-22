@@ -28,6 +28,54 @@ serve(async (req) => {
 
     const now = new Date()
 
+    // ===== 0. 删除业务记录时登记的 Storage 文件清理队列 =====
+    // 每次最多处理 100 个，失败项保留到下次定时任务重试，避免循环重试阻塞。
+    const { data: queuedFiles, error: queueFetchError } = await supabase
+      .from('storage_cleanup_queue')
+      .select('id, storage_path')
+      .order('created_at', { ascending: true })
+      .limit(100)
+
+    if (queueFetchError) {
+      throw new Error(`Failed to fetch storage cleanup queue: ${queueFetchError.message}`)
+    }
+
+    const removedQueueIds: string[] = []
+    let queuedStorageErrors = 0
+
+    if (queuedFiles && queuedFiles.length > 0) {
+      const { error: queuedRemoveError } = await supabase.storage
+        .from('return-photos')
+        .remove(queuedFiles.map((file) => file.storage_path))
+
+      if (!queuedRemoveError) {
+        removedQueueIds.push(...queuedFiles.map((file) => file.id))
+      } else {
+        console.error('Failed to remove queued storage files in batch:', queuedRemoveError)
+        for (const file of queuedFiles) {
+          const { error: singleRemoveError } = await supabase.storage
+            .from('return-photos')
+            .remove([file.storage_path])
+          if (singleRemoveError) {
+            queuedStorageErrors++
+            console.error(`Failed to remove queued file ${file.storage_path}:`, singleRemoveError)
+          } else {
+            removedQueueIds.push(file.id)
+          }
+        }
+      }
+
+      if (removedQueueIds.length > 0) {
+        const { error: queueDeleteError } = await supabase
+          .from('storage_cleanup_queue')
+          .delete()
+          .in('id', removedQueueIds)
+        if (queueDeleteError) {
+          throw new Error(`Failed to clear storage cleanup queue: ${queueDeleteError.message}`)
+        }
+      }
+    }
+
     // ===== 1. 30天照片清理: 从 Storage 删除过期照片文件 =====
     const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000).toISOString()
 
@@ -98,6 +146,11 @@ serve(async (req) => {
 
     const result = {
       message: 'Cleanup completed',
+      queuedCleanup: {
+        scanned: queuedFiles?.length || 0,
+        storageDeleted: removedQueueIds.length,
+        storageErrors: queuedStorageErrors,
+      },
       photoCleanup: {
         scanned: expiredPhotos?.length || 0,
         storageDeleted: deletedStorageCount,

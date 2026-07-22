@@ -1,10 +1,28 @@
 import { supabase } from '@/lib/supabase'
 import type { BorrowRequest, BorrowRequestInput, RenewInput, BorrowRecord } from '@/types'
 import type { PhotoData } from '@/components/borrow/return-photo-capture'
+import { TEST_BORROW_TYPE } from '@/lib/borrow-request-cleanup'
 
 export interface ProcessReturnData {
   notes?: string
   photo: PhotoData
+}
+
+export type DeletableBorrowRequest = Omit<BorrowRequest, 'approval_records'> & {
+  approval_records?: Array<{ id: string }>
+  borrow_records?: Array<{ id: string; item_id: string; status: BorrowRecord['status'] }>
+}
+
+export interface DeleteBorrowRequestResult {
+  request_id: string
+  request_number: string
+  deletion_reason: 'test' | 'cancelled' | 'test_and_cancelled'
+  deleted_approval_count: number
+  deleted_borrow_record_count: number
+  deleted_notification_count: number
+  deleted_movement_count: number
+  queued_photo_count: number
+  restored_item_count: number
 }
 
 export const borrowService = {
@@ -52,12 +70,19 @@ export const borrowService = {
   },
 
   async cancelRequest(id: string): Promise<void> {
-    const { error } = await supabase
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) throw new Error('未登录')
+
+    const { data, error } = await supabase
       .from('borrow_requests')
       .update({ status: 'cancelled', updated_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('requester_id', user.id)
       .eq('status', 'pending')
+      .select('id')
+      .maybeSingle()
     if (error) throw error
+    if (!data) throw new Error('申请不存在、已处理或无权取消')
   },
 
   async getMyRequests(): Promise<BorrowRequest[]> {
@@ -71,6 +96,32 @@ export const borrowService = {
       .order('created_at', { ascending: false })
     if (error) throw error
     return data || []
+  },
+
+  /** 管理员记录清理页：只返回“测试”类型或用户已取消的申请。 */
+  async getDeletableRequests(): Promise<DeletableBorrowRequest[]> {
+    const { data, error } = await supabase
+      .from('borrow_requests')
+      .select(`
+        *,
+        requester:profiles(id, display_name, department),
+        request_items:borrow_request_items(id, request_id, item_id, status, item:items(id, name, model)),
+        approval_records(id),
+        borrow_records(id, item_id, status)
+      `)
+      .or(`borrow_type.eq.${TEST_BORROW_TYPE},status.eq.cancelled`)
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data || []) as unknown as DeletableBorrowRequest[]
+  },
+
+  /** 由数据库再次校验管理员身份和删除范围，并原子清理关联记录。 */
+  async deleteEligibleRequest(requestId: string): Promise<DeleteBorrowRequestResult> {
+    const { data, error } = await supabase.rpc('delete_eligible_borrow_request', {
+      p_request_id: requestId,
+    })
+    if (error) throw error
+    return data as DeleteBorrowRequestResult
   },
 
   async getRecentRequestsForDashboard(userId: string, limit = 5): Promise<BorrowRequest[]> {
