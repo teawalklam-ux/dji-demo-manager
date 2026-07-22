@@ -10,7 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
-import { ITEM_STATUS_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
+import { ITEM_STATUS_MAP, REQUEST_STATUS_MAP, getBorrowTypeInfo } from '@/lib/constants'
 import { getCurrentOverdueDays } from '@/lib/borrow-record'
 import type { Item, BorrowRecord, ApprovalRecord } from '@/types'
 import { Download, Search } from 'lucide-react'
@@ -241,7 +241,7 @@ export function ReportsPage() {
                       <TableCell className="font-medium">{record.borrower?.display_name || '-'}</TableCell>
                       <TableCell>{record.item?.name || '-'}</TableCell>
                       <TableCell>{record.item?.model || '-'}</TableCell>
-                      <TableCell>{record.borrow_type === 'customer' ? '客户试用' : '营销演示'}</TableCell>
+                      <TableCell>{getBorrowTypeInfo(record.borrow_type).label}</TableCell>
                       <TableCell>{record.borrow_date}</TableCell>
                       <TableCell>{record.due_date}</TableCell>
                       <TableCell>
