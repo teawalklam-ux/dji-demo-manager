@@ -1,8 +1,7 @@
-import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { categoriesService } from '@/services/categories.service'
-import { exportService } from '@/services/export.service'
 import { useAuth } from '@/contexts/auth-context'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -12,21 +11,24 @@ import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
-import { BatchBarcodePrint } from '@/components/barcode/barcode-print'
-import { BarcodeScanner } from '@/components/barcode/barcode-scanner'
 import { ITEM_STATUS_MAP } from '@/lib/constants'
-import { BatchImport } from '@/components/import/batch-import'
 import { Plus, Download, ScanLine, Search, Printer, Upload, ArrowUpDown } from 'lucide-react'
 import type { Item, Category, ItemStatus, ItemDisplayStatus } from '@/types'
 
 type SortField = 'barcode' | 'name' | 'model' | 'category' | 'status' | 'location'
 type SortOrder = 'asc' | 'desc'
 
+const PAGE_SIZE = 50
+const BatchBarcodePrint = lazy(() => import('@/components/barcode/barcode-print').then(module => ({ default: module.BatchBarcodePrint })))
+const BarcodeScanner = lazy(() => import('@/components/barcode/barcode-scanner').then(module => ({ default: module.BarcodeScanner })))
+const BatchImport = lazy(() => import('@/components/import/batch-import').then(module => ({ default: module.BatchImport })))
+
 export function ItemsList() {
   const { isAdmin } = useAuth()
   const [loading, setLoading] = useState(true)
   const [items, setItems] = useState<Item[]>([])
   const [totalCount, setTotalCount] = useState(0)
+  const [page, setPage] = useState(1)
   const [categories, setCategories] = useState<Category[]>([])
   const [search, setSearch] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -49,34 +51,22 @@ export function ItemsList() {
   const loadItems = useCallback(async () => {
     try {
       setLoading(true)
-      const physicalStatus = statusFilter && statusFilter !== 'reserved'
-        ? statusFilter as ItemStatus
-        : undefined
-      const [result, reservedItemIds] = await Promise.all([
-        itemsService.getAll({
-          search: debouncedSearch || undefined,
-          category_id: categoryFilter || undefined,
-          status: physicalStatus,
-        }),
-        itemsService.getReservedItemIds(),
-      ])
-      const itemsWithDisplayStatus = result.data.map(item => ({
-        ...item,
-        display_status: item.status === 'in_stock' && reservedItemIds.has(item.id)
-          ? 'reserved' as const
-          : item.status,
-      }))
-      const visibleItems = statusFilter
-        ? itemsWithDisplayStatus.filter(item => item.display_status === statusFilter)
-        : itemsWithDisplayStatus
-      setItems(visibleItems)
-      setTotalCount(statusFilter === 'reserved' || statusFilter === 'in_stock' ? visibleItems.length : result.count)
+      const result = await itemsService.getPage({
+        search: debouncedSearch || undefined,
+        category_id: categoryFilter || undefined,
+        display_status: statusFilter ? statusFilter as ItemDisplayStatus : undefined,
+        page,
+        page_size: PAGE_SIZE,
+      })
+      setItems(result.data)
+      setTotalCount(result.count)
+      setSelectedIds(new Set())
     } catch (error) {
       console.error('加载样机列表失败:', error)
     } finally {
       setLoading(false)
     }
-  }, [debouncedSearch, categoryFilter, statusFilter])
+  }, [debouncedSearch, categoryFilter, page, statusFilter])
 
   useEffect(() => {
     loadCategories()
@@ -86,6 +76,7 @@ export function ItemsList() {
   useEffect(() => {
     if (debounceTimer.current) clearTimeout(debounceTimer.current)
     debounceTimer.current = setTimeout(() => {
+      setPage(1)
       setDebouncedSearch(search)
     }, 300)
     return () => {
@@ -106,9 +97,29 @@ export function ItemsList() {
     }
   }
 
-  function handleExport() {
+  async function handleExport() {
     try {
-      exportService.exportItemsToExcel(items)
+      const physicalStatus = statusFilter && statusFilter !== 'reserved'
+        ? statusFilter as ItemStatus
+        : undefined
+      const [result, reservedItemIds, { exportService }] = await Promise.all([
+        itemsService.getAll({
+          search: debouncedSearch || undefined,
+          category_id: categoryFilter || undefined,
+          status: physicalStatus,
+        }),
+        itemsService.getReservedItemIds(),
+        import('@/services/export.service'),
+      ])
+      const exportItems = result.data
+        .map(item => ({
+          ...item,
+          display_status: item.status === 'in_stock' && reservedItemIds.has(item.id)
+            ? 'reserved' as const
+            : item.status,
+        }))
+        .filter(item => !statusFilter || item.display_status === statusFilter)
+      exportService.exportItemsToExcel(exportItems)
     } catch (error) {
       console.error('导出失败:', error)
     }
@@ -268,7 +279,10 @@ export function ItemsList() {
               />
             </div>
             <div className="flex gap-2 shrink-0">
-              <Select value={categoryFilter} onValueChange={(value) => setCategoryFilter(value === 'all' ? '' : value)}>
+              <Select value={categoryFilter} onValueChange={(value) => {
+                setPage(1)
+                setCategoryFilter(value === 'all' ? '' : value)
+              }}>
                 <SelectTrigger className="w-full sm:w-[160px]">
                   <SelectValue placeholder="全部分类" />
                 </SelectTrigger>
@@ -279,7 +293,10 @@ export function ItemsList() {
                   ))}
                 </SelectContent>
               </Select>
-              <Select value={statusFilter} onValueChange={(value) => setStatusFilter(value === 'all' ? '' : value)}>
+              <Select value={statusFilter} onValueChange={(value) => {
+                setPage(1)
+                setStatusFilter(value === 'all' ? '' : value)
+              }}>
                 <SelectTrigger className="w-full sm:w-[130px]">
                   <SelectValue placeholder="全部状态" />
                 </SelectTrigger>
@@ -428,38 +445,74 @@ export function ItemsList() {
                   </div>
                 ))}
               </div>
+
+              {totalCount > PAGE_SIZE && (
+                <div className="flex items-center justify-between border-t pt-4 mt-4">
+                  <p className="text-sm text-muted-foreground">
+                    第 {page} / {Math.ceil(totalCount / PAGE_SIZE)} 页
+                  </p>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page <= 1 || loading}
+                      onClick={() => setPage(current => Math.max(current - 1, 1))}
+                    >
+                      上一页
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={page >= Math.ceil(totalCount / PAGE_SIZE) || loading}
+                      onClick={() => setPage(current => current + 1)}
+                    >
+                      下一页
+                    </Button>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </CardContent>
       </Card>
 
       {/* 扫码对话框 */}
-      <BarcodeScanner
-        open={scanDialogOpen}
-        onOpenChange={setScanDialogOpen}
-        mode="barcode"
-        onScan={(code) => {
-          setScanDialogOpen(false)
-          setSearch(code)
-        }}
-      />
+      {scanDialogOpen && (
+        <Suspense fallback={null}>
+          <BarcodeScanner
+            open={scanDialogOpen}
+            onOpenChange={setScanDialogOpen}
+            mode="barcode"
+            onScan={(code) => {
+              setScanDialogOpen(false)
+              setSearch(code)
+            }}
+          />
+        </Suspense>
+      )}
 
       {/* 批量打印弹窗 */}
       {batchPrintOpen && (
-        <BatchBarcodePrint
-          items={items}
-          selectedIds={Array.from(selectedIds)}
-          onClose={() => setBatchPrintOpen(false)}
-        />
+        <Suspense fallback={null}>
+          <BatchBarcodePrint
+            items={items}
+            selectedIds={Array.from(selectedIds)}
+            onClose={() => setBatchPrintOpen(false)}
+          />
+        </Suspense>
       )}
 
       {/* 批量导入弹窗 */}
-      <BatchImport
-        open={batchImportOpen}
-        onOpenChange={setBatchImportOpen}
-        categories={categories}
-        onSuccess={loadItems}
-      />
+      {batchImportOpen && (
+        <Suspense fallback={null}>
+          <BatchImport
+            open={batchImportOpen}
+            onOpenChange={setBatchImportOpen}
+            categories={categories}
+            onSuccess={loadItems}
+          />
+        </Suspense>
+      )}
     </div>
   )
 }

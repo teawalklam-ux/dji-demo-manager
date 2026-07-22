@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { approvalService } from '@/services/approval.service'
@@ -23,14 +23,20 @@ import {
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { ITEM_STATUS_MAP, BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 import type { Item, StockMovement, ApprovalRecord, BorrowRequest } from '@/types'
 import { toast } from 'sonner'
 
 const CHART_COLORS = ['#2E6AB0', '#22C55E', '#EF4444', '#F97316', '#6B7280']
 
 export function Dashboard() {
-  const { isApprover } = useAuth()
-  const [loading, setLoading] = useState(true)
+  const { isApprover, user, profile } = useAuth()
+  const userId = user?.id
+  const [statsLoading, setStatsLoading] = useState(true)
+  const [overdueLoading, setOverdueLoading] = useState(true)
+  const [movementsLoading, setMovementsLoading] = useState(true)
+  const [approvalsLoading, setApprovalsLoading] = useState(true)
+  const [requestsLoading, setRequestsLoading] = useState(true)
   const [stats, setStats] = useState({ total: 0, inStock: 0, reserved: 0, borrowed: 0, overdue: 0 })
   const [overdueItems, setOverdueItems] = useState<Item[]>([])
   const [recentMovements, setRecentMovements] = useState<StockMovement[]>([])
@@ -43,36 +49,73 @@ export function Dashboard() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
+  const loadDashboardData = useCallback(async () => {
+    setStatsLoading(true)
+    setOverdueLoading(true)
+    setMovementsLoading(true)
+    setApprovalsLoading(isApprover)
+    setRequestsLoading(!!userId)
+
+    const statsTask = itemsService.getStats()
+      .then((summary) => {
+        setStats(summary)
+        setMonthlyRequests(summary.monthlyRequests)
+      })
+      .catch((error) => console.error('加载仪表盘统计失败:', error))
+      .finally(() => setStatsLoading(false))
+
+    const overdueTask = itemsService.getPage({ display_status: 'overdue', page_size: 5 })
+      .then((result) => setOverdueItems(result.data))
+      .catch((error) => console.error('加载逾期样机失败:', error))
+      .finally(() => setOverdueLoading(false))
+
+    const movementsTask = (async () => {
+      try {
+        const { data, error } = await supabase
+          .from('stock_movements')
+          .select('id, item_id, movement_type, created_at, item:items(id, name, model), operator:profiles(id, display_name)')
+          .order('created_at', { ascending: false })
+          .limit(10)
+        if (error) throw error
+        setRecentMovements((data || []) as unknown as StockMovement[])
+      } catch (error) {
+        console.error('加载库存变动失败:', error)
+      } finally {
+        setMovementsLoading(false)
+      }
+    })()
+
+    const isAdmin = profile?.role === 'super_admin' || profile?.role === 'admin'
+    const approvalsTask = isApprover && userId
+      ? approvalService.getPendingApprovalsForDashboard(userId, isAdmin)
+          .then(setPendingApprovals)
+          .catch((error) => console.error('加载待审批失败:', error))
+          .finally(() => setApprovalsLoading(false))
+      : Promise.resolve().then(() => {
+          setPendingApprovals([])
+          setApprovalsLoading(false)
+        })
+
+    const requestsTask = userId
+      ? borrowService.getRecentRequestsForDashboard(userId)
+          .then(setMyRecentRequests)
+          .catch((error) => console.error('加载最近申请失败:', error))
+          .finally(() => setRequestsLoading(false))
+      : Promise.resolve().then(() => {
+          setMyRecentRequests([])
+          setRequestsLoading(false)
+        })
+
+    await Promise.allSettled([statsTask, overdueTask, movementsTask, approvalsTask, requestsTask])
+  }, [isApprover, profile?.role, userId])
+
   useEffect(() => {
-    loadDashboardData()
-  }, [])
+    const timer = window.setTimeout(() => {
+      void loadDashboardData()
+    }, 0)
 
-  async function loadDashboardData() {
-    try {
-      setLoading(true)
-      const [statsResult, overdueResult, movementsResult, pendingResult, monthlyResult, myRequestsResult] = await Promise.allSettled([
-        itemsService.getStats(),
-        itemsService.getAll({ status: 'overdue' }),
-        supabase.from('stock_movements').select('*, item:items(*, category:categories(*)), operator:profiles(*)').order('created_at', { ascending: false }).limit(10),
-        isApprover
-          ? approvalService.getPendingApprovals()
-          : Promise.resolve([]),
-        supabase.from('borrow_requests').select('*', { count: 'exact', head: true }).gte('created_at', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString()),
-        borrowService.getMyRequests(),
-      ])
-
-      if (statsResult.status === 'fulfilled') setStats(statsResult.value)
-      if (overdueResult.status === 'fulfilled') setOverdueItems(overdueResult.value.data)
-      if (movementsResult.status === 'fulfilled') setRecentMovements(movementsResult.value.data || [])
-      if (pendingResult.status === 'fulfilled') setPendingApprovals(pendingResult.value)
-      if (monthlyResult.status === 'fulfilled') setMonthlyRequests(monthlyResult.value.count || 0)
-      if (myRequestsResult.status === 'fulfilled') setMyRecentRequests(myRequestsResult.value.slice(0, 5))
-    } catch (error) {
-      console.error('加载仪表盘数据失败:', error)
-    } finally {
-      setLoading(false)
-    }
-  }
+    return () => window.clearTimeout(timer)
+  }, [loadDashboardData])
 
   // 快速审批 - 通过
   async function handleApprove(requestId: string) {
@@ -81,8 +124,8 @@ export function Dashboard() {
       await approvalService.processApproval(requestId, 'approved')
       toast.success('审批通过')
       loadDashboardData()
-    } catch (error: any) {
-      toast.error(error.message || '审批操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
       setProcessingId(null)
     }
@@ -101,8 +144,8 @@ export function Dashboard() {
       setRejectDialogOpen(null)
       setRejectReason('')
       loadDashboardData()
-    } catch (error: any) {
-      toast.error(error.message || '审批操作失败')
+    } catch (error: unknown) {
+      toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
       setProcessingId(null)
     }
@@ -124,14 +167,6 @@ export function Dashboard() {
     retire: '退役',
   }
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Spinner className="size-8" />
-      </div>
-    )
-  }
-
   return (
     <div className="space-y-6">
       <h1 className="text-2xl font-bold">仪表盘</h1>
@@ -147,8 +182,8 @@ export function Dashboard() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{stats.inStock}</div>
-                  <p className="text-xs text-muted-foreground">共 {stats.total} 台样机</p>
+                  <div className="text-2xl font-bold">{statsLoading ? <Spinner className="size-5" /> : stats.inStock}</div>
+                  <p className="text-xs text-muted-foreground">{statsLoading ? '加载中...' : `共 ${stats.total} 台样机`}</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
               </div>
@@ -165,7 +200,7 @@ export function Dashboard() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{stats.borrowed}</div>
+                  <div className="text-2xl font-bold">{statsLoading ? <Spinner className="size-5" /> : stats.borrowed}</div>
                   <p className="text-xs text-muted-foreground">当前借出数量</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
@@ -183,7 +218,7 @@ export function Dashboard() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-red-600">{stats.overdue}</div>
+                  <div className="text-2xl font-bold text-red-600">{statsLoading ? <Spinner className="size-5" /> : stats.overdue}</div>
                   <p className="text-xs text-muted-foreground">需要及时跟进</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
@@ -201,7 +236,7 @@ export function Dashboard() {
             <CardContent>
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{monthlyRequests}</div>
+                  <div className="text-2xl font-bold">{statsLoading ? <Spinner className="size-5" /> : monthlyRequests}</div>
                   <p className="text-xs text-muted-foreground">本月借用申请数</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
@@ -242,7 +277,7 @@ export function Dashboard() {
 
       <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
         {/* 逾期预警 */}
-        {overdueItems.length > 0 && (
+        {(overdueLoading || overdueItems.length > 0) && (
           <Card className="border-red-200 bg-red-50">
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-red-700">
@@ -251,7 +286,9 @@ export function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <div className="space-y-3">
+              {overdueLoading ? (
+                <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
+              ) : <div className="space-y-3">
                 {overdueItems.slice(0, 5).map(item => (
                   <div key={item.id} className="flex items-center justify-between rounded-md bg-white p-3 shadow-sm">
                     <div>
@@ -266,7 +303,7 @@ export function Dashboard() {
                     </div>
                   </div>
                 ))}
-              </div>
+              </div>}
             </CardContent>
           </Card>
         )}
@@ -277,7 +314,9 @@ export function Dashboard() {
             <CardTitle>样机状态分布</CardTitle>
           </CardHeader>
           <CardContent>
-            {pieData.length > 0 ? (
+            {statsLoading ? (
+              <div className="flex h-[250px] items-center justify-center"><Spinner className="size-6" /></div>
+            ) : pieData.length > 0 ? (
               <ResponsiveContainer width="100%" height={250}>
                 <PieChart>
                   <Pie
@@ -319,7 +358,9 @@ export function Dashboard() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              {pendingApprovals.length === 0 ? (
+              {approvalsLoading ? (
+                <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
+              ) : pendingApprovals.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">暂无待审批申请</p>
               ) : (
                 <div className="space-y-3">
@@ -327,6 +368,7 @@ export function Dashboard() {
                     const request = record.request
                     if (!request) return null
                     const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
+                    const item = request.item || request.request_items?.[0]?.item
                     return (
                       <div key={record.id} className="rounded-md bg-white p-3 shadow-sm space-y-2">
                         <div className="flex items-center justify-between">
@@ -334,7 +376,7 @@ export function Dashboard() {
                           <Badge className={typeInfo?.color}>{typeInfo?.label}</Badge>
                         </div>
                         <div className="text-sm text-muted-foreground">
-                          {request.item?.name} ({request.item?.model})
+                          {item?.name} ({item?.model})
                           <span className="mx-1">·</span>
                           {request.expected_borrow_date && new Date(request.expected_borrow_date).toLocaleDateString('zh-CN')}
                         </div>
@@ -377,7 +419,9 @@ export function Dashboard() {
             <CardTitle>最近库存变动</CardTitle>
           </CardHeader>
           <CardContent>
-            {recentMovements.length > 0 ? (
+            {movementsLoading ? (
+              <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
+            ) : recentMovements.length > 0 ? (
               <div className="space-y-3">
                 {recentMovements.map(movement => (
                   <div key={movement.id} className="flex items-center justify-between border-b pb-2 last:border-0">
@@ -404,7 +448,7 @@ export function Dashboard() {
       </div>
 
       {/* 我的最近申请 */}
-      {myRecentRequests.length > 0 && (
+      {(requestsLoading || myRecentRequests.length > 0) && (
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle>我的最近申请</CardTitle>
@@ -415,13 +459,16 @@ export function Dashboard() {
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="space-y-3">
+            {requestsLoading ? (
+              <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
+            ) : <div className="space-y-3">
               {myRecentRequests.map(req => {
                 const statusInfo = REQUEST_STATUS_MAP[req.status]
+                const item = req.item || req.request_items?.[0]?.item
                 return (
                   <div key={req.id} className="flex items-center justify-between border-b pb-2 last:border-0">
                     <div>
-                      <p className="font-medium">{req.item?.name || '-'}</p>
+                      <p className="font-medium">{item?.name || '-'}</p>
                       <p className="text-sm text-muted-foreground">
                         {req.request_number} | {new Date(req.created_at).toLocaleDateString('zh-CN')}
                       </p>
@@ -430,7 +477,7 @@ export function Dashboard() {
                   </div>
                 )
               })}
-            </div>
+            </div>}
           </CardContent>
         </Card>
       )}

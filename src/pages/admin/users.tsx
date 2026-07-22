@@ -22,6 +22,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 import { ROLE_MAP, USER_STATUS_MAP } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 import type { UserRole, Profile, UserStatus } from '@/types'
 import { UserPlus, KeyRound, Pencil, Check, X, Crown, AlertTriangle } from 'lucide-react'
 
@@ -141,8 +142,8 @@ export function UsersPage() {
     try {
       await usersService.resetUserPassword(email)
       toast.success('重置密码邮件已发送，请通知用户查收邮箱')
-    } catch (err: any) {
-      const msg = err?.message || err?.toString() || '未知错误'
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, '未知错误')
       if (msg.includes('rate limit') || msg.includes('429')) {
         toast.error('发送过于频繁，请稍后再试（Supabase 免费版每小时限3封）')
       } else if (msg.includes('not found') || msg.includes('no user')) {
@@ -170,8 +171,8 @@ export function UsersPage() {
       setDialogOpen(false)
       setInviteForm({ email: '', display_name: '', role: 'user', password: '' })
       fetchUsers()
-    } catch (err: any) {
-      const msg = err?.message || '操作失败'
+    } catch (err: unknown) {
+      const msg = getErrorMessage(err, '操作失败')
       if (msg.includes('已注册') || msg.includes('already')) {
         toast.error('该邮箱已注册，请在用户列表中查找并编辑')
       } else if (msg.includes('rate limit') || msg.includes('429')) {
@@ -235,8 +236,8 @@ export function UsersPage() {
       setTimeout(() => {
         window.location.href = '/dji-demo-manager/'
       }, 2000)
-    } catch (err: any) {
-      toast.error(err?.message || '转移权限失败')
+    } catch (err: unknown) {
+      toast.error(getErrorMessage(err, '转移权限失败'))
       console.error(err)
       setTransferLoading(false)
     }
