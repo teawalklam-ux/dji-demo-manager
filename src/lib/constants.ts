@@ -10,8 +10,8 @@ export type ItemStatus = 'in_stock' | 'borrowed' | 'overdue' | 'maintenance' | '
 // “预定”由未来已审批的预约派生，不写入 items.status。
 export type ItemDisplayStatus = ItemStatus | 'reserved'
 
-// 借用类型
-export type BorrowType = 'customer' | 'marketing'
+// 借用类型支持管理员通过审批链配置动态扩展。
+export type BorrowType = string
 
 // 借用申请状态
 export type BorrowRequestStatus =
@@ -55,9 +55,39 @@ export const ITEM_STATUS_MAP: Record<ItemDisplayStatus, StatusInfo> = {
   retired: { label: '已退役', color: 'bg-gray-100 text-gray-800' },
 }
 
-export const BORROW_TYPE_MAP: Record<string, StatusInfo> = {
+const BUILT_IN_BORROW_TYPE_MAP: Record<string, StatusInfo> = {
   customer: { label: '客户试用', color: 'bg-purple-100 text-purple-800' },
   marketing: { label: '营销演示', color: 'bg-cyan-100 text-cyan-800' },
+}
+
+export const BORROW_TYPE_MAP: Record<string, StatusInfo> = new Proxy(BUILT_IN_BORROW_TYPE_MAP, {
+  get(target, property, receiver) {
+    if (typeof property !== 'string') return Reflect.get(target, property, receiver)
+    return target[property] || {
+      label: property,
+      color: 'bg-indigo-100 text-indigo-800',
+    }
+  },
+})
+
+export const BUILT_IN_BORROW_TYPE_OPTIONS = [
+  { value: 'customer', label: BORROW_TYPE_MAP.customer.label },
+  { value: 'marketing', label: BORROW_TYPE_MAP.marketing.label },
+] as const
+
+export function getBorrowTypeInfo(borrowType: string): StatusInfo {
+  return BORROW_TYPE_MAP[borrowType]
+}
+
+export function getBorrowTypeOptions(configuredTypes: Iterable<string>) {
+  const builtInValues = new Set<string>(BUILT_IN_BORROW_TYPE_OPTIONS.map(option => option.value))
+  const customValues = Array.from(new Set(configuredTypes))
+    .filter(type => type !== 'all' && !builtInValues.has(type))
+
+  return [
+    ...BUILT_IN_BORROW_TYPE_OPTIONS,
+    ...customValues.map(value => ({ value, label: getBorrowTypeInfo(value).label })),
+  ]
 }
 
 export const REQUEST_STATUS_MAP: Record<string, StatusInfo> = {
