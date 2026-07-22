@@ -1,3 +1,4 @@
+-- Production migration history: 20260717030135_wrap_privileged_rpcs_with_invoker_api.
 -- Keep privileged implementations outside the exposed Data API schema while
 -- preserving the exact public RPC names, arguments, defaults, and result types.
 -- Each private implementation retains its existing auth.uid()/role checks.

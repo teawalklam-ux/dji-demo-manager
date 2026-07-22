@@ -1,3 +1,4 @@
+-- Production migration history: 20260717030627_add_missing_foreign_key_indexes.
 -- PostgreSQL does not automatically index referencing foreign-key columns.
 -- These tables are currently small, so regular CREATE INDEX keeps this migration
 -- transaction-safe while adding negligible lock time.

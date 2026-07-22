@@ -1,3 +1,4 @@
+-- Production migration history: 20260717024731_harden_function_grants_and_rls.
 -- P0 security hardening:
 -- 1. Keep the role lookup helper usable by RLS without exposing it as a public RPC.
 -- 2. Remove direct API execution from trigger and maintenance functions.
