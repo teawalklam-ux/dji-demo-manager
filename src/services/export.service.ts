@@ -1,6 +1,7 @@
 import * as XLSX from 'xlsx'
 import type { Item, BorrowRecord, ApprovalRecord } from '@/types'
 import { ITEM_STATUS_MAP, BORROW_TYPE_MAP } from '@/lib/constants'
+import { getCurrentOverdueDays } from '@/lib/borrow-record'
 
 function saveAsExcel(data: Record<string, string | number>[], filename: string, sheetName: string) {
   const ws = XLSX.utils.json_to_sheet(data)
@@ -38,7 +39,7 @@ export const exportService = {
       '应还日期': record.due_date,
       '实际归还日期': record.return_date || '',
       '状态': record.status === 'active' ? '借用中' : record.status === 'returned' ? '已归还' : '逾期',
-      '逾期天数': record.overdue_days || 0,
+      '逾期天数': getCurrentOverdueDays(record),
       '备注': record.notes || '',
     }))
     saveAsExcel(data, `借用记录_${new Date().toISOString().split('T')[0]}`, '借用记录')
