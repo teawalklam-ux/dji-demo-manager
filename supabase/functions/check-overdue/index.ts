@@ -169,6 +169,7 @@ serve(async (req) => {
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
     if (wecomUrl && wecomItems.length > 0) {
       const overdueList = wecomItems.join('\n')
+
       try {
         const wecomResponse = await fetch(wecomUrl, {
           method: 'POST',
