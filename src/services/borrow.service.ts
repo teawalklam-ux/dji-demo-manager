@@ -192,6 +192,36 @@ export const borrowService = {
       }
       throw error
     }
+
+    // 3. 归还成功后触发企业微信通知。通知失败不回滚已完成的归还操作。
+    await this.triggerReturnNotification(recordId)
+  },
+
+  /** 调用 Edge Function 发送企业微信归还通知。 */
+  async triggerReturnNotification(recordId: string): Promise<void> {
+    try {
+      const { data: { session } } = await supabase.auth.getSession()
+      if (!session) {
+        console.error('[triggerReturnNotification] 未找到登录会话')
+        return
+      }
+
+      const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
+      const response = await fetch(`${supabaseUrl}/functions/v1/notify-return`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify({ borrow_record_id: recordId }),
+      })
+
+      if (!response.ok) {
+        console.error('[triggerReturnNotification] 企业微信归还通知失败:', await response.text())
+      }
+    } catch (error) {
+      console.error('[triggerReturnNotification] 企业微信归还通知失败:', error)
+    }
   },
 
   async createRenewal(parentRequestId: string, data: RenewInput): Promise<string> {
