@@ -1,5 +1,5 @@
 // 样机归还企业微信通知
-// 由前端在 process_return 成功后调用，通知林芷因和当前销售主管。
+// 由前端在 process_return 成功后调用，通知林芷因和田潇。
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
@@ -9,8 +9,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-const RETURN_CC_NAME = '林芷因'
-const SALES_SUPERVISOR_ROLE = 'approver'
+const RETURN_MENTION_NAMES = ['林芷因', '田潇']
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -118,9 +117,9 @@ serve(async (req) => {
 
     const { data: recipients, error: recipientsError } = await supabase
       .from('profiles')
-      .select('id, display_name, phone, role')
+      .select('id, display_name, phone')
       .eq('status', 'active')
-      .or(`display_name.eq.${RETURN_CC_NAME},role.eq.${SALES_SUPERVISOR_ROLE}`)
+      .in('display_name', RETURN_MENTION_NAMES)
 
     if (recipientsError) {
       throw new Error(`Failed to fetch WeCom recipients: ${recipientsError.message}`)
