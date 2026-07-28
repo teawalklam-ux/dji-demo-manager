@@ -74,7 +74,7 @@ function AppSidebar() {
           </div>
           <div className="min-w-0">
             <h2 className="truncate font-display text-sm font-semibold tracking-[-0.015em]">DJI 样机管理</h2>
-            <p className="truncate text-xs text-muted-foreground">大疆代理商</p>
+            <p className="truncate text-xs text-muted-foreground">示例企业</p>
           </div>
         </div>
       </SidebarHeader>
