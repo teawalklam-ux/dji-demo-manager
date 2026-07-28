@@ -27,10 +27,16 @@ import { getErrorMessage } from '@/lib/errors'
 import type { Item, StockMovement, ApprovalRecord, BorrowRequest } from '@/types'
 import { toast } from 'sonner'
 
-const CHART_COLORS = ['#2E6AB0', '#22C55E', '#EF4444', '#F97316', '#6B7280']
+const CHART_COLORS = [
+  'var(--color-chart-1)',
+  'var(--color-chart-2)',
+  'var(--color-chart-3)',
+  'var(--color-chart-4)',
+  'var(--color-chart-5)',
+]
 
 export function Dashboard() {
-  const { isApprover, user, profile } = useAuth()
+  const { isApprover, user, profile, isDemoMode } = useAuth()
   const userId = user?.id
   const [statsLoading, setStatsLoading] = useState(true)
   const [overdueLoading, setOverdueLoading] = useState(true)
@@ -71,13 +77,18 @@ export function Dashboard() {
 
     const movementsTask = (async () => {
       try {
-        const { data, error } = await supabase
-          .from('stock_movements')
-          .select('id, item_id, movement_type, created_at, item:items(id, name, model), operator:profiles(id, display_name)')
-          .order('created_at', { ascending: false })
-          .limit(10)
-        if (error) throw error
-        setRecentMovements((data || []) as unknown as StockMovement[])
+        if (import.meta.env.DEV && isDemoMode) {
+          const { demoApi } = await import('@/lib/demo-mode')
+          setRecentMovements(await demoApi.getMovements())
+        } else {
+          const { data, error } = await supabase
+            .from('stock_movements')
+            .select('id, item_id, movement_type, created_at, item:items(id, name, model), operator:profiles(id, display_name)')
+            .order('created_at', { ascending: false })
+            .limit(10)
+          if (error) throw error
+          setRecentMovements((data || []) as unknown as StockMovement[])
+        }
       } catch (error) {
         console.error('加载库存变动失败:', error)
       } finally {
@@ -97,7 +108,9 @@ export function Dashboard() {
         })
 
     const requestsTask = userId
-      ? borrowService.getRecentRequestsForDashboard(userId)
+      ? (import.meta.env.DEV && isDemoMode
+          ? import('@/lib/demo-mode').then(({ demoApi }) => demoApi.getRecentRequests())
+          : borrowService.getRecentRequestsForDashboard(userId))
           .then(setMyRecentRequests)
           .catch((error) => console.error('加载最近申请失败:', error))
           .finally(() => setRequestsLoading(false))
@@ -107,7 +120,7 @@ export function Dashboard() {
         })
 
     await Promise.allSettled([statsTask, overdueTask, movementsTask, approvalsTask, requestsTask])
-  }, [isApprover, profile?.role, userId])
+  }, [isApprover, isDemoMode, profile?.role, userId])
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
@@ -168,21 +181,21 @@ export function Dashboard() {
   }
 
   return (
-    <div className="space-y-6">
-      <h1 className="text-2xl font-bold">仪表盘</h1>
+    <div className="hm-page space-y-10">
+      <h1 className="hm-page-title">仪表盘</h1>
 
       {/* 统计卡片 - 可点击跳转 */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <Link to="/items?status=in_stock" className="block">
-          <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-card)] border bg-border shadow-card sm:grid-cols-2 xl:grid-cols-12">
+        <Link to="/items?status=in_stock" className="hm-metric-link block bg-card xl:col-span-4">
+          <Card className="h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
               <CardTitle className="text-sm font-medium">在库样机</CardTitle>
               <Package className="size-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{statsLoading ? <Spinner className="size-5" /> : stats.inStock}</div>
+                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] tabular-nums">{statsLoading ? <Spinner className="size-5" /> : stats.inStock}</div>
                   <p className="text-xs text-muted-foreground">{statsLoading ? '加载中...' : `共 ${stats.total} 台样机`}</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
@@ -191,16 +204,16 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/items?status=borrowed" className="block">
-          <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Link to="/items?status=borrowed" className="hm-metric-link block bg-card xl:col-span-3">
+          <Card className="h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
               <CardTitle className="text-sm font-medium">借出中</CardTitle>
               <ArrowRightLeft className="size-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{statsLoading ? <Spinner className="size-5" /> : stats.borrowed}</div>
+                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] tabular-nums">{statsLoading ? <Spinner className="size-5" /> : stats.borrowed}</div>
                   <p className="text-xs text-muted-foreground">当前借出数量</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
@@ -209,16 +222,16 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/items?status=overdue" className="block">
-          <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Link to="/items?status=overdue" className="hm-metric-link block bg-card xl:col-span-2">
+          <Card className="h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
               <CardTitle className="text-sm font-medium">逾期未还</CardTitle>
-              <AlertTriangle className="size-4 text-red-500" />
+              <AlertTriangle className="size-4 text-destructive" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold text-red-600">{statsLoading ? <Spinner className="size-5" /> : stats.overdue}</div>
+                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] text-destructive tabular-nums">{statsLoading ? <Spinner className="size-5" /> : stats.overdue}</div>
                   <p className="text-xs text-muted-foreground">需要及时跟进</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
@@ -227,16 +240,16 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/borrow/my-requests" className="block">
-          <Card className="transition-shadow hover:shadow-md cursor-pointer h-full">
-            <CardHeader className="flex flex-row items-center justify-between pb-2">
+        <Link to="/borrow/my-requests" className="hm-metric-link block bg-card xl:col-span-3">
+          <Card className="h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
               <CardTitle className="text-sm font-medium">本月申请</CardTitle>
               <FileText className="size-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent>
+            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <div className="text-2xl font-bold">{statsLoading ? <Spinner className="size-5" /> : monthlyRequests}</div>
+                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] tabular-nums">{statsLoading ? <Spinner className="size-5" /> : monthlyRequests}</div>
                   <p className="text-xs text-muted-foreground">本月借用申请数</p>
                 </div>
                 <ChevronRight className="size-5 text-muted-foreground" />
@@ -247,9 +260,9 @@ export function Dashboard() {
       </div>
 
       {/* 快捷操作 */}
-      <div className="flex flex-wrap gap-3">
+      <div className="hm-tool-rail flex flex-wrap gap-2 py-4">
         <Link to="/borrow/apply">
-          <Button variant="outline" size="lg">
+          <Button size="lg">
             <FileText className="size-4 mr-2" />
             申请借用
           </Button>
@@ -275,12 +288,12 @@ export function Dashboard() {
         )}
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* 逾期预警 */}
         {(overdueLoading || overdueItems.length > 0) && (
-          <Card className="border-red-200 bg-red-50">
+          <Card className="border-destructive/25 bg-destructive/[0.045]">
             <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-red-700">
+              <CardTitle className="flex items-center gap-2 text-destructive">
                 <AlertTriangle className="size-5" />
                 逾期预警
               </CardTitle>
@@ -290,12 +303,12 @@ export function Dashboard() {
                 <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
               ) : <div className="space-y-3">
                 {overdueItems.slice(0, 5).map(item => (
-                  <div key={item.id} className="flex items-center justify-between rounded-md bg-white p-3 shadow-sm">
-                    <div>
+                  <div key={item.id} className="flex flex-col gap-3 border-t py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <p className="font-medium">{item.name}</p>
                       <p className="text-sm text-muted-foreground">{item.model} | {item.barcode}</p>
                     </div>
-                    <div className="flex items-center gap-2">
+                    <div className="flex shrink-0 items-center gap-2">
                       <Badge className={ITEM_STATUS_MAP.overdue.color}>{ITEM_STATUS_MAP.overdue.label}</Badge>
                       <Link to={`/items/${item.id}`}>
                         <Button variant="outline" size="sm">查看</Button>
@@ -344,10 +357,10 @@ export function Dashboard() {
         </Card>
       </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
         {/* 待审批快速审批（审批人/管理员/超级管理员） */}
         {isApprover && (
-          <Card className={pendingApprovals.length > 0 ? 'border-yellow-200 bg-yellow-50' : ''}>
+          <Card className={pendingApprovals.length > 0 ? 'border-warning/30 bg-warning/[0.06]' : ''}>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
                 <CheckSquare className="size-5" />
@@ -363,14 +376,14 @@ export function Dashboard() {
               ) : pendingApprovals.length === 0 ? (
                 <p className="text-center text-muted-foreground py-4">暂无待审批申请</p>
               ) : (
-                <div className="space-y-3">
+                <div>
                   {pendingApprovals.slice(0, 5).map(record => {
                     const request = record.request
                     if (!request) return null
                     const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
                     const item = request.item || request.request_items?.[0]?.item
                     return (
-                      <div key={record.id} className="rounded-md bg-white p-3 shadow-sm space-y-2">
+                      <div key={record.id} className="space-y-2 border-t py-3 first:border-t-0">
                         <div className="flex items-center justify-between">
                           <div className="font-medium">{request.requester?.display_name || '-'}</div>
                           <Badge className={typeInfo?.color}>{typeInfo?.label}</Badge>
@@ -383,7 +396,7 @@ export function Dashboard() {
                         <div className="flex items-center gap-2 pt-1">
                           <Button
                             size="sm"
-                            className="bg-green-600 hover:bg-green-700"
+                            className="bg-success text-success-foreground hover:bg-success/90"
                             onClick={() => handleApprove(request.id)}
                             disabled={processingId === request.id}
                           >
@@ -422,16 +435,16 @@ export function Dashboard() {
             {movementsLoading ? (
               <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
             ) : recentMovements.length > 0 ? (
-              <div className="space-y-3">
-                {recentMovements.map(movement => (
-                  <div key={movement.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                    <div>
+                <div>
+                  {recentMovements.map(movement => (
+                  <div key={movement.id} className="flex flex-col gap-2 border-t py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <p className="font-medium">{movement.item?.name || '-'}</p>
                       <p className="text-sm text-muted-foreground">
                         {movement.item?.model} | {movementTypeLabels[movement.movement_type] || movement.movement_type}
                       </p>
                     </div>
-                    <div className="text-right">
+                    <div className="shrink-0 text-left sm:text-right">
                       <Badge variant="outline">{movementTypeLabels[movement.movement_type] || movement.movement_type}</Badge>
                       <p className="text-xs text-muted-foreground mt-1">
                         {new Date(movement.created_at).toLocaleString('zh-CN')}
@@ -461,13 +474,13 @@ export function Dashboard() {
           <CardContent>
             {requestsLoading ? (
               <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
-            ) : <div className="space-y-3">
+            ) : <div>
               {myRecentRequests.map(req => {
                 const statusInfo = REQUEST_STATUS_MAP[req.status]
                 const item = req.item || req.request_items?.[0]?.item
                 return (
-                  <div key={req.id} className="flex items-center justify-between border-b pb-2 last:border-0">
-                    <div>
+                  <div key={req.id} className="flex flex-col gap-2 border-t py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+                    <div className="min-w-0">
                       <p className="font-medium">{item?.name || '-'}</p>
                       <p className="text-sm text-muted-foreground">
                         {req.request_number} | {new Date(req.created_at).toLocaleDateString('zh-CN')}

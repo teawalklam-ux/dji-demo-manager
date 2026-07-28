@@ -9,7 +9,7 @@ interface AuthGuardProps {
 }
 
 export function AuthGuard({ children, requireRole }: AuthGuardProps) {
-  const { user, profile, loading, isPendingApproval, isDisabled } = useAuth()
+  const { user, profile, loading, isPendingApproval, isDisabled, isDemoMode } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -22,6 +22,17 @@ export function AuthGuard({ children, requireRole }: AuthGuardProps) {
 
   if (!user) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  if (isDemoMode) {
+    const isDemoItemDetail = /^\/items\/[^/]+$/.test(location.pathname)
+      && location.pathname !== '/items/new'
+    const isAllowedDemoRoute = location.pathname === '/'
+      || location.pathname === '/items'
+      || isDemoItemDetail
+    if (!isAllowedDemoRoute) {
+      return <Navigate to="/" replace />
+    }
   }
 
   // 待审批用户 → 跳转到等待审批页面

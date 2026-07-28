@@ -1,0 +1,127 @@
+/* Hallmark · macrostructure: Workbench (Stat-Led dashboard / Index-First inventory) · genre: modern-minimal · theme: custom · axes: light / local-sans / cool · vibe: precise, calm, operational, trustworthy · enrichment: none · motion: button press + interactive-surface lift, reduced-motion safe · pre-emit critique: P5 H5 E4 S5 R5 V5 · contrast: pass (40–41) · nav: N3 side rail · footer: Ft2 inline version · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pending rendered check (34, 49, 50–57) · icons: pass (30) */
+:root {
+  /* Core surfaces and ink */
+  --color-paper: oklch(98.8% 0.004 250);
+  --color-paper-2: oklch(96.4% 0.009 252);
+  --color-paper-3: oklch(92.8% 0.014 254);
+  --color-rule: oklch(85.5% 0.016 255);
+  --color-rule-2: oklch(65% 0.025 257);
+  --color-muted: oklch(46% 0.022 258);
+  --color-neutral: oklch(36% 0.025 258);
+  --color-ink-2: oklch(29% 0.028 259);
+  --color-ink: oklch(20.6% 0.039 265.5);
+
+  /* DJI-aligned accent and semantic states */
+  --color-accent: oklch(50% 0.16 258);
+  --color-accent-ink: oklch(98.8% 0.004 250);
+  --color-accent-surface: oklch(92% 0.032 258);
+  --color-focus: oklch(9% 0.025 260);
+  --color-success: oklch(43% 0.13 150);
+  --color-success-ink: oklch(98.8% 0.004 250);
+  --color-success-surface: oklch(95% 0.035 150);
+  --color-warning: oklch(42% 0.105 75);
+  --color-warning-ink: oklch(98.8% 0.004 250);
+  --color-warning-surface: oklch(95% 0.045 82);
+  --color-danger: oklch(49% 0.18 25);
+  --color-danger-ink: oklch(98.8% 0.004 250);
+  --color-danger-surface: oklch(95% 0.035 25);
+  --color-info: var(--color-accent);
+  --color-info-ink: var(--color-accent-ink);
+  --color-info-surface: var(--color-accent-surface);
+
+  /* Data visualisation */
+  --color-chart-1: var(--color-accent);
+  --color-chart-2: var(--color-success);
+  --color-chart-3: var(--color-danger);
+  --color-chart-4: var(--color-warning);
+  --color-chart-5: var(--color-neutral);
+
+  /* Font roles: named local faces avoid a new runtime dependency */
+  --font-display: "Bahnschrift", "DIN Alternate", "Microsoft YaHei UI", ui-sans-serif, sans-serif;
+  --font-body: "Segoe UI Variable Text", "PingFang SC", "Microsoft YaHei UI", ui-sans-serif, system-ui, sans-serif;
+  --font-outlier: "Cascadia Mono", "SFMono-Regular", ui-monospace, monospace;
+  --display-weight: 650;
+  --display-style: normal;
+  --tracking-display: -0.025em;
+  --tracking-label: 0.04em;
+
+  /* Type scale */
+  --text-xs: 0.75rem;
+  --text-sm: 0.875rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.5rem;
+  --text-2xl: 2rem;
+  --text-display: clamp(2.25rem, 3vw + 1rem, 4rem);
+
+  /* Four-point spacing scale */
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+  --space-3xl: 7rem;
+  --space-4xl: 11rem;
+  --space-5xl: 14rem;
+
+  /* Geometry and elevation */
+  --rule-hair: 1px;
+  --rule-fine: 2px;
+  --radius-card: 0.625rem;
+  --radius-pill: 999px;
+  --radius-input: 0.5rem;
+  --shadow-card: 0 1px 2px oklch(20.6% 0.039 265.5 / 0.06);
+  --shadow-popover: 0 18px 48px oklch(20.6% 0.039 265.5 / 0.14);
+
+  /* Motion */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 180ms;
+  --dur-long: 420ms;
+
+  /* Stacking */
+  --z-base: 0;
+  --z-sticky: 20;
+  --z-popover: 50;
+  --z-modal: 80;
+
+  /* shadcn/Tailwind channel aliases (consumed through oklch()) */
+  --hm-background: 96.4% 0.009 252;
+  --hm-foreground: 20.6% 0.039 265.5;
+  --hm-card: 98.8% 0.004 250;
+  --hm-card-foreground: 20.6% 0.039 265.5;
+  --hm-popover: 98.8% 0.004 250;
+  --hm-popover-foreground: 20.6% 0.039 265.5;
+  --hm-primary: 50% 0.16 258;
+  --hm-primary-foreground: 98.8% 0.004 250;
+  --hm-secondary: 92.8% 0.014 254;
+  --hm-secondary-foreground: 29% 0.028 259;
+  --hm-muted: 92.8% 0.014 254;
+  --hm-muted-foreground: 46% 0.022 258;
+  --hm-accent: 92% 0.032 258;
+  --hm-accent-foreground: 29% 0.028 259;
+  --hm-destructive: 49% 0.18 25;
+  --hm-destructive-foreground: 98.8% 0.004 250;
+  --hm-border: 85.5% 0.016 255;
+  --hm-input: 65% 0.025 257;
+  --hm-ring: 9% 0.025 260;
+  --hm-sidebar-background: 98.8% 0.004 250;
+  --hm-sidebar-foreground: 20.6% 0.039 265.5;
+  --hm-sidebar-primary: 50% 0.16 258;
+  --hm-sidebar-primary-foreground: 98.8% 0.004 250;
+  --hm-sidebar-accent: 92% 0.032 258;
+  --hm-sidebar-accent-foreground: 29% 0.028 259;
+  --hm-sidebar-border: 85.5% 0.016 255;
+  --hm-sidebar-ring: 9% 0.025 260;
+  --hm-success: 43% 0.13 150;
+  --hm-success-foreground: 98.8% 0.004 250;
+  --hm-warning: 42% 0.105 75;
+  --hm-warning-foreground: 98.8% 0.004 250;
+  --hm-info: 50% 0.16 258;
+  --hm-info-foreground: 98.8% 0.004 250;
+}

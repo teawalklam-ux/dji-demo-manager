@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useParams, Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { useAuth } from '@/contexts/auth-context'
@@ -38,7 +38,7 @@ type ItemReservationLine = BorrowRequestItem & {
 
 export function ItemDetail() {
   const { id } = useParams<{ id: string }>()
-  const { isAdmin } = useAuth()
+  const { isAdmin, isDemoMode } = useAuth()
   const [loading, setLoading] = useState(true)
   const [item, setItem] = useState<Item | null>(null)
   const [borrowRecords, setBorrowRecords] = useState<ItemBorrowHistoryRecord[]>([])
@@ -46,10 +46,6 @@ export function ItemDetail() {
   const [error, setError] = useState<string | null>(null)
 
   const barcodeRef = useRef<SVGSVGElement>(null)
-
-  useEffect(() => {
-    if (id) loadData(id)
-  }, [id])
 
   useEffect(() => {
     if (barcodeRef.current && item) {
@@ -63,9 +59,21 @@ export function ItemDetail() {
     }
   }, [item])
 
-  async function loadData(itemId: string) {
+  const loadData = useCallback(async (itemId: string) => {
     try {
       setLoading(true)
+      if (import.meta.env.DEV && isDemoMode) {
+        const { demoApi } = await import('@/lib/demo-mode')
+        const detail = await demoApi.getItemDetail(itemId)
+        setItem(detail.item)
+        setBorrowRecords(mergeBorrowHistory(
+          detail.borrowRecords,
+          detail.reservationLines as ItemReservationLine[]
+        ))
+        setStockMovements(detail.stockMovements)
+        return
+      }
+
       const [itemResult, recordsResult, reservationLinesResult, movementsResult] = await Promise.allSettled([
         itemsService.getById(itemId),
         supabase
@@ -111,7 +119,11 @@ export function ItemDetail() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [isDemoMode])
+
+  useEffect(() => {
+    if (id) void loadData(id)
+  }, [id, loadData])
 
   function handlePrint() {
     window.print()
@@ -169,12 +181,14 @@ export function ItemDetail() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          <Link to={`/borrow/apply/${item.id}`}>
-            <Button>
-              <FileText className="size-4" />
-              申请借用
-            </Button>
-          </Link>
+          {!isDemoMode && (
+            <Link to={`/borrow/apply/${item.id}`}>
+              <Button>
+                <FileText className="size-4" />
+                申请借用
+              </Button>
+            </Link>
+          )}
           {isAdmin && (
             <Link to={`/items/${item.id}/edit`}>
               <Button variant="outline">

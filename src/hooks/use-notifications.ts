@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import type { OverdueNotification } from '@/types'
 
 export function useNotifications() {
-  const { user } = useAuth()
+  const { user, isDemoMode } = useAuth()
   const [notifications, setNotifications] = useState<OverdueNotification[]>([])
   const [unreadCount, setUnreadCount] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -35,7 +35,7 @@ export function useNotifications() {
 
   // Realtime 订阅：监听新通知
   useEffect(() => {
-    if (!user) return
+    if (!user || isDemoMode) return
 
     const channel = supabase
       .channel('notifications-changes')
@@ -64,7 +64,7 @@ export function useNotifications() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [user, loadNotifications])
+  }, [user, isDemoMode, loadNotifications])
 
   async function markAsRead(id: string) {
     await notificationsService.markAsRead(id)
