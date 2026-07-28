@@ -55,32 +55,33 @@ const adminNavItems = [
 ]
 
 function AppSidebar() {
-  const { profile, signOut, isSuperAdmin, isAdmin, hasRole } = useAuth()
+  const { profile, signOut, isSuperAdmin, isAdmin, hasRole, isDemoMode } = useAuth()
   const location = useLocation()
 
   const filteredMainNav = mainNavItems.filter(
-    item => !item.roles || item.roles.some(r => hasRole(r))
+    item => (!item.roles || item.roles.some(r => hasRole(r)))
+      && (!isDemoMode || item.href === '/' || item.href === '/items')
   )
 
   return (
-    <Sidebar>
-      <SidebarHeader className="border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
-            <svg className="h-4 w-4 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+    <Sidebar className="border-r">
+      <SidebarHeader className="border-b px-4 py-4">
+        <div className="flex min-w-0 items-center gap-3">
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-input)] bg-primary shadow-xs">
+            <svg aria-hidden="true" className="h-4 w-4 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
-          <div>
-            <h2 className="text-sm font-bold">DJI 样机管理</h2>
-            <p className="text-xs text-muted-foreground">大疆代理商</p>
+          <div className="min-w-0">
+            <h2 className="truncate font-display text-sm font-semibold tracking-[-0.015em]">DJI 样机管理</h2>
+            <p className="truncate text-xs text-muted-foreground">大疆代理商</p>
           </div>
         </div>
       </SidebarHeader>
 
       <SidebarContent>
         <div className="px-3 py-2">
-          <p className="mb-1 px-2 text-xs font-semibold text-muted-foreground">主菜单</p>
+          <p className="mb-2 px-2 text-[11px] font-semibold tracking-[var(--tracking-label)] text-muted-foreground">主菜单</p>
           <SidebarMenu>
             {filteredMainNav.map((item) => (
               <SidebarMenuItem key={item.href}>
@@ -97,7 +98,7 @@ function AppSidebar() {
 
         {isAdmin && (
           <div className="px-3 py-2">
-            <p className="mb-1 px-2 text-xs font-semibold text-muted-foreground">管理后台</p>
+            <p className="mb-2 px-2 text-[11px] font-semibold tracking-[var(--tracking-label)] text-muted-foreground">管理后台</p>
             <SidebarMenu>
               {adminNavItems
                 .filter(item => !item.superAdminOnly || isSuperAdmin)
@@ -129,7 +130,11 @@ function AppSidebar() {
               {ROLE_MAP[profile?.role || 'user']?.label}
             </Badge>
           </div>
-          <button onClick={signOut} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground" title="退出登录">
+          <button
+            onClick={signOut}
+            className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-input)] text-muted-foreground transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-muted hover:text-foreground active:translate-y-px"
+            title="退出登录"
+          >
             <LogOut className="h-4 w-4" />
           </button>
         </div>
@@ -141,7 +146,7 @@ function AppSidebar() {
 function NotificationItem({ notification, onMarkRead }: { notification: OverdueNotification; onMarkRead: (id: string) => void }) {
   const isApproval = notification.notification_category === 'approval'
   const Icon = isApproval ? Clock : AlertCircle
-  const iconColor = isApproval ? 'text-blue-500' : 'text-red-500'
+  const iconColor = isApproval ? 'text-info' : 'text-destructive'
 
   const handleClick = () => {
     if (!notification.is_read) {
@@ -153,7 +158,7 @@ function NotificationItem({ notification, onMarkRead }: { notification: OverdueN
 
   return (
     <div
-      className={`flex gap-3 p-3 cursor-pointer hover:bg-muted/50 transition-colors ${!notification.is_read ? 'bg-muted/30' : ''}`}
+      className={`flex cursor-pointer gap-3 p-3 transition-[background-color,color] duration-micro ease-hm-out hover:bg-muted/50 ${!notification.is_read ? 'bg-muted/30' : ''}`}
       onClick={handleClick}
     >
       <div className="mt-0.5">
@@ -188,7 +193,7 @@ function getTimeAgo(dateStr: string): string {
 }
 
 function TopHeader() {
-  const { profile } = useAuth()
+  const { profile, isDemoMode } = useAuth()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const [showNotifications, setShowNotifications] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
@@ -207,13 +212,15 @@ function TopHeader() {
   }, [showNotifications])
 
   return (
-    <header className="flex h-14 items-center gap-4 border-b bg-background px-4">
+    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-3 sm:gap-4 sm:px-5">
       <SidebarTrigger />
       <div className="flex-1" />
       <div className="relative" ref={notifRef}>
         <button
-          className="relative rounded-md p-2 text-muted-foreground hover:bg-muted hover:text-foreground"
+          className="relative flex size-11 items-center justify-center rounded-[var(--radius-input)] text-muted-foreground transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-muted hover:text-foreground active:translate-y-px"
           onClick={() => setShowNotifications(!showNotifications)}
+          aria-label="通知"
+          aria-expanded={showNotifications}
         >
           <Bell className="h-5 w-5" />
           {unreadCount > 0 && (
@@ -224,7 +231,7 @@ function TopHeader() {
         </button>
 
         {showNotifications && (
-          <div className="absolute right-0 top-full mt-2 z-50 w-96 rounded-lg border bg-background shadow-lg">
+          <div className="fixed left-4 right-4 top-14 z-[var(--z-popover)] overflow-hidden rounded-[var(--radius-card)] border bg-popover text-popover-foreground shadow-popover sm:absolute sm:left-auto sm:right-0 sm:top-full sm:mt-2 sm:w-96">
             <div className="flex items-center justify-between border-b px-4 py-3">
               <h3 className="text-sm font-semibold">通知</h3>
               {unreadCount > 0 && (
@@ -249,11 +256,11 @@ function TopHeader() {
                 ))
               )}
             </div>
-            {notifications.length > 0 && (
+            {notifications.length > 0 && !isDemoMode && (
               <div className="border-t px-4 py-2">
                 <Link
                   to="/approval/queue"
-                  className="text-xs text-primary hover:underline"
+                  className="whitespace-nowrap text-xs font-medium text-primary underline-offset-4 hover:underline"
                   onClick={() => setShowNotifications(false)}
                 >
                   查看审批队列
@@ -263,7 +270,12 @@ function TopHeader() {
           </div>
         )}
       </div>
-      <span className="text-sm text-muted-foreground">{profile?.department || ''}</span>
+      {isDemoMode && (
+        <Badge variant="outline" className="hidden border-info/30 bg-info/[0.055] text-info sm:inline-flex">
+          本地演示
+        </Badge>
+      )}
+      <span className="hidden max-w-48 truncate text-sm text-muted-foreground sm:inline">{profile?.department || ''}</span>
     </header>
   )
 }
@@ -272,12 +284,12 @@ export function AppLayout() {
   return (
     <SidebarProvider>
       <AppSidebar />
-      <div className="flex flex-1 flex-col">
+      <div className="flex min-w-0 flex-1 flex-col bg-background">
         <TopHeader />
-        <main className="flex-1 overflow-auto p-6">
+        <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
           <Outlet />
         </main>
-        <div className="text-right px-4 py-1 text-[10px] text-muted-foreground/40 select-none">
+        <div className="select-none px-4 py-1 text-right text-[10px] text-muted-foreground/50">
           v{APP_VERSION}
         </div>
       </div>

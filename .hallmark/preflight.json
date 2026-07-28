@@ -1,0 +1,86 @@
+{
+  "hallmark_version": "1.1",
+  "date": "2026-07-27",
+  "project": "DJI Demo Manager",
+  "branch": "codex/test1.5",
+  "base_commit": "9c490494",
+  "framework": {
+    "runtime": "React 19",
+    "bundler": "Vite 7",
+    "styling": "Tailwind CSS 3 + shadcn/ui",
+    "router": "React Router 7"
+  },
+  "design": {
+    "genre": "modern-minimal",
+    "macrostructure": "Workbench with Stat-Led dashboard and Index-First inventory",
+    "theme": "custom",
+    "theme_axes": "light / system-native / cool",
+    "vibe": "precise, calm, operational, trustworthy",
+    "enrichment": "none"
+  },
+  "scope": {
+    "create": [
+      "design.md",
+      "tokens.css",
+      ".hallmark/preflight.json",
+      ".hallmark/log.json"
+    ],
+    "modify": [
+      "tailwind.config.js",
+      "src/index.css",
+      "src/components/layout/app-layout.tsx",
+      "src/components/ui/button.tsx",
+      "src/components/ui/card.tsx",
+      "src/components/ui/input.tsx",
+      "src/components/ui/table.tsx",
+      "src/components/ui/badge.tsx",
+      "src/pages/dashboard.tsx",
+      "src/pages/items/index.tsx"
+    ],
+    "delete": []
+  },
+  "protected_during_ui_pass": [
+    "src/App.tsx",
+    "src/services/**",
+    "src/hooks/**",
+    "src/contexts/**",
+    "src/lib/supabase.ts",
+    "supabase/**",
+    ".env*",
+    "package*.json",
+    "vite.config.*",
+    ".github/**"
+  ],
+  "security": {
+    "secret_files_read": false,
+    "secret_values_copied": false,
+    "backend_contract_changes": false,
+    "deployment_changes": false
+  },
+  "follow_up": {
+    "date": "2026-07-28",
+    "request": "development-only account backed by a lightweight local API",
+    "create": [
+      "scripts/demo-server.mjs",
+      "src/lib/demo-mode.ts"
+    ],
+    "modify": [
+      "src/contexts/auth-context.tsx",
+      "src/components/auth/auth-guard.tsx",
+      "src/components/auth/login-form.tsx",
+      "src/components/layout/app-layout.tsx",
+      "src/services/items.service.ts",
+      "src/services/categories.service.ts",
+      "src/services/notifications.service.ts",
+      "src/hooks/use-notifications.ts",
+      "src/pages/dashboard.tsx",
+      "src/pages/items/detail.tsx"
+    ],
+    "production_isolation": {
+      "enabled_only_when_import_meta_env_dev": true,
+      "bind_address": "127.0.0.1",
+      "real_supabase_schema_or_api_changes": false,
+      "package_or_deployment_changes": false
+    }
+  }
+}

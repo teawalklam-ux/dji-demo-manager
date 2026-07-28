@@ -1,3 +1,5 @@
+@import "../tokens.css";
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
@@ -40,12 +42,147 @@
   }
 }
 
+/* Hallmark maps the existing shadcn contract onto the single token source above. */
+@layer base {
+  :root {
+    --background: var(--hm-background);
+    --foreground: var(--hm-foreground);
+    --card: var(--hm-card);
+    --card-foreground: var(--hm-card-foreground);
+    --popover: var(--hm-popover);
+    --popover-foreground: var(--hm-popover-foreground);
+    --primary: var(--hm-primary);
+    --primary-foreground: var(--hm-primary-foreground);
+    --secondary: var(--hm-secondary);
+    --secondary-foreground: var(--hm-secondary-foreground);
+    --muted: var(--hm-muted);
+    --muted-foreground: var(--hm-muted-foreground);
+    --accent: var(--hm-accent);
+    --accent-foreground: var(--hm-accent-foreground);
+    --destructive: var(--hm-destructive);
+    --destructive-foreground: var(--hm-destructive-foreground);
+    --border: var(--hm-border);
+    --input: var(--hm-input);
+    --ring: var(--hm-ring);
+    --radius: var(--radius-card);
+    --sidebar-background: var(--hm-sidebar-background);
+    --sidebar-foreground: var(--hm-sidebar-foreground);
+    --sidebar-primary: var(--hm-sidebar-primary);
+    --sidebar-primary-foreground: var(--hm-sidebar-primary-foreground);
+    --sidebar-accent: var(--hm-sidebar-accent);
+    --sidebar-accent-foreground: var(--hm-sidebar-accent-foreground);
+    --sidebar-border: var(--hm-sidebar-border);
+    --sidebar-ring: var(--hm-sidebar-ring);
+    --chart-1: var(--color-chart-1);
+    --chart-2: var(--color-chart-2);
+    --chart-3: var(--color-chart-3);
+    --chart-4: var(--color-chart-4);
+    --chart-5: var(--color-chart-5);
+  }
+}
+
 @layer base {
   * {
     @apply border-border;
   }
+  html,
+  body {
+    min-width: 20rem;
+    overflow-x: clip;
+  }
   body {
     @apply bg-background text-foreground;
+    font-family: var(--font-body);
+    font-feature-settings: "kern" 1, "tnum" 1;
+    text-rendering: optimizeLegibility;
+  }
+  h1,
+  h2,
+  h3 {
+    min-width: 0;
+    overflow-wrap: anywhere;
+    font-family: var(--font-display);
+    font-style: normal;
+    letter-spacing: var(--tracking-display);
+  }
+  button,
+  [role="button"],
+  nav a {
+    white-space: nowrap;
+  }
+  :where(a, button, input, select, textarea, [tabindex]):focus-visible {
+    outline: 2px solid var(--color-focus);
+    outline-offset: 2px;
+  }
+  ::selection {
+    background: var(--color-accent-surface);
+    color: var(--color-ink);
+  }
+}
+
+@layer components {
+  .hm-page {
+    width: 100%;
+    max-width: 96rem;
+    margin-inline: auto;
+  }
+  .hm-page-title {
+    font-family: var(--font-display);
+    font-size: clamp(1.5rem, 1.1rem + 1vw, 2.25rem);
+    font-weight: var(--display-weight);
+    letter-spacing: var(--tracking-display);
+    line-height: 1.1;
+  }
+  .hm-metric-link {
+    min-width: 0;
+    color: inherit;
+    transition:
+      transform var(--dur-short) var(--ease-out),
+      background-color var(--dur-short) var(--ease-out);
+  }
+  .hm-metric-link:focus-visible {
+    position: relative;
+    z-index: 1;
+  }
+  .hm-tool-rail {
+    border-block: var(--rule-hair) solid var(--color-rule);
+    background: color-mix(in oklch, var(--color-paper) 72%, transparent);
+  }
+  .hm-data-surface {
+    background: var(--color-paper);
+    border: var(--rule-hair) solid var(--color-rule);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-card);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .hm-metric-link:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@media (pointer: coarse) {
+  [data-slot="button"],
+  [data-slot="sidebar-menu-button"],
+  button {
+    min-height: 2.75rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  .hm-metric-link {
+    transition-duration: 0.01ms;
+  }
+  .hm-metric-link:hover {
+    transform: none;
   }
 }
 

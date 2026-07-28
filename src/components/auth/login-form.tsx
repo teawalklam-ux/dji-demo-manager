@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
+import { MonitorCog } from 'lucide-react'
 
 export function LoginForm() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -14,7 +15,7 @@ export function LoginForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [registerSuccess, setRegisterSuccess] = useState(false)
-  const { signIn, signUp } = useAuth()
+  const { signIn, signInDemo, signUp } = useAuth()
   const navigate = useNavigate()
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -64,6 +65,18 @@ export function LoginForm() {
     setLoading(false)
   }
 
+  const handleDemoLogin = async () => {
+    setError('')
+    setLoading(true)
+    const { error } = await signInDemo()
+    if (error) {
+      setError(error.message)
+    } else {
+      navigate('/')
+    }
+    setLoading(false)
+  }
+
   const switchMode = () => {
     setMode(mode === 'login' ? 'register' : 'login')
     setError('')
@@ -71,11 +84,11 @@ export function LoginForm() {
   }
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-muted/30 p-4">
+    <div className="flex min-h-dvh items-center justify-center bg-muted/30 p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-primary">
-            <svg className="h-8 w-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg aria-hidden="true" className="h-8 w-8 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
             </svg>
           </div>
@@ -142,9 +155,27 @@ export function LoginForm() {
                 {loading ? <Spinner className="mr-2 h-4 w-4" /> : null}
                 {mode === 'login' ? '登录' : '注册'}
               </Button>
-              <div className="text-center text-sm">
+              <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm">
                 {mode === 'login' ? (
-                  <>还没有账号？<button type="button" className="text-primary hover:underline" onClick={switchMode}>注册</button></>
+                  <>
+                    <span>还没有账号？</span>
+                    <button type="button" className="font-medium text-primary underline-offset-4 hover:underline" onClick={switchMode}>
+                      注册
+                    </button>
+                    {import.meta.env.DEV && (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-primary"
+                        disabled={loading}
+                        onClick={handleDemoLogin}
+                      >
+                        <MonitorCog className="size-3.5" />
+                        本地演示
+                      </Button>
+                    )}
+                  </>
                 ) : (
                   <>已有账号？<button type="button" className="text-primary hover:underline" onClick={switchMode}>登录</button></>
                 )}

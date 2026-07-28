@@ -3,6 +3,13 @@ import type { OverdueNotification } from '@/types'
 
 export const notificationsService = {
   async getMyNotifications(): Promise<OverdueNotification[]> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        return demoApi.getNotifications()
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return []
 
@@ -23,6 +30,14 @@ export const notificationsService = {
   },
 
   async markAsRead(id: string): Promise<void> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        await demoApi.markNotificationRead(id)
+        return
+      }
+    }
+
     const { error } = await supabase
       .from('overdue_notifications')
       .update({ is_read: true })
@@ -31,6 +46,14 @@ export const notificationsService = {
   },
 
   async markAllAsRead(): Promise<void> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        await demoApi.markAllNotificationsRead()
+        return
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
 
@@ -43,6 +66,13 @@ export const notificationsService = {
   },
 
   async getUnreadCount(): Promise<number> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        return (await demoApi.getUnreadCount()).count
+      }
+    }
+
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return 0
 

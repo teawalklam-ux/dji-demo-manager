@@ -44,6 +44,19 @@ export const itemsService = {
   async getPage(filters?: ItemPageFilters): Promise<PaginatedResponse<Item>> {
     const page = Math.max(filters?.page || 1, 1)
     const pageSize = Math.min(Math.max(filters?.page_size || 50, 1), 100)
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        return demoApi.getItems({
+          search: filters?.search,
+          category_id: filters?.category_id,
+          status: filters?.display_status || filters?.status,
+          page,
+          page_size: pageSize,
+        })
+      }
+    }
+
     const { data, error } = await supabase.rpc('get_items_page', {
       p_search: filters?.search?.trim() || null,
       p_category_id: filters?.category_id || null,
@@ -90,6 +103,19 @@ export const itemsService = {
   },
 
   async getAll(filters?: ItemFilters): Promise<PaginatedResponse<Item>> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        return demoApi.getItems({
+          search: filters?.search,
+          category_id: filters?.category_id,
+          status: filters?.status,
+          page: 1,
+          page_size: 100,
+        })
+      }
+    }
+
     let query = supabase
       .from('items')
       .select('*, category:categories(*), current_borrower:profiles(*)', { count: 'exact' })
@@ -113,6 +139,13 @@ export const itemsService = {
   },
 
   async getById(id: string): Promise<Item | null> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        return demoApi.getItem(id)
+      }
+    }
+
     const { data, error } = await supabase
       .from('items')
       .select('*, category:categories(*), current_borrower:profiles(*)')
@@ -123,6 +156,14 @@ export const itemsService = {
   },
 
   async getByBarcode(barcode: string): Promise<Item | null> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        const result = await demoApi.getItems({ search: barcode, page_size: 100 })
+        return result.data.find((item) => item.barcode === barcode) || null
+      }
+    }
+
     const { data, error } = await supabase
       .from('items')
       .select('*, category:categories(*), current_borrower:profiles(*)')
@@ -133,6 +174,13 @@ export const itemsService = {
   },
 
   async create(data: ItemCreateInput): Promise<Item> {
+    if (import.meta.env.DEV) {
+      const { isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        throw new Error('本地演示账号不允许新增样机')
+      }
+    }
+
     const { data: item, error } = await supabase
       .from('items')
       .insert(data)
@@ -152,6 +200,13 @@ export const itemsService = {
   },
 
   async update(id: string, data: Partial<ItemCreateInput>): Promise<Item> {
+    if (import.meta.env.DEV) {
+      const { isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        throw new Error('本地演示账号不允许修改样机')
+      }
+    }
+
     const { data: item, error } = await supabase
       .from('items')
       .update(data)
@@ -163,6 +218,13 @@ export const itemsService = {
   },
 
   async delete(id: string): Promise<void> {
+    if (import.meta.env.DEV) {
+      const { isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        throw new Error('本地演示账号不允许删除样机')
+      }
+    }
+
     // 先删除关联记录（外键约束顺序：approval_records → borrow_records → stock_movements → borrow_requests → items）
     // 1. 删除审批记录（borrow_requests 有 ON DELETE CASCADE，但 borrow_records 没有）
     const { error: arErr } = await supabase
@@ -189,6 +251,14 @@ export const itemsService = {
   },
 
   async getInStockItems(): Promise<Item[]> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        const result = await demoApi.getItems({ status: 'in_stock', page_size: 100 })
+        return result.data
+      }
+    }
+
     const { data, error } = await supabase
       .from('items')
       .select('*, category:categories(*)')
@@ -200,6 +270,14 @@ export const itemsService = {
 
   /** 可预约样机：借出/逾期样机也可选择未来无冲突日期，维修与退役样机不可申请。 */
   async getBorrowableItems(): Promise<Item[]> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        const result = await demoApi.getItems({ borrowable: true, page_size: 100 })
+        return result.data
+      }
+    }
+
     const [itemsResult, statusResult] = await Promise.all([
       supabase
         .from('items')
@@ -250,12 +328,26 @@ export const itemsService = {
 
   /** 获取借出日期尚未到、且已审批预约的在库样机。 */
   async getReservedItemIds(): Promise<Set<string>> {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        return new Set(await demoApi.getReservedItemIds())
+      }
+    }
+
     const { data, error } = await supabase.rpc('get_reserved_item_ids')
     if (error) throw error
     return new Set((data || []).map((row: { item_id: string }) => row.item_id))
   },
 
   async getStats() {
+    if (import.meta.env.DEV) {
+      const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) {
+        return demoApi.getDashboardSummary()
+      }
+    }
+
     const { data, error } = await supabase.rpc('get_dashboard_summary')
     if (error) throw error
 

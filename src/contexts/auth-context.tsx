@@ -8,6 +8,7 @@ interface AuthContextType {
   profile: Profile | null
   loading: boolean
   signIn: (email: string, password: string) => Promise<{ error: Error | null }>
+  signInDemo: () => Promise<{ error: Error | null }>
   signUp: (email: string, password: string, displayName: string) => Promise<{ error: Error | null }>
   signOut: () => Promise<void>
   hasRole: (role: UserRole) => boolean
@@ -16,6 +17,7 @@ interface AuthContextType {
   isApprover: boolean
   isPendingApproval: boolean
   isDisabled: boolean
+  isDemoMode: boolean
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -24,46 +26,84 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null)
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
+  const [isDemoMode, setIsDemoMode] = useState(false)
 
   useEffect(() => {
-    // 获取当前 session
-    supabase.auth.getSession().then(({ data: { session }, error }) => {
-      if (error) {
-        console.error('getSession error:', error)
-        setLoading(false)
-        return
-      }
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        fetchProfile(session.user.id)
-      } else {
-        setLoading(false)
-      }
-    }).catch((err) => {
-      console.error('getSession exception:', err)
-      setLoading(false)
-    })
+    let cancelled = false
+    let unsubscribe: (() => void) | undefined
 
-    // 监听认证状态变化 (用 setTimeout 避免 Supabase 死锁)
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      (event, session) => {
-        // 密码重置流程：跳转到重置密码页面
-        if (event === 'PASSWORD_RECOVERY') {
-          window.location.href = '/dji-demo-manager/reset-password'
+    async function initializeAuth() {
+      if (import.meta.env.DEV) {
+        const { demoApi, isDemoSessionActive, setDemoSessionActive } = await import('@/lib/demo-mode')
+        if (isDemoSessionActive()) {
+          setIsDemoMode(true)
+          try {
+            const { user: demoUser, profile: demoProfile } = await demoApi.getSession()
+            if (cancelled) return
+            setUser(demoUser)
+            setProfile(demoProfile)
+          } catch (error) {
+            console.error('restore demo session error:', error)
+            setDemoSessionActive(false)
+            if (cancelled) return
+            setIsDemoMode(false)
+            setUser(null)
+            setProfile(null)
+          } finally {
+            if (!cancelled) setLoading(false)
+          }
           return
         }
+      }
 
+      // 获取当前 session
+      supabase.auth.getSession().then(({ data: { session }, error }) => {
+        if (cancelled) return
+        if (error) {
+          console.error('getSession error:', error)
+          setLoading(false)
+          return
+        }
         setUser(session?.user ?? null)
         if (session?.user) {
-          setTimeout(() => fetchProfile(session.user.id), 0)
+          fetchProfile(session.user.id)
         } else {
-          setProfile(null)
           setLoading(false)
         }
-      }
-    )
+      }).catch((err) => {
+        if (cancelled) return
+        console.error('getSession exception:', err)
+        setLoading(false)
+      })
 
-    return () => subscription.unsubscribe()
+      // 监听认证状态变化 (用 setTimeout 避免 Supabase 死锁)
+      const { data: { subscription } } = supabase.auth.onAuthStateChange(
+        (event, session) => {
+          if (cancelled) return
+          // 密码重置流程：跳转到重置密码页面
+          if (event === 'PASSWORD_RECOVERY') {
+            window.location.href = '/dji-demo-manager/reset-password'
+            return
+          }
+
+          setUser(session?.user ?? null)
+          if (session?.user) {
+            setTimeout(() => fetchProfile(session.user.id), 0)
+          } else {
+            setProfile(null)
+            setLoading(false)
+          }
+        }
+      )
+      unsubscribe = () => subscription.unsubscribe()
+    }
+
+    void initializeAuth()
+
+    return () => {
+      cancelled = true
+      unsubscribe?.()
+    }
   }, [])
 
   async function fetchProfile(userId: string) {
@@ -97,6 +137,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  async function signInDemo() {
+    if (!import.meta.env.DEV) {
+      return { error: new Error('本地演示模式仅在开发环境可用') }
+    }
+
+    try {
+      const {
+        DEMO_EMAIL,
+        DEMO_PASSWORD,
+        demoApi,
+        setDemoSessionActive,
+      } = await import('@/lib/demo-mode')
+      const { user: demoUser, profile: demoProfile } = await demoApi.login(DEMO_EMAIL, DEMO_PASSWORD)
+      setDemoSessionActive(true)
+      setIsDemoMode(true)
+      setUser(demoUser)
+      setProfile(demoProfile)
+      setLoading(false)
+      return { error: null }
+    } catch (err) {
+      return { error: err instanceof Error ? err : new Error('本地演示登录失败') }
+    }
+  }
+
   async function signUp(email: string, password: string, displayName: string) {
     try {
       const { error } = await supabase.auth.signUp({
@@ -116,6 +180,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }
 
   async function signOut() {
+    if (import.meta.env.DEV && isDemoMode) {
+      const { setDemoSessionActive } = await import('@/lib/demo-mode')
+      setDemoSessionActive(false)
+      setIsDemoMode(false)
+      setUser(null)
+      setProfile(null)
+      return
+    }
+
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
@@ -144,7 +217,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isDisabled = profile?.status === 'disabled'
 
   return (
-    <AuthContext.Provider value={{ user, profile, loading, signIn, signUp, signOut, hasRole, isAdmin, isSuperAdmin, isApprover, isPendingApproval, isDisabled }}>
+    <AuthContext.Provider value={{ user, profile, loading, signIn, signInDemo, signUp, signOut, hasRole, isAdmin, isSuperAdmin, isApprover, isPendingApproval, isDisabled, isDemoMode }}>
       {children}
     </AuthContext.Provider>
   )
