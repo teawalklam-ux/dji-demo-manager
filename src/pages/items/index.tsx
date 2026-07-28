@@ -207,16 +207,16 @@ export function ItemsList() {
       return <ArrowUpDown className="ml-1 size-3 text-muted-foreground/40 inline-block" />
     }
     return (
-      <span className={`ml-1 inline-block text-xs font-bold ${sortOrder === 'asc' ? 'text-primary' : 'text-orange-500'}`}>
+      <span className={`ml-1 inline-block text-xs font-bold ${sortOrder === 'asc' ? 'text-primary' : 'text-warning'}`}>
         {sortOrder === 'asc' ? '↑' : '↓'}
       </span>
     )
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <h1 className="text-xl sm:text-2xl font-bold">样机管理</h1>
+    <div className="hm-page space-y-8">
+      <div className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
+        <h1 className="hm-page-title">样机管理</h1>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
             <Link to="/items/new">
@@ -266,9 +266,9 @@ export function ItemsList() {
       </div>
 
       {/* 搜索与筛选 */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-col sm:flex-row gap-3">
+      <Card className="overflow-visible border-0 bg-transparent shadow-none">
+        <CardContent className="hm-tool-rail px-0 py-4 sm:px-0 sm:pb-4">
+          <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1 min-w-0">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -278,7 +278,7 @@ export function ItemsList() {
                 className="pl-9 w-full"
               />
             </div>
-            <div className="flex gap-2 shrink-0">
+            <div className="grid shrink-0 grid-cols-1 gap-2 sm:flex">
               <Select value={categoryFilter} onValueChange={(value) => {
                 setPage(1)
                 setCategoryFilter(value === 'all' ? '' : value)
@@ -313,11 +313,11 @@ export function ItemsList() {
       </Card>
 
       {/* 数据表格 */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">样机列表 (共 {totalCount} 条)</CardTitle>
+      <Card className="hm-data-surface">
+        <CardHeader className="border-b">
+          <CardTitle className="text-base tabular-nums">样机列表 (共 {totalCount} 条)</CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0 sm:p-0">
           {loading ? (
             <div className="flex items-center justify-center py-8">
               <Spinner className="size-6" />
@@ -327,7 +327,7 @@ export function ItemsList() {
           ) : (
             <>
               {/* 桌面端表格 */}
-              <div className="hidden sm:block overflow-x-auto">
+              <div className="hidden sm:block">
                 <Table>
                   <TableHeader>
                     <TableRow>
@@ -338,37 +338,37 @@ export function ItemsList() {
                         />
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
                         onClick={() => handleSort('barcode')}
                       >
                         条码{sortIndicator('barcode')}
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
                         onClick={() => handleSort('name')}
                       >
                         名称{sortIndicator('name')}
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
                         onClick={() => handleSort('model')}
                       >
                         型号{sortIndicator('model')}
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
                         onClick={() => handleSort('category')}
                       >
                         分类{sortIndicator('category')}
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
                         onClick={() => handleSort('status')}
                       >
                         状态{sortIndicator('status')}
                       </TableHead>
                       <TableHead
-                        className="cursor-pointer select-none hover:text-foreground transition-colors whitespace-nowrap"
+                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
                         onClick={() => handleSort('location')}
                       >
                         存放位置{sortIndicator('location')}
@@ -407,11 +407,11 @@ export function ItemsList() {
               </div>
 
               {/* 移动端卡片 */}
-              <div className="sm:hidden space-y-3">
+              <div className="space-y-3 p-3 sm:hidden">
                 {sortedItems.map(item => (
                   <div
                     key={item.id}
-                    className={`border rounded-lg p-3 ${selectedIds.has(item.id) ? 'bg-accent/50 border-primary' : 'bg-card'}`}
+                    className={`rounded-[var(--radius-input)] border p-3 transition-[color,background-color,border-color] duration-micro ease-hm-out ${selectedIds.has(item.id) ? 'border-primary bg-accent/60' : 'bg-card'}`}
                     onClick={() => toggleSelect(item.id)}
                   >
                     <div className="flex items-start gap-3">
@@ -447,7 +447,7 @@ export function ItemsList() {
               </div>
 
               {totalCount > PAGE_SIZE && (
-                <div className="flex items-center justify-between border-t pt-4 mt-4">
+                <div className="flex flex-wrap items-center justify-between gap-3 border-t px-3 py-4 sm:px-5">
                   <p className="text-sm text-muted-foreground">
                     第 {page} / {Math.ceil(totalCount / PAGE_SIZE)} 页
                   </p>
