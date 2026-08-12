@@ -68,7 +68,11 @@ function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-input)] bg-sidebar-primary text-sidebar-primary-foreground">
-            <span className="font-display text-[11px] font-bold tracking-[-0.02em]">DJI</span>
+            <img
+              src={`${import.meta.env.BASE_URL}dji-logo-white.png`}
+              alt="DJI"
+              className="h-5 w-7 object-contain"
+            />
           </div>
           <div className="min-w-0">
             <h2 className="truncate font-display text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">样机管理系统</h2>
@@ -152,8 +156,9 @@ function AppSidebar() {
 
 function NotificationItem({ notification, onMarkRead }: { notification: OverdueNotification; onMarkRead: (id: string) => void }) {
   const isApproval = notification.notification_category === 'approval'
+  const isReservation = notification.notification_category === 'reservation'
   const Icon = isApproval ? Clock : AlertCircle
-  const iconColor = isApproval ? 'text-info' : 'text-destructive'
+  const iconColor = isApproval ? 'text-info' : isReservation ? 'text-warning' : 'text-destructive'
 
   const handleClick = () => {
     if (!notification.is_read) {

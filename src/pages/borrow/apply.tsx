@@ -69,6 +69,8 @@ export function BorrowApply() {
   const [expectedBorrowDate, setExpectedBorrowDate] = useState('')
   const [expectedReturnDate, setExpectedReturnDate] = useState('')
   const [availabilityConflicts, setAvailabilityConflicts] = useState<Array<{ item_id: string; item_name: string; occupied_start_date: string; occupied_end_date: string }>>([])
+  const [availabilityChecking, setAvailabilityChecking] = useState(false)
+  const [availabilityCheckFailed, setAvailabilityCheckFailed] = useState(false)
 
   const filteredItems = items.filter(
     (item) =>
@@ -87,6 +89,10 @@ export function BorrowApply() {
         customerService.getMine(),
       ])
       setItems(itemsData)
+      if (itemId && !itemsData.some((item) => item.id === itemId)) {
+        setSelectedItemIds([])
+        toast.error('该样机当前为逾期、维修或退役状态，不能提交预约申请')
+      }
       setChains(chainsData.filter((c) => c.is_active))
       setCustomers(customersData)
     } catch (error) {
@@ -95,7 +101,7 @@ export function BorrowApply() {
     } finally {
       setLoading(false)
     }
-  }, [])
+  }, [itemId])
 
   useEffect(() => {
     loadInitialData()
@@ -104,18 +110,29 @@ export function BorrowApply() {
   useEffect(() => {
     if (!expectedBorrowDate || !expectedReturnDate || expectedReturnDate < expectedBorrowDate || selectedItemIds.length === 0) {
       setAvailabilityConflicts([])
+      setAvailabilityChecking(false)
+      setAvailabilityCheckFailed(false)
       return
     }
     let cancelled = false
+    setAvailabilityChecking(true)
+    setAvailabilityCheckFailed(false)
     borrowService.checkAvailability(selectedItemIds, expectedBorrowDate, expectedReturnDate)
       .then((conflicts) => {
-        if (!cancelled) setAvailabilityConflicts(conflicts)
+        if (!cancelled) {
+          setAvailabilityConflicts(conflicts)
+          setAvailabilityCheckFailed(false)
+        }
       })
       .catch((error) => {
         if (!cancelled) {
           setAvailabilityConflicts([])
+          setAvailabilityCheckFailed(true)
           console.error('预检样机可用性失败:', error)
         }
+      })
+      .finally(() => {
+        if (!cancelled) setAvailabilityChecking(false)
       })
     return () => { cancelled = true }
   }, [selectedItemIds, expectedBorrowDate, expectedReturnDate])
@@ -185,6 +202,10 @@ export function BorrowApply() {
       toast.error('所选日期已有审批通过的样机预约，请调整样机或日期')
       return
     }
+    if (availabilityChecking || availabilityCheckFailed) {
+      toast.error(availabilityChecking ? '正在校验样机可用性，请稍候' : '样机可用性校验失败，请刷新后重试')
+      return
+    }
     if (borrowType === 'customer') {
       if (!customerName.trim()) {
         toast.error('请填写客户名称')
@@ -241,7 +262,7 @@ export function BorrowApply() {
       <Card>
         <CardHeader>
           <CardTitle>选择样机</CardTitle>
-          <CardDescription>选择在申请日期内无冲突的样机，预定与借出设备仍可申请未来可用日期</CardDescription>
+          <CardDescription>选择在申请日期内无冲突的样机；正常借出设备可申请未来日期，逾期设备不可预约</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -431,6 +452,11 @@ export function BorrowApply() {
               </ul>
             </div>
           )}
+          {availabilityCheckFailed && (
+            <div className="rounded-md bg-red-50 p-3 text-sm text-red-700">
+              无法确认所选样机的可用性。为避免重复预约，本次申请已暂停提交，请刷新后重试。
+            </div>
+          )}
           {maxBorrowDays !== null && (
             <div className={`rounded-md p-3 text-sm ${exceedsMaxDays ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
               {borrowTypeInfo.label}最多可申请 <strong>{maxBorrowDays}</strong> 天
@@ -484,7 +510,7 @@ export function BorrowApply() {
         <Button variant="outline" onClick={() => navigate(-1)}>
           取消
         </Button>
-        <Button onClick={handleSubmit} disabled={submitting || availabilityConflicts.length > 0}>
+        <Button onClick={handleSubmit} disabled={submitting || availabilityChecking || availabilityCheckFailed || availabilityConflicts.length > 0}>
           {submitting && <Spinner className="mr-2 size-4" />}
           提交申请
         </Button>

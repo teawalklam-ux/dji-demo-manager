@@ -111,6 +111,8 @@ export const demoApi = {
       reserved: number
       borrowed: number
       overdue: number
+      maintenance: number
+      retired: number
       monthlyRequests: number
     }>('/dashboard/summary')
   },

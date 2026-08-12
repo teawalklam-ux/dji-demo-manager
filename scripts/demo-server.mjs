@@ -275,6 +275,8 @@ function getDashboardSummary() {
     reserved: count('reserved'),
     borrowed: count('borrowed'),
     overdue: count('overdue'),
+    maintenance: count('maintenance'),
+    retired: count('retired'),
     monthlyRequests: 6,
   }
 }
@@ -394,7 +396,7 @@ const server = createServer(async (req, res) => {
           .some((value) => value.toLocaleLowerCase('zh-CN').includes(search))
         const matchesCategory = !categoryId || item.category_id === categoryId
         const matchesStatus = !status || item.display_status === status || item.status === status
-        const matchesBorrowable = !borrowable || ['in_stock', 'borrowed', 'overdue'].includes(item.status)
+        const matchesBorrowable = !borrowable || ['in_stock', 'borrowed'].includes(item.status)
         return matchesSearch && matchesCategory && matchesStatus && matchesBorrowable
       })
 
