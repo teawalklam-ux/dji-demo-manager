@@ -16,6 +16,8 @@ type DashboardSummaryRow = {
   reserved: number
   borrowed: number
   overdue: number
+  maintenance: number
+  retired: number
   monthly_requests: number
 }
 
@@ -268,7 +270,7 @@ export const itemsService = {
     return data || []
   },
 
-  /** 可预约样机：借出/逾期样机也可选择未来无冲突日期，维修与退役样机不可申请。 */
+  /** 可预约样机：在库或正常借出样机可选择无冲突日期；逾期、维修与退役样机不可申请。 */
   async getBorrowableItems(): Promise<Item[]> {
     if (import.meta.env.DEV) {
       const { demoApi, isDemoSessionActive } = await import('@/lib/demo-mode')
@@ -299,7 +301,7 @@ export const itemsService = {
           updated_at,
           category:categories(*)
         `)
-        .in('status', ['in_stock', 'borrowed', 'overdue'])
+        .in('status', ['in_stock', 'borrowed'])
         .order('name'),
       supabase.rpc('get_borrowable_item_status_details'),
     ])
@@ -358,6 +360,8 @@ export const itemsService = {
       reserved: summary?.reserved || 0,
       borrowed: summary?.borrowed || 0,
       overdue: summary?.overdue || 0,
+      maintenance: summary?.maintenance || 0,
+      retired: summary?.retired || 0,
       monthlyRequests: summary?.monthly_requests || 0,
     }
   },

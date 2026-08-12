@@ -34,6 +34,7 @@
   --color-info: var(--color-accent);
   --color-info-ink: var(--color-accent-ink);
   --color-info-surface: var(--color-accent-surface);
+  --color-reserved: oklch(50% 0.15 300);
 
   /* Data visualisation */
   --color-chart-1: var(--color-accent);
@@ -41,6 +42,12 @@
   --color-chart-3: var(--color-danger);
   --color-chart-4: var(--color-warning);
   --color-chart-5: var(--color-neutral);
+  --color-chart-in-stock: var(--color-success);
+  --color-chart-reserved: var(--color-reserved);
+  --color-chart-borrowed: var(--color-accent);
+  --color-chart-overdue: var(--color-danger);
+  --color-chart-maintenance: var(--color-warning);
+  --color-chart-retired: var(--color-neutral);
 
   /* Font roles: named local faces avoid a new runtime dependency */
   --font-display: "Bahnschrift", "DIN Alternate", "Microsoft YaHei UI", ui-sans-serif, sans-serif;
