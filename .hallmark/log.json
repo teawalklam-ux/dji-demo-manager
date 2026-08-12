@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-08-12",
+    "scope": "app-surface",
+    "macrostructure": "Workbench shell / Stat-Led dashboard",
+    "theme": "custom",
+    "theme_axes": "light workspace / dark side rail / cool accent",
+    "vibe": "precise, calm, operational, trustworthy",
+    "enrichment": "none",
+    "brief": "Dashboard home and application sidebar visual hierarchy redesign"
+  },
+  {
     "date": "2026-07-27",
     "scope": "app",
     "macrostructure": "Workbench family (Stat-Led dashboard / Index-First inventory)",

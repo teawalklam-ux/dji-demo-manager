@@ -8,7 +8,7 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
 - 工作目标：快速理解库存状态，完成查找、借用、审批与跟进。
 - 视觉语气：精准、冷静、业务导向、可信赖。
 - 类型：modern-minimal。
-- 主题：自定义冷色系统；DJI 蓝是唯一主强调色。
+- 主题：自定义冷色系统；DJI 蓝是唯一主强调色。应用侧栏使用同一冷色锚点的深墨色反转面，主工作区保持冷白纸面。
 - 字体：标题使用设备本地的 Bahnschrift / 微软雅黑，正文使用 Segoe UI Variable / 苹方 / 微软雅黑，数据标识使用 Cascadia Mono；不新增网络字体或构建依赖。
 - 图片与装饰：无。该产品以真实数据与操作密度为视觉内容。
 
@@ -16,11 +16,11 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
 
 ### 应用壳：Workbench
 
-侧栏承载稳定的信息架构，顶部栏只保留全局控制，主内容区使用受控宽度和清晰工作区分组。导航与通知行为保持原样。
+侧栏承载稳定的信息架构，使用深墨色反转面与单一 DJI 蓝当前项标记；顶部栏只保留页面定位和全局控制，主内容区使用受控宽度和清晰工作区分组。导航、折叠与通知行为保持原样。
 
 ### 仪表盘：Stat-Led
 
-第一屏先展示真实库存统计，不制造任何指标。统计条改为相连的操作面；预警、图表、审批与变动记录使用单层容器和分隔线，避免卡片嵌套。
+第一屏先展示真实库存统计，不制造任何指标。页面标题与快捷操作组成同一工作头，统计条改为相连且不等宽的操作面；预警、图表、审批与变动记录使用 7/5 与 5/7 的非对称单层工作面。无数据时保留解释与下一步操作，不再让区块直接消失。
 
 ### 样机列表：Index-First / Workbench
 
@@ -92,6 +92,10 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --color-ink: oklch(20.6% 0.039 265.5);
   --color-accent: oklch(50% 0.16 258);
   --color-focus: oklch(9% 0.025 260);
+  --color-sidebar-surface: oklch(25% 0.04 263);
+  --color-sidebar-active: oklch(31% 0.06 258);
+  --color-sidebar-text: oklch(94% 0.012 252);
+  --color-sidebar-accent: oklch(67% 0.16 258);
   --font-display: "Bahnschrift", "DIN Alternate", "Microsoft YaHei UI", ui-sans-serif, sans-serif;
   --font-body: "Segoe UI Variable Text", "PingFang SC", "Microsoft YaHei UI", ui-sans-serif, system-ui, sans-serif;
   --font-outlier: "Cascadia Mono", "SFMono-Regular", ui-monospace, monospace;
@@ -135,7 +139,11 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
     "ink": { "$value": "oklch(20.6% 0.039 265.5)", "$type": "color" },
     "accent": { "$value": "oklch(50% 0.16 258)", "$type": "color" },
     "accent-ink": { "$value": "oklch(98.8% 0.004 250)", "$type": "color" },
-    "focus": { "$value": "oklch(9% 0.025 260)", "$type": "color" }
+    "focus": { "$value": "oklch(9% 0.025 260)", "$type": "color" },
+    "sidebar-surface": { "$value": "oklch(25% 0.04 263)", "$type": "color" },
+    "sidebar-active": { "$value": "oklch(31% 0.06 258)", "$type": "color" },
+    "sidebar-text": { "$value": "oklch(94% 0.012 252)", "$type": "color" },
+    "sidebar-accent": { "$value": "oklch(67% 0.16 258)", "$type": "color" }
   },
   "font": {
     "display": { "$value": "Bahnschrift, DIN Alternate, Microsoft YaHei UI, ui-sans-serif, sans-serif", "$type": "fontFamily" },
@@ -191,6 +199,14 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --border: 85.5% 0.016 255;
   --input: 65% 0.025 257;
   --ring: 9% 0.025 260;
+  --sidebar-background: 20.6% 0.039 265.5;
+  --sidebar-foreground: 94% 0.012 252;
+  --sidebar-primary: 67% 0.16 258;
+  --sidebar-primary-foreground: 20.6% 0.039 265.5;
+  --sidebar-accent: 31% 0.06 258;
+  --sidebar-accent-foreground: 94% 0.012 252;
+  --sidebar-border: 34% 0.035 260;
+  --sidebar-ring: 76% 0.12 258;
   --radius: 0.625rem;
 }
 ```
