@@ -1,10 +1,10 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { approvalService } from '@/services/approval.service'
 import { borrowService } from '@/services/borrow.service'
 import { useAuth } from '@/contexts/auth-context'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
@@ -19,6 +19,7 @@ import { Label } from '@/components/ui/label'
 import {
   Package, ArrowRightLeft, AlertTriangle, FileText,
   CheckSquare, ClipboardList, ArrowRight, ChevronRight,
+  CircleCheckBig, History, ChartPie, type LucideIcon,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { supabase } from '@/lib/supabase'
@@ -34,6 +35,31 @@ const CHART_COLORS = [
   'var(--color-chart-4)',
   'var(--color-chart-5)',
 ]
+
+function DashboardEmptyState({
+  icon: Icon,
+  title,
+  description,
+  action,
+}: {
+  icon: LucideIcon
+  title: string
+  description: string
+  action?: ReactNode
+}) {
+  return (
+    <div className="hm-empty-state">
+      <span className="hm-empty-state__icon" aria-hidden="true">
+        <Icon className="size-5" />
+      </span>
+      <div>
+        <p className="font-medium text-foreground">{title}</p>
+        <p className="mt-1 max-w-md text-sm leading-6 text-muted-foreground">{description}</p>
+        {action && <div className="mt-4">{action}</div>}
+      </div>
+    </div>
+  )
+}
 
 export function Dashboard() {
   const { isApprover, user, profile, isDemoMode } = useAuth()
@@ -181,200 +207,235 @@ export function Dashboard() {
   }
 
   return (
-    <div className="hm-page space-y-10">
-      <h1 className="hm-page-title">仪表盘</h1>
+    <div className="hm-page hm-dashboard space-y-8 sm:space-y-10">
+      <section className="hm-dashboard-heading">
+        <div className="min-w-0">
+          <h1 className="hm-page-title">仪表盘</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
+            集中查看样机库存、借用申请与待办审批。
+          </p>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button asChild size="lg">
+            <Link to="/borrow/apply">
+              <FileText className="size-4" />
+              申请借用
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link to="/borrow/my-requests">
+              <ClipboardList className="size-4" />
+              我的申请
+            </Link>
+          </Button>
+          {isApprover && (
+            <Button asChild variant="outline" size="lg">
+              <Link to="/approval/queue">
+                <CheckSquare className="size-4" />
+                审批队列
+                {pendingApprovals.length > 0 && (
+                  <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-xs">
+                    {pendingApprovals.length}
+                  </Badge>
+                )}
+              </Link>
+            </Button>
+          )}
+        </div>
+      </section>
 
-      {/* 统计卡片 - 可点击跳转 */}
-      <div className="grid grid-cols-1 gap-px overflow-hidden rounded-[var(--radius-card)] border bg-border shadow-card sm:grid-cols-2 xl:grid-cols-12">
-        <Link to="/items?status=in_stock" className="hm-metric-link block bg-card xl:col-span-4">
-          <Card className="h-full rounded-none border-0 shadow-none">
-            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
-              <CardTitle className="text-sm font-medium">在库样机</CardTitle>
-              <Package className="size-4 text-muted-foreground" />
+      {/* 统计带：保留原有查询和跳转，仅重新建立数值层级。 */}
+      <section aria-label="样机运营指标" className="hm-metric-grid">
+        <Link to="/items?status=in_stock" className="hm-metric-link bg-card xl:col-span-4">
+          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+              <CardTitle className="text-sm font-medium text-muted-foreground">在库样机</CardTitle>
+              <Package className="size-4 text-primary" />
             </CardHeader>
-            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] tabular-nums">{statsLoading ? <Spinner className="size-5" /> : stats.inStock}</div>
-                  <p className="text-xs text-muted-foreground">{statsLoading ? '加载中...' : `共 ${stats.total} 台样机`}</p>
-                </div>
-                <ChevronRight className="size-5 text-muted-foreground" />
+            <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
+              <div>
+                <div className="hm-metric-value" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : stats.inStock}</div>
+                <p className="mt-2 text-xs text-muted-foreground">{statsLoading ? '加载中…' : `全部样机 ${stats.total} 台`}</p>
               </div>
+              <ChevronRight className="size-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </Link>
 
-        <Link to="/items?status=borrowed" className="hm-metric-link block bg-card xl:col-span-3">
-          <Card className="h-full rounded-none border-0 shadow-none">
-            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
-              <CardTitle className="text-sm font-medium">借出中</CardTitle>
+        <Link to="/items?status=borrowed" className="hm-metric-link bg-card xl:col-span-3">
+          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+              <CardTitle className="text-sm font-medium text-muted-foreground">借出中</CardTitle>
               <ArrowRightLeft className="size-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] tabular-nums">{statsLoading ? <Spinner className="size-5" /> : stats.borrowed}</div>
-                  <p className="text-xs text-muted-foreground">当前借出数量</p>
-                </div>
-                <ChevronRight className="size-5 text-muted-foreground" />
+            <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
+              <div>
+                <div className="hm-metric-value" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : stats.borrowed}</div>
+                <p className="mt-2 text-xs text-muted-foreground">当前借出数量</p>
               </div>
+              <ChevronRight className="size-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </Link>
 
-        <Link to="/items?status=overdue" className="hm-metric-link block bg-card xl:col-span-2">
-          <Card className="h-full rounded-none border-0 shadow-none">
-            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
-              <CardTitle className="text-sm font-medium">逾期未还</CardTitle>
+        <Link to="/items?status=overdue" className="hm-metric-link bg-card xl:col-span-2">
+          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+              <CardTitle className="text-sm font-medium text-muted-foreground">逾期未还</CardTitle>
               <AlertTriangle className="size-4 text-destructive" />
             </CardHeader>
-            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] text-destructive tabular-nums">{statsLoading ? <Spinner className="size-5" /> : stats.overdue}</div>
-                  <p className="text-xs text-muted-foreground">需要及时跟进</p>
-                </div>
-                <ChevronRight className="size-5 text-muted-foreground" />
+            <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
+              <div>
+                <div className="hm-metric-value text-destructive" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : stats.overdue}</div>
+                <p className="mt-2 text-xs text-muted-foreground">需要及时跟进</p>
               </div>
+              <ChevronRight className="size-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </Link>
 
-        <Link to="/borrow/my-requests" className="hm-metric-link block bg-card xl:col-span-3">
-          <Card className="h-full rounded-none border-0 shadow-none">
-            <CardHeader className="flex flex-row items-center justify-between px-4 pb-2 pt-4 sm:px-5 sm:pt-5">
-              <CardTitle className="text-sm font-medium">本月申请</CardTitle>
+        <Link to="/borrow/my-requests" className="hm-metric-link bg-card xl:col-span-3">
+          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+            <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
+              <CardTitle className="text-sm font-medium text-muted-foreground">本月申请</CardTitle>
               <FileText className="size-4 text-muted-foreground" />
             </CardHeader>
-            <CardContent className="px-4 pb-4 sm:px-5 sm:pb-5">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="font-display text-3xl font-semibold tracking-[-0.03em] tabular-nums">{statsLoading ? <Spinner className="size-5" /> : monthlyRequests}</div>
-                  <p className="text-xs text-muted-foreground">本月借用申请数</p>
-                </div>
-                <ChevronRight className="size-5 text-muted-foreground" />
+            <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
+              <div>
+                <div className="hm-metric-value" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : monthlyRequests}</div>
+                <p className="mt-2 text-xs text-muted-foreground">本月借用申请数</p>
               </div>
+              <ChevronRight className="size-5 text-muted-foreground" />
             </CardContent>
           </Card>
         </Link>
-      </div>
+      </section>
 
-      {/* 快捷操作 */}
-      <div className="hm-tool-rail flex flex-wrap gap-2 py-4">
-        <Link to="/borrow/apply">
-          <Button size="lg">
-            <FileText className="size-4 mr-2" />
-            申请借用
-          </Button>
-        </Link>
-        <Link to="/borrow/my-requests">
-          <Button variant="outline" size="lg">
-            <ClipboardList className="size-4 mr-2" />
-            我的申请
-          </Button>
-        </Link>
-        {isApprover && (
-          <Link to="/approval/queue">
-            <Button variant="outline" size="lg">
-              <CheckSquare className="size-4 mr-2" />
-              审批队列
-              {pendingApprovals.length > 0 && (
-                <Badge variant="destructive" className="ml-2 px-1.5 py-0 text-xs">
-                  {pendingApprovals.length}
-                </Badge>
-              )}
-            </Button>
-          </Link>
-        )}
-      </div>
-
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
-        {/* 逾期预警 */}
-        {(overdueLoading || overdueItems.length > 0) && (
-          <Card className="border-destructive/25 bg-destructive/[0.045]">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2 text-destructive">
-                <AlertTriangle className="size-5" />
-                逾期预警
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              {overdueLoading ? (
-                <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
-              ) : <div className="space-y-3">
-                {overdueItems.slice(0, 5).map(item => (
-                  <div key={item.id} className="flex flex-col gap-3 border-t py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="min-w-0">
-                      <p className="font-medium">{item.name}</p>
-                      <p className="text-sm text-muted-foreground">{item.model} | {item.barcode}</p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                      <Badge className={ITEM_STATUS_MAP.overdue.color}>{ITEM_STATUS_MAP.overdue.label}</Badge>
-                      <Link to={`/items/${item.id}`}>
-                        <Button variant="outline" size="sm">查看</Button>
-                      </Link>
-                    </div>
-                  </div>
-                ))}
-              </div>}
-            </CardContent>
-          </Card>
-        )}
-
-        {/* 状态分布 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>样机状态分布</CardTitle>
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+        <Card className="hm-dashboard-panel xl:col-span-7">
+          <CardHeader className="border-b pb-4">
+            <div className="flex items-start gap-3">
+              <span className="hm-panel-icon"><ChartPie className="size-4" /></span>
+              <div>
+                <CardTitle>样机状态分布</CardTitle>
+                <CardDescription className="mt-1">全部样机当前所处状态</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-4 sm:pt-6">
             {statsLoading ? (
-              <div className="flex h-[250px] items-center justify-center"><Spinner className="size-6" /></div>
+              <div className="flex h-[17.5rem] items-center justify-center"><Spinner className="size-6" /></div>
             ) : pieData.length > 0 ? (
-              <ResponsiveContainer width="100%" height={250}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={90}
-                    paddingAngle={4}
-                    dataKey="value"
-                    label={({ name, value }) => `${name}: ${value}`}
-                  >
-                    {pieData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Tooltip />
-                  <Legend />
-                </PieChart>
-              </ResponsiveContainer>
+              <div
+                className="relative h-[17.5rem] min-w-0"
+                role="img"
+                aria-label={`样机状态分布：全部 ${stats.total} 台`}
+              >
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="45%"
+                      innerRadius={68}
+                      outerRadius={96}
+                      paddingAngle={3}
+                      dataKey="value"
+                      stroke="var(--color-paper)"
+                      strokeWidth={2}
+                    >
+                      {pieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                    <Legend verticalAlign="bottom" iconType="circle" iconSize={8} />
+                  </PieChart>
+                </ResponsiveContainer>
+                <div className="hm-chart-center" aria-hidden="true">
+                  <span className="font-display text-3xl font-semibold tabular-nums">{stats.total}</span>
+                  <span className="text-xs text-muted-foreground">全部样机</span>
+                </div>
+              </div>
             ) : (
-              <p className="text-center text-muted-foreground py-8">暂无数据</p>
+              <DashboardEmptyState
+                icon={Package}
+                title="暂无样机数据"
+                description="样机入库后，这里会展示实时库存状态分布。"
+                action={<Button asChild variant="outline" size="sm"><Link to="/items">查看样机列表</Link></Button>}
+              />
             )}
           </CardContent>
         </Card>
-      </div>
 
-      <div className="grid grid-cols-1 gap-8 lg:grid-cols-2">
+        <Card className="hm-dashboard-panel xl:col-span-5">
+          <CardHeader className="border-b pb-4">
+            <div className="flex items-start gap-3">
+              <span className="hm-panel-icon hm-panel-icon--danger"><AlertTriangle className="size-4" /></span>
+              <div>
+                <CardTitle>逾期跟进</CardTitle>
+                <CardDescription className="mt-1">优先处理未按计划归还的样机</CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-2">
+            {overdueLoading ? (
+              <div className="flex justify-center py-12"><Spinner className="size-5" /></div>
+            ) : overdueItems.length > 0 ? (
+              <div>
+                {overdueItems.slice(0, 5).map(item => (
+                  <div key={item.id} className="hm-list-row">
+                    <div className="min-w-0">
+                      <p className="truncate font-medium">{item.name}</p>
+                      <p className="mt-1 truncate text-sm text-muted-foreground">{item.model} · {item.barcode}</p>
+                    </div>
+                    <div className="flex shrink-0 items-center gap-2">
+                      <Badge className={ITEM_STATUS_MAP.overdue.color}>{ITEM_STATUS_MAP.overdue.label}</Badge>
+                      <Button asChild variant="outline" size="sm">
+                        <Link to={`/items/${item.id}`}>查看</Link>
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <DashboardEmptyState
+                icon={CircleCheckBig}
+                title="目前没有逾期样机"
+                description="所有借出样机都在计划归还时间内。"
+                action={<Button asChild variant="outline" size="sm"><Link to="/items">查看全部样机</Link></Button>}
+              />
+            )}
+          </CardContent>
+        </Card>
+      </section>
+
+      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
         {/* 待审批快速审批（审批人/管理员/超级管理员） */}
         {isApprover && (
-          <Card className={pendingApprovals.length > 0 ? 'border-warning/30 bg-warning/[0.06]' : ''}>
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <CheckSquare className="size-5" />
-                待审批
-                {pendingApprovals.length > 0 && (
-                  <Badge variant="destructive" className="ml-1">{pendingApprovals.length}</Badge>
-                )}
-              </CardTitle>
+          <Card className="hm-dashboard-panel xl:col-span-5">
+            <CardHeader className="border-b pb-4">
+              <div className="flex items-start justify-between gap-4">
+                <div className="flex items-start gap-3">
+                  <span className="hm-panel-icon"><CheckSquare className="size-4" /></span>
+                  <div>
+                    <CardTitle>待审批</CardTitle>
+                    <CardDescription className="mt-1">需要你处理的借用申请</CardDescription>
+                  </div>
+                </div>
+                {pendingApprovals.length > 0 && <Badge variant="destructive">{pendingApprovals.length}</Badge>}
+              </div>
             </CardHeader>
-            <CardContent>
+            <CardContent className="pt-2">
               {approvalsLoading ? (
-                <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
+                <div className="flex justify-center py-12"><Spinner className="size-5" /></div>
               ) : pendingApprovals.length === 0 ? (
-                <p className="text-center text-muted-foreground py-4">暂无待审批申请</p>
+                <DashboardEmptyState
+                  icon={CircleCheckBig}
+                  title="没有待审批申请"
+                  description="新的审批任务到达后会显示在这里。"
+                  action={<Button asChild variant="outline" size="sm"><Link to="/approval/queue">查看审批队列</Link></Button>}
+                />
               ) : (
                 <div>
                   {pendingApprovals.slice(0, 5).map(record => {
@@ -383,7 +444,7 @@ export function Dashboard() {
                     const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
                     const item = request.item || request.request_items?.[0]?.item
                     return (
-                      <div key={record.id} className="space-y-2 border-t py-3 first:border-t-0">
+                      <div key={record.id} className="space-y-3 border-t py-4 first:border-t-0">
                         <div className="flex items-center justify-between">
                           <div className="font-medium">{request.requester?.display_name || '-'}</div>
                           <Badge className={typeInfo?.color}>{typeInfo?.label}</Badge>
@@ -416,8 +477,8 @@ export function Dashboard() {
                     )
                   })}
                   {pendingApprovals.length > 5 && (
-                    <Link to="/approval/queue" className="block text-center text-sm text-primary hover:underline pt-1">
-                      查看全部 {pendingApprovals.length} 条待审批 →
+                    <Link to="/approval/queue" className="mt-2 inline-flex whitespace-nowrap text-sm font-medium text-primary underline-offset-4 hover:underline">
+                      查看全部 {pendingApprovals.length} 条待审批
                     </Link>
                   )}
                 </div>
@@ -427,17 +488,23 @@ export function Dashboard() {
         )}
 
         {/* 最近库存变动 */}
-        <Card>
-          <CardHeader>
-            <CardTitle>最近库存变动</CardTitle>
+        <Card className={`hm-dashboard-panel ${isApprover ? 'xl:col-span-7' : 'xl:col-span-12'}`}>
+          <CardHeader className="border-b pb-4">
+            <div className="flex items-start gap-3">
+              <span className="hm-panel-icon"><History className="size-4" /></span>
+              <div>
+                <CardTitle>最近库存变动</CardTitle>
+                <CardDescription className="mt-1">按发生时间倒序记录库存动作</CardDescription>
+              </div>
+            </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-2">
             {movementsLoading ? (
-              <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
+              <div className="flex justify-center py-12"><Spinner className="size-5" /></div>
             ) : recentMovements.length > 0 ? (
                 <div>
                   {recentMovements.map(movement => (
-                  <div key={movement.id} className="flex flex-col gap-2 border-t py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+                  <div key={movement.id} className="hm-list-row">
                     <div className="min-w-0">
                       <p className="font-medium">{movement.item?.name || '-'}</p>
                       <p className="text-sm text-muted-foreground">
@@ -446,7 +513,7 @@ export function Dashboard() {
                     </div>
                     <div className="shrink-0 text-left sm:text-right">
                       <Badge variant="outline">{movementTypeLabels[movement.movement_type] || movement.movement_type}</Badge>
-                      <p className="text-xs text-muted-foreground mt-1">
+                      <p className="mt-1 text-xs text-muted-foreground">
                         {new Date(movement.created_at).toLocaleString('zh-CN')}
                       </p>
                     </div>
@@ -454,32 +521,42 @@ export function Dashboard() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground py-4">暂无变动记录</p>
+              <DashboardEmptyState
+                icon={History}
+                title="暂无库存变动"
+                description="入库、借出、归还等记录会按时间显示在这里。"
+                action={<Button asChild variant="outline" size="sm"><Link to="/items">查看样机列表</Link></Button>}
+              />
             )}
           </CardContent>
         </Card>
-      </div>
+      </section>
 
       {/* 我的最近申请 */}
-      {(requestsLoading || myRecentRequests.length > 0) && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle>我的最近申请</CardTitle>
-            <Link to="/borrow/my-requests">
-              <Button variant="ghost" size="sm">
-                查看全部 <ArrowRight className="size-4 ml-1" />
-              </Button>
-            </Link>
+      <Card className="hm-dashboard-panel">
+          <CardHeader className="flex flex-row items-start justify-between gap-4 border-b pb-4">
+            <div className="flex items-start gap-3">
+              <span className="hm-panel-icon"><ClipboardList className="size-4" /></span>
+              <div>
+                <CardTitle>我的最近申请</CardTitle>
+                <CardDescription className="mt-1">跟进最近提交的借用流程</CardDescription>
+              </div>
+            </div>
+            <Button asChild variant="ghost" size="sm">
+              <Link to="/borrow/my-requests">
+                查看全部 <ArrowRight className="size-4" />
+              </Link>
+            </Button>
           </CardHeader>
-          <CardContent>
+          <CardContent className="pt-2">
             {requestsLoading ? (
-              <div className="flex justify-center py-6"><Spinner className="size-5" /></div>
-            ) : <div>
+              <div className="flex justify-center py-12"><Spinner className="size-5" /></div>
+            ) : myRecentRequests.length > 0 ? <div>
               {myRecentRequests.map(req => {
                 const statusInfo = REQUEST_STATUS_MAP[req.status]
                 const item = req.item || req.request_items?.[0]?.item
                 return (
-                  <div key={req.id} className="flex flex-col gap-2 border-t py-3 first:border-t-0 sm:flex-row sm:items-center sm:justify-between">
+                  <div key={req.id} className="hm-list-row">
                     <div className="min-w-0">
                       <p className="font-medium">{item?.name || '-'}</p>
                       <p className="text-sm text-muted-foreground">
@@ -490,10 +567,16 @@ export function Dashboard() {
                   </div>
                 )
               })}
-            </div>}
+            </div> : (
+              <DashboardEmptyState
+                icon={ClipboardList}
+                title="还没有借用申请"
+                description="提交申请后，可在这里查看最近流程与当前状态。"
+                action={<Button asChild size="sm"><Link to="/borrow/apply">申请借用</Link></Button>}
+              />
+            )}
           </CardContent>
         </Card>
-      )}
 
       {/* 拒绝审批弹窗 */}
       <Dialog

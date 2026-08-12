@@ -133,16 +133,128 @@
     letter-spacing: var(--tracking-display);
     line-height: 1.1;
   }
+  .hm-dashboard-heading {
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-md);
+    padding-block: var(--space-xs) var(--space-lg);
+    border-bottom: var(--rule-hair) solid var(--color-rule);
+  }
+  .hm-metric-grid {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--rule-hair);
+    overflow: hidden;
+    border: var(--rule-hair) solid var(--color-rule);
+    border-radius: var(--radius-card);
+    background: var(--color-rule);
+    box-shadow: var(--shadow-card);
+  }
   .hm-metric-link {
     min-width: 0;
+    display: block;
     color: inherit;
     transition:
       transform var(--dur-short) var(--ease-out),
       background-color var(--dur-short) var(--ease-out);
   }
+  .hm-metric-card {
+    position: relative;
+    min-height: 10.5rem;
+  }
+  .hm-metric-link:first-child .hm-metric-card::before {
+    position: absolute;
+    inset: 0 0 auto;
+    height: var(--rule-fine);
+    background: var(--color-accent);
+    content: "";
+  }
+  .hm-metric-value {
+    min-height: 2.5rem;
+    font-family: var(--font-display);
+    font-size: clamp(2rem, 1.7rem + 1vw, 3rem);
+    font-weight: var(--display-weight);
+    font-variant-numeric: tabular-nums;
+    letter-spacing: -0.04em;
+    line-height: 1;
+  }
   .hm-metric-link:focus-visible {
     position: relative;
     z-index: 1;
+  }
+  .hm-dashboard-panel {
+    min-width: 0;
+    box-shadow: none;
+  }
+  .hm-panel-icon {
+    display: inline-flex;
+    width: 2rem;
+    height: 2rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-input);
+    background: var(--color-accent-surface);
+    color: var(--color-accent);
+  }
+  .hm-panel-icon--danger {
+    background: var(--color-danger-surface);
+    color: var(--color-danger);
+  }
+  .hm-list-row {
+    display: flex;
+    min-width: 0;
+    flex-direction: column;
+    gap: var(--space-xs);
+    padding-block: var(--space-sm);
+    border-top: var(--rule-hair) solid var(--color-rule);
+  }
+  .hm-list-row:first-child {
+    border-top: 0;
+  }
+  .hm-empty-state {
+    display: flex;
+    min-height: 12rem;
+    align-items: flex-start;
+    gap: var(--space-sm);
+    padding-block: var(--space-xl);
+  }
+  .hm-empty-state__icon {
+    display: inline-flex;
+    width: 2.5rem;
+    height: 2.5rem;
+    flex: 0 0 auto;
+    align-items: center;
+    justify-content: center;
+    border-radius: var(--radius-pill);
+    background: var(--color-paper-3);
+    color: var(--color-neutral);
+  }
+  .hm-chart-center {
+    pointer-events: none;
+    position: absolute;
+    left: 50%;
+    top: 45%;
+    display: flex;
+    transform: translate(-50%, -50%);
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3xs);
+  }
+  .hm-sidebar-link {
+    position: relative;
+  }
+  .hm-sidebar-link::before {
+    position: absolute;
+    inset-block: 0.65rem;
+    inset-inline-start: -0.75rem;
+    width: var(--rule-fine);
+    border-radius: var(--radius-pill);
+    background: transparent;
+    content: "";
+  }
+  .hm-sidebar-link[data-active="true"]::before {
+    background: var(--color-sidebar-accent);
   }
   .hm-tool-rail {
     border-block: var(--rule-hair) solid var(--color-rule);
@@ -153,6 +265,31 @@
     border: var(--rule-hair) solid var(--color-rule);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-card);
+  }
+}
+
+@media (min-width: 40rem) {
+  .hm-metric-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .hm-list-row {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+}
+
+@media (min-width: 64rem) {
+  .hm-dashboard-heading {
+    flex-direction: row;
+    align-items: end;
+    justify-content: space-between;
+  }
+}
+
+@media (min-width: 80rem) {
+  .hm-metric-grid {
+    grid-template-columns: repeat(12, minmax(0, 1fr));
   }
 }
 
