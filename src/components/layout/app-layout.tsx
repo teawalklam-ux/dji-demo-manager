@@ -64,28 +64,30 @@ function AppSidebar() {
   )
 
   return (
-    <Sidebar className="border-r">
-      <SidebarHeader className="border-b px-4 py-4">
+    <Sidebar className="border-r-0">
+      <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-input)] bg-primary shadow-xs">
-            <svg aria-hidden="true" className="h-4 w-4 text-primary-foreground" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-            </svg>
+          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-input)] bg-sidebar-primary text-sidebar-primary-foreground">
+            <span className="font-display text-[11px] font-bold tracking-[-0.02em]">DJI</span>
           </div>
           <div className="min-w-0">
-            <h2 className="truncate font-display text-sm font-semibold tracking-[-0.015em]">DJI 样机管理</h2>
-            <p className="truncate text-xs text-muted-foreground">深圳市一探疆来科技有限公司</p>
+            <h2 className="truncate font-display text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">样机管理系统</h2>
+            <p className="mt-0.5 truncate text-xs text-[var(--color-sidebar-muted)]">深圳市一探疆来科技有限公司</p>
           </div>
         </div>
       </SidebarHeader>
 
-      <SidebarContent>
-        <div className="px-3 py-2">
-          <p className="mb-2 px-2 text-[11px] font-semibold tracking-[var(--tracking-label)] text-muted-foreground">主菜单</p>
+      <SidebarContent className="gap-4 px-3 py-5">
+        <div>
+          <p className="mb-2 px-3 text-[11px] font-semibold tracking-[var(--tracking-label)] text-[var(--color-sidebar-muted)]">工作区</p>
           <SidebarMenu>
             {filteredMainNav.map((item) => (
               <SidebarMenuItem key={item.href}>
-                <SidebarMenuButton asChild isActive={location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))}>
+                <SidebarMenuButton
+                  asChild
+                  isActive={location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))}
+                  className="hm-sidebar-link h-10 rounded-[var(--radius-input)] px-3 text-sidebar-foreground/70 hover:text-sidebar-foreground data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
+                >
                   <Link to={item.href}>
                     <item.icon className="h-4 w-4" />
                     <span>{item.title}</span>
@@ -97,14 +99,18 @@ function AppSidebar() {
         </div>
 
         {isAdmin && (
-          <div className="px-3 py-2">
-            <p className="mb-2 px-2 text-[11px] font-semibold tracking-[var(--tracking-label)] text-muted-foreground">管理后台</p>
+          <div>
+            <p className="mb-2 px-3 text-[11px] font-semibold tracking-[var(--tracking-label)] text-[var(--color-sidebar-muted)]">管理</p>
             <SidebarMenu>
               {adminNavItems
                 .filter(item => !item.superAdminOnly || isSuperAdmin)
                 .map((item) => (
                 <SidebarMenuItem key={item.href}>
-                  <SidebarMenuButton asChild isActive={location.pathname.startsWith(item.href)}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={location.pathname.startsWith(item.href)}
+                    className="hm-sidebar-link h-10 rounded-[var(--radius-input)] px-3 text-sidebar-foreground/70 hover:text-sidebar-foreground data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
+                  >
                     <Link to={item.href}>
                       <item.icon className="h-4 w-4" />
                       <span>{item.title}</span>
@@ -117,23 +123,24 @@ function AppSidebar() {
         )}
       </SidebarContent>
 
-      <SidebarFooter className="border-t p-3">
-        <div className="flex items-center gap-2">
-          <Avatar className="h-8 w-8">
-            <AvatarFallback className="text-xs">
+      <SidebarFooter className="border-t border-sidebar-border p-3">
+        <div className="flex items-center gap-3 rounded-[var(--radius-card)] border border-sidebar-border bg-sidebar-accent/45 p-2.5">
+          <Avatar className="h-9 w-9 border border-sidebar-border">
+            <AvatarFallback className="bg-sidebar-primary text-xs font-semibold text-sidebar-primary-foreground">
               {profile?.display_name?.charAt(0) || 'U'}
             </AvatarFallback>
           </Avatar>
           <div className="flex-1 overflow-hidden">
-            <p className="truncate text-sm font-medium">{profile?.display_name}</p>
-            <Badge variant="outline" className="text-[10px] px-1 py-0">
+            <p className="truncate text-sm font-medium text-sidebar-foreground">{profile?.display_name}</p>
+            <Badge variant="outline" className="mt-1 border-sidebar-border bg-transparent px-1.5 py-0 text-[10px] text-[var(--color-sidebar-muted)]">
               {ROLE_MAP[profile?.role || 'user']?.label}
             </Badge>
           </div>
           <button
             onClick={signOut}
-            className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-input)] text-muted-foreground transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-muted hover:text-foreground active:translate-y-px"
+            className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-input)] text-[var(--color-sidebar-muted)] transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-sidebar-accent hover:text-sidebar-foreground active:translate-y-px"
             title="退出登录"
+            aria-label="退出登录"
           >
             <LogOut className="h-4 w-4" />
           </button>
@@ -194,6 +201,7 @@ function getTimeAgo(dateStr: string): string {
 
 function TopHeader() {
   const { profile, isDemoMode } = useAuth()
+  const location = useLocation()
   const { notifications, unreadCount, markAsRead, markAllAsRead } = useNotifications()
   const [showNotifications, setShowNotifications] = useState(false)
   const notifRef = useRef<HTMLDivElement>(null)
@@ -211,10 +219,24 @@ function TopHeader() {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [showNotifications])
 
+  const currentSection = (() => {
+    if (location.pathname === '/') return '运行总览'
+    if (location.pathname.startsWith('/items')) return '样机管理'
+    if (location.pathname.startsWith('/borrow/apply')) return '借用申请'
+    if (location.pathname.startsWith('/borrow')) return '我的申请'
+    if (location.pathname.startsWith('/approval')) return '审批队列'
+    if (location.pathname.startsWith('/reports')) return '报表导出'
+    if (location.pathname.startsWith('/admin')) return '管理后台'
+    return '工作区'
+  })()
+
   return (
-    <header className="flex h-14 shrink-0 items-center gap-3 border-b bg-background px-3 sm:gap-4 sm:px-5">
-      <SidebarTrigger />
-      <div className="flex-1" />
+    <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-card px-3 sm:gap-4 sm:px-6">
+      <SidebarTrigger className="size-10" aria-label="切换侧栏" />
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-medium text-foreground">{currentSection}</p>
+        <p className="hidden truncate text-xs text-muted-foreground sm:block">DJI 样机管理系统</p>
+      </div>
       <div className="relative" ref={notifRef}>
         <button
           className="relative flex size-11 items-center justify-center rounded-[var(--radius-input)] text-muted-foreground transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-muted hover:text-foreground active:translate-y-px"
@@ -286,7 +308,7 @@ export function AppLayout() {
       <AppSidebar />
       <div className="flex min-w-0 flex-1 flex-col bg-background">
         <TopHeader />
-        <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8">
+        <main className="min-w-0 flex-1 overflow-auto p-4 sm:p-6 lg:p-8 xl:p-10">
           <Outlet />
         </main>
         <div className="select-none px-4 py-1 text-right text-[10px] text-muted-foreground/50">

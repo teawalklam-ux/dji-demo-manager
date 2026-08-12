@@ -1,4 +1,4 @@
-/* Hallmark · macrostructure: Workbench (Stat-Led dashboard / Index-First inventory) · genre: modern-minimal · theme: custom · axes: light / local-sans / cool · vibe: precise, calm, operational, trustworthy · enrichment: none · motion: button press + interactive-surface lift, reduced-motion safe · pre-emit critique: P5 H5 E4 S5 R5 V5 · contrast: pass (40–41) · nav: N3 side rail · footer: Ft2 inline version · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · responsive: pending rendered check (34, 49, 50–57) · icons: pass (30) */
+/* Hallmark · macrostructure: Workbench shell / Stat-Led dashboard · genre: modern-minimal · theme: custom · axes: light workspace / dark side rail / cool accent · vibe: precise, calm, operational, trustworthy · enrichment: none · motion: button press + interactive-surface lift, reduced-motion safe · pre-emit critique: P5 H5 E5 S5 R5 V4 · contrast: pass (40–41) · nav: N3 dark side rail · footer: Ft2 inline version · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · mobile: pass (34, 49, 50–57) · icons: pass (30) */
 :root {
   /* Core surfaces and ink */
   --color-paper: oklch(98.8% 0.004 250);
@@ -10,6 +10,12 @@
   --color-neutral: oklch(36% 0.025 258);
   --color-ink-2: oklch(29% 0.028 259);
   --color-ink: oklch(20.6% 0.039 265.5);
+  --color-sidebar-text: oklch(94% 0.012 252);
+  --color-sidebar-muted: oklch(72% 0.02 255);
+  --color-sidebar-rule: oklch(34% 0.035 260);
+  --color-sidebar-surface: oklch(25% 0.04 263);
+  --color-sidebar-active: oklch(31% 0.06 258);
+  --color-sidebar-accent: oklch(67% 0.16 258);
 
   /* DJI-aligned accent and semantic states */
   --color-accent: oklch(50% 0.16 258);
@@ -110,14 +116,14 @@
   --hm-border: 85.5% 0.016 255;
   --hm-input: 65% 0.025 257;
   --hm-ring: 9% 0.025 260;
-  --hm-sidebar-background: 98.8% 0.004 250;
-  --hm-sidebar-foreground: 20.6% 0.039 265.5;
-  --hm-sidebar-primary: 50% 0.16 258;
-  --hm-sidebar-primary-foreground: 98.8% 0.004 250;
-  --hm-sidebar-accent: 92% 0.032 258;
-  --hm-sidebar-accent-foreground: 29% 0.028 259;
-  --hm-sidebar-border: 85.5% 0.016 255;
-  --hm-sidebar-ring: 9% 0.025 260;
+  --hm-sidebar-background: 20.6% 0.039 265.5;
+  --hm-sidebar-foreground: 94% 0.012 252;
+  --hm-sidebar-primary: 67% 0.16 258;
+  --hm-sidebar-primary-foreground: 20.6% 0.039 265.5;
+  --hm-sidebar-accent: 31% 0.06 258;
+  --hm-sidebar-accent-foreground: 94% 0.012 252;
+  --hm-sidebar-border: 34% 0.035 260;
+  --hm-sidebar-ring: 76% 0.12 258;
   --hm-success: 43% 0.13 150;
   --hm-success-foreground: 98.8% 0.004 250;
   --hm-warning: 42% 0.105 75;
