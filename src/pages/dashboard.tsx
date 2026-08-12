@@ -28,13 +28,14 @@ import { getErrorMessage } from '@/lib/errors'
 import type { Item, StockMovement, ApprovalRecord, BorrowRequest } from '@/types'
 import { toast } from 'sonner'
 
-const CHART_COLORS = [
-  'var(--color-chart-1)',
-  'var(--color-chart-2)',
-  'var(--color-chart-3)',
-  'var(--color-chart-4)',
-  'var(--color-chart-5)',
-]
+const STATUS_CHART_COLORS = {
+  in_stock: 'var(--color-chart-in-stock)',
+  reserved: 'var(--color-chart-reserved)',
+  borrowed: 'var(--color-chart-borrowed)',
+  overdue: 'var(--color-chart-overdue)',
+  maintenance: 'var(--color-chart-maintenance)',
+  retired: 'var(--color-chart-retired)',
+} as const
 
 function DashboardEmptyState({
   icon: Icon,
@@ -69,7 +70,7 @@ export function Dashboard() {
   const [movementsLoading, setMovementsLoading] = useState(true)
   const [approvalsLoading, setApprovalsLoading] = useState(true)
   const [requestsLoading, setRequestsLoading] = useState(true)
-  const [stats, setStats] = useState({ total: 0, inStock: 0, reserved: 0, borrowed: 0, overdue: 0 })
+  const [stats, setStats] = useState({ total: 0, inStock: 0, reserved: 0, borrowed: 0, overdue: 0, maintenance: 0, retired: 0 })
   const [overdueItems, setOverdueItems] = useState<Item[]>([])
   const [recentMovements, setRecentMovements] = useState<StockMovement[]>([])
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRecord[]>([])
@@ -191,11 +192,12 @@ export function Dashboard() {
   }
 
   const pieData = [
-    { name: '在库', value: stats.inStock },
-    { name: '预定', value: stats.reserved },
-    { name: '借出', value: stats.borrowed },
-    { name: '逾期', value: stats.overdue },
-    { name: '维修中', value: stats.total - stats.inStock - stats.reserved - stats.borrowed - stats.overdue },
+    { status: 'in_stock', name: '可用在库', value: stats.inStock },
+    { status: 'reserved', name: '预定', value: stats.reserved },
+    { status: 'borrowed', name: '借出', value: stats.borrowed },
+    { status: 'overdue', name: '逾期', value: stats.overdue },
+    { status: 'maintenance', name: '维修中', value: stats.maintenance },
+    { status: 'retired', name: '已退役', value: stats.retired },
   ].filter(d => d.value > 0)
 
   const movementTypeLabels: Record<string, string> = {
@@ -249,7 +251,7 @@ export function Dashboard() {
         <Link to="/items?status=in_stock" className="hm-metric-link bg-card xl:col-span-4">
           <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
-              <CardTitle className="text-sm font-medium text-muted-foreground">在库样机</CardTitle>
+              <CardTitle className="text-sm font-medium text-muted-foreground">可用在库</CardTitle>
               <Package className="size-4 text-primary" />
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
@@ -344,8 +346,8 @@ export function Dashboard() {
                       stroke="var(--color-paper)"
                       strokeWidth={2}
                     >
-                      {pieData.map((_, index) => (
-                        <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                      {pieData.map((entry) => (
+                        <Cell key={entry.status} fill={STATUS_CHART_COLORS[entry.status as keyof typeof STATUS_CHART_COLORS]} />
                       ))}
                     </Pie>
                     <Tooltip />

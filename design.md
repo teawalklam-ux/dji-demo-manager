@@ -10,7 +10,7 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
 - 类型：modern-minimal。
 - 主题：自定义冷色系统；DJI 蓝是唯一主强调色。应用侧栏使用同一冷色锚点的深墨色反转面，主工作区保持冷白纸面。
 - 字体：标题使用设备本地的 Bahnschrift / 微软雅黑，正文使用 Segoe UI Variable / 苹方 / 微软雅黑，数据标识使用 Cascadia Mono；不新增网络字体或构建依赖。
-- 图片与装饰：无。该产品以真实数据与操作密度为视觉内容。
+- 图片与装饰：仅侧栏品牌区使用白色透明 DJI Logo，并在原深蓝圆角底内保持安全留白；其余区域以真实数据与操作密度为视觉内容。
 
 ## 宏观结构
 
@@ -21,6 +21,8 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
 ### 仪表盘：Stat-Led
 
 第一屏先展示真实库存统计，不制造任何指标。页面标题与快捷操作组成同一工作头，统计条改为相连且不等宽的操作面；预警、图表、审批与变动记录使用 7/5 与 5/7 的非对称单层工作面。无数据时保留解释与下一步操作，不再让区块直接消失。
+
+状态图表固定使用语义色：可用在库为成功绿、预定为紫、借出为 DJI 蓝、逾期为危险红、维修为警示橙、退役为中性灰。颜色不随数据顺序改变。
 
 ### 样机列表：Index-First / Workbench
 
@@ -91,11 +93,21 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --color-ink-2: oklch(29% 0.028 259);
   --color-ink: oklch(20.6% 0.039 265.5);
   --color-accent: oklch(50% 0.16 258);
+  --color-success: oklch(43% 0.13 150);
+  --color-warning: oklch(42% 0.105 75);
+  --color-danger: oklch(49% 0.18 25);
   --color-focus: oklch(9% 0.025 260);
   --color-sidebar-surface: oklch(25% 0.04 263);
   --color-sidebar-active: oklch(31% 0.06 258);
   --color-sidebar-text: oklch(94% 0.012 252);
   --color-sidebar-accent: oklch(67% 0.16 258);
+  --color-reserved: oklch(50% 0.15 300);
+  --color-chart-in-stock: var(--color-success);
+  --color-chart-reserved: var(--color-reserved);
+  --color-chart-borrowed: var(--color-accent);
+  --color-chart-overdue: var(--color-danger);
+  --color-chart-maintenance: var(--color-warning);
+  --color-chart-retired: var(--color-neutral);
   --font-display: "Bahnschrift", "DIN Alternate", "Microsoft YaHei UI", ui-sans-serif, sans-serif;
   --font-body: "Segoe UI Variable Text", "PingFang SC", "Microsoft YaHei UI", ui-sans-serif, system-ui, sans-serif;
   --font-outlier: "Cascadia Mono", "SFMono-Regular", ui-monospace, monospace;
@@ -139,11 +151,21 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
     "ink": { "$value": "oklch(20.6% 0.039 265.5)", "$type": "color" },
     "accent": { "$value": "oklch(50% 0.16 258)", "$type": "color" },
     "accent-ink": { "$value": "oklch(98.8% 0.004 250)", "$type": "color" },
+    "success": { "$value": "oklch(43% 0.13 150)", "$type": "color" },
+    "warning": { "$value": "oklch(42% 0.105 75)", "$type": "color" },
+    "danger": { "$value": "oklch(49% 0.18 25)", "$type": "color" },
     "focus": { "$value": "oklch(9% 0.025 260)", "$type": "color" },
     "sidebar-surface": { "$value": "oklch(25% 0.04 263)", "$type": "color" },
     "sidebar-active": { "$value": "oklch(31% 0.06 258)", "$type": "color" },
     "sidebar-text": { "$value": "oklch(94% 0.012 252)", "$type": "color" },
-    "sidebar-accent": { "$value": "oklch(67% 0.16 258)", "$type": "color" }
+    "sidebar-accent": { "$value": "oklch(67% 0.16 258)", "$type": "color" },
+    "reserved": { "$value": "oklch(50% 0.15 300)", "$type": "color" },
+    "chart-in-stock": { "$value": "{color.success}", "$type": "color" },
+    "chart-reserved": { "$value": "{color.reserved}", "$type": "color" },
+    "chart-borrowed": { "$value": "{color.accent}", "$type": "color" },
+    "chart-overdue": { "$value": "{color.danger}", "$type": "color" },
+    "chart-maintenance": { "$value": "{color.warning}", "$type": "color" },
+    "chart-retired": { "$value": "{color.neutral}", "$type": "color" }
   },
   "font": {
     "display": { "$value": "Bahnschrift, DIN Alternate, Microsoft YaHei UI, ui-sans-serif, sans-serif", "$type": "fontFamily" },

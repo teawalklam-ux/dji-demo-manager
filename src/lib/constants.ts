@@ -26,6 +26,7 @@ export type BorrowRequestStatus =
   | 'overdue'
   | 'renewal_requested'
   | 'revoked'
+  | 'invalidated'
 
 // 借用记录状态
 export type BorrowRecordStatus = 'active' | 'returned' | 'overdue'
@@ -102,6 +103,7 @@ export const REQUEST_STATUS_MAP: Record<string, StatusInfo> = {
   overdue: { label: '已逾期', color: 'bg-red-100 text-red-800' },
   renewal_requested: { label: '续借申请', color: 'bg-orange-100 text-orange-800' },
   revoked: { label: '已撤销', color: 'bg-orange-100 text-orange-800' },
+  invalidated: { label: '预约失效', color: 'bg-red-100 text-red-800' },
 }
 
 export const ROLE_MAP: Record<string, StatusInfo> = {

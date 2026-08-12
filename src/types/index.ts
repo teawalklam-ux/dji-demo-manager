@@ -121,6 +121,8 @@ export interface BorrowRequest {
   status: BorrowRequestStatus
   parent_request_id: string | null
   rejection_reason: string | null
+  invalidated_at: string | null
+  invalidation_reason: string | null
   created_at: string
   updated_at: string
   // Joined
@@ -144,7 +146,7 @@ export interface BorrowRequestItem {
   id: string
   request_id: string
   item_id: string
-  status: 'pending' | 'reserved' | 'borrowed' | 'returned' | 'cancelled'
+  status: 'pending' | 'reserved' | 'borrowed' | 'returned' | 'cancelled' | 'invalidated'
   actual_borrow_date: string | null
   actual_return_date: string | null
   created_at: string
@@ -259,7 +261,7 @@ export interface UserCustomer {
 }
 
 // ===== 通知 =====
-export type NotificationCategory = 'overdue' | 'approval'
+export type NotificationCategory = 'overdue' | 'approval' | 'return' | 'reservation'
 
 export interface OverdueNotification {
   id: string

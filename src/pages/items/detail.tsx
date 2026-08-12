@@ -12,6 +12,7 @@ import { ArrowLeft, Printer, Edit, FileText } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import JsBarcode from 'jsbarcode'
 import type { BorrowRecord, BorrowRequestItem, Item, StockMovement } from '@/types'
+import { toast } from 'sonner'
 
 type ItemBorrowHistoryRecord = {
   id: string
@@ -181,14 +182,26 @@ export function ItemDetail() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          {!isDemoMode && (
+          {!isDemoMode && (item.status === 'in_stock' || item.status === 'borrowed' ? (
             <Link to={`/borrow/apply/${item.id}`}>
               <Button>
                 <FileText className="size-4" />
                 申请借用
               </Button>
             </Link>
-          )}
+          ) : (
+            <Button
+              variant="outline"
+              onClick={() => toast.error(
+                item.status === 'overdue'
+                  ? '该样机已逾期且没有可靠的预计归还时间，不能提交预约申请'
+                  : `该样机当前${ITEM_STATUS_MAP[item.status]?.label || item.status}，不能提交预约申请`
+              )}
+            >
+              <FileText className="size-4" />
+              申请借用
+            </Button>
+          ))}
           {isAdmin && (
             <Link to={`/items/${item.id}/edit`}>
               <Button variant="outline">
