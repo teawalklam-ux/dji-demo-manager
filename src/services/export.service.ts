@@ -38,7 +38,13 @@ export const exportService = {
       '借用日期': record.borrow_date,
       '应还日期': record.due_date,
       '实际归还日期': record.return_date || '',
-      '状态': record.status === 'active' ? '借用中' : record.status === 'returned' ? '已归还' : '逾期',
+      '状态': record.status === 'active'
+        ? '借用中'
+        : record.status === 'returned'
+          ? '已归还'
+          : record.status === 'revoked'
+            ? '已撤销'
+            : '逾期',
       '逾期天数': getCurrentOverdueDays(record),
       '备注': record.notes || '',
     }))
@@ -52,7 +58,15 @@ export const exportService = {
       '申请人': record.request?.requester?.display_name || '',
       '样机名称': record.request?.item?.name || '',
       '审批步骤': `第${record.step_level}步`,
-      '审批动作': record.action === 'approved' ? '同意' : record.action === 'rejected' ? '拒绝' : '待审批',
+      '审批动作': record.action === 'approved'
+        ? '同意'
+        : record.action === 'rejected'
+          ? '拒绝'
+          : record.action === 'cancelled'
+            ? '已取消'
+            : record.action === 'revoked'
+              ? '已撤销'
+              : '待审批',
       '审批意见': record.comment || '',
       '审批时间': record.acted_at || '',
     }))

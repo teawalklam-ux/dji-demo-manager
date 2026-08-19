@@ -1,5 +1,15 @@
 [
   {
+    "date": "2026-08-19",
+    "scope": "app-feature",
+    "macrostructure": "Evidence-led request ledger / split audit detail",
+    "theme": "custom",
+    "theme_axes": "light workspace / dark side rail / cool accent",
+    "vibe": "precise, calm, operational, trustworthy",
+    "enrichment": "return-photo evidence",
+    "brief": "Applicant request detail and editing plus administrator application history"
+  },
+  {
     "date": "2026-08-12",
     "scope": "app-surface",
     "macrostructure": "Workbench shell / Stat-Led dashboard",

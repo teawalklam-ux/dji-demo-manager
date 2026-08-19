@@ -17,8 +17,8 @@ export const notificationsService = {
       .from('overdue_notifications')
       .select(`
         *,
-        borrow_record:borrow_records(*, item:items(*), borrower:profiles(*)),
-        borrow_request:borrow_requests(*, item:items(*), requester:profiles(*)),
+        borrow_record:borrow_records(*, item:items(*), borrower:profiles!borrow_records_borrower_id_fkey(*)),
+        borrow_request:borrow_requests(*, item:items(*), requester:profiles!borrow_requests_requester_id_fkey(*)),
         recipient:profiles!overdue_notifications_recipient_id_fkey(*)
       `)
       .or(`borrower_id.eq.${user.id},recipient_id.eq.${user.id}`)

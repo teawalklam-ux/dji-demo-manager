@@ -29,7 +29,7 @@ export type BorrowRequestStatus =
   | 'invalidated'
 
 // 借用记录状态
-export type BorrowRecordStatus = 'active' | 'returned' | 'overdue'
+export type BorrowRecordStatus = 'active' | 'returned' | 'overdue' | 'revoked'
 
 // 库存变动类型
 export type MovementType = 'borrow_out' | 'return_in' | 'new_entry' | 'maintenance' | 'retire' | 'revoke'

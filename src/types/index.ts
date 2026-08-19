@@ -123,6 +123,10 @@ export interface BorrowRequest {
   rejection_reason: string | null
   invalidated_at: string | null
   invalidation_reason: string | null
+  revoked_at: string | null
+  revoked_by: string | null
+  revocation_reason: string | null
+  revoked_from_status: BorrowRequestStatus | null
   created_at: string
   updated_at: string
   // Joined
@@ -130,6 +134,8 @@ export interface BorrowRequest {
   item?: Item
   request_items?: BorrowRequestItem[]
   approval_records?: ApprovalRecord[]
+  borrow_records?: BorrowRecord[]
+  revoker?: Profile
 }
 
 export interface BorrowRequestInput {
@@ -146,7 +152,7 @@ export interface BorrowRequestItem {
   id: string
   request_id: string
   item_id: string
-  status: 'pending' | 'reserved' | 'borrowed' | 'returned' | 'cancelled' | 'invalidated'
+  status: 'pending' | 'reserved' | 'borrowed' | 'returned' | 'cancelled' | 'invalidated' | 'revoked'
   actual_borrow_date: string | null
   actual_return_date: string | null
   created_at: string
@@ -226,6 +232,10 @@ export interface BorrowRecord {
   status: BorrowRecordStatus
   overdue_days: number
   notes: string | null
+  revoked_at: string | null
+  revoked_by: string | null
+  revocation_reason: string | null
+  revoked_from_status: 'active' | 'overdue' | null
   created_at: string
   updated_at: string
   // Joined
@@ -295,6 +305,17 @@ export interface ReturnPhoto {
   // Joined
   uploader?: Profile
   borrow_record?: BorrowRecord
+}
+
+export interface ReturnPhotoView extends ReturnPhoto {
+  signed_url: string | null
+  load_error: string | null
+}
+
+export interface BorrowRequestDetail {
+  request: BorrowRequest
+  borrow_records: BorrowRecord[]
+  return_photos: ReturnPhotoView[]
 }
 
 // ===== 通用 =====

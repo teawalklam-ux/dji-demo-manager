@@ -21,7 +21,7 @@ type ItemBorrowHistoryRecord = {
   borrowDate: string
   dueDate: string
   returnDate: string | null
-  status: 'reserved' | 'active' | 'returned' | 'overdue'
+  status: 'reserved' | 'active' | 'returned' | 'overdue' | 'revoked'
   createdAt: string
 }
 
@@ -79,12 +79,12 @@ export function ItemDetail() {
         itemsService.getById(itemId),
         supabase
           .from('borrow_records')
-          .select('*, borrower:profiles(*), request:borrow_requests(*)')
+          .select('*, borrower:profiles!borrow_records_borrower_id_fkey(*), request:borrow_requests(*)')
           .eq('item_id', itemId)
           .order('created_at', { ascending: false }),
         supabase
           .from('borrow_request_items')
-          .select('*, request:borrow_requests(*, requester:profiles(*))')
+          .select('*, request:borrow_requests(*, requester:profiles!borrow_requests_requester_id_fkey(*))')
           .eq('item_id', itemId)
           .in('status', ['reserved', 'borrowed'])
           .order('created_at', { ascending: false }),
@@ -136,6 +136,7 @@ export function ItemDetail() {
     new_entry: '入库',
     maintenance: '维修',
     retire: '退役',
+    revoke: '审批撤销',
   }
 
   const recordStatusLabels: Record<string, { label: string; color: string }> = {
@@ -143,6 +144,7 @@ export function ItemDetail() {
     active: { label: '借用中', color: 'bg-blue-100 text-blue-800' },
     returned: { label: '已归还', color: 'bg-green-100 text-green-800' },
     overdue: { label: '逾期', color: 'bg-red-100 text-red-800' },
+    revoked: { label: '已撤销', color: 'bg-orange-100 text-orange-800' },
   }
 
   if (loading) {
