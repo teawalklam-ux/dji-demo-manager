@@ -1,6 +1,16 @@
 import { supabase } from '@/lib/supabase'
 import type { Profile, UserRole, UserStatus } from '@/types'
 
+type ManagedUserUpdate = Partial<Pick<Profile, 'display_name' | 'phone' | 'department' | 'role' | 'status'>>
+
+async function manageUserProfile(userId: string, updates: ManagedUserUpdate): Promise<void> {
+  const { error } = await supabase.rpc('manage_user_profile', {
+    p_user_id: userId,
+    p_updates: updates,
+  })
+  if (error) throw error
+}
+
 export const usersService = {
   async getAll(): Promise<Profile[]> {
     const { data, error } = await supabase
@@ -22,44 +32,24 @@ export const usersService = {
   },
 
   async updateRole(userId: string, role: UserRole): Promise<void> {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ role })
-      .eq('id', userId)
-    if (error) throw error
+    await manageUserProfile(userId, { role })
   },
 
   async updateStatus(userId: string, status: UserStatus): Promise<void> {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status })
-      .eq('id', userId)
-    if (error) throw error
+    await manageUserProfile(userId, { status })
   },
 
   async updateUser(userId: string, updates: Partial<Pick<Profile, 'display_name' | 'phone' | 'department' | 'role'>>): Promise<void> {
-    const { error } = await supabase
-      .from('profiles')
-      .update(updates)
-      .eq('id', userId)
-    if (error) throw error
+    await manageUserProfile(userId, updates)
   },
 
   async approveUser(userId: string): Promise<void> {
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: 'active', updated_at: new Date().toISOString() })
-      .eq('id', userId)
-    if (error) throw error
+    await manageUserProfile(userId, { status: 'active' })
   },
 
   async rejectUser(userId: string): Promise<void> {
     // 拒绝用户：禁用该用户 profile，阻止其登录使用系统
-    const { error } = await supabase
-      .from('profiles')
-      .update({ status: 'disabled', updated_at: new Date().toISOString() })
-      .eq('id', userId)
-    if (error) throw error
+    await manageUserProfile(userId, { status: 'disabled' })
   },
 
   async resetUserPassword(email: string): Promise<void> {
