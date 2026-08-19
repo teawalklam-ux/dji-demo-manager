@@ -228,7 +228,7 @@ export const borrowService = {
 
         const { data, error } = await supabase.storage
           .from('return-photos')
-          .createSignedUrl(photo.storage_path, 10 * 60)
+          .createSignedUrl(photo.storage_path, 60)
 
         return {
           ...basePhoto,

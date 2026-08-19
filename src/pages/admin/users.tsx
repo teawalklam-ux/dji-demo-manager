@@ -206,13 +206,13 @@ export function UsersPage() {
       const updateData = editUser.role === 'super_admin'
         ? {
             display_name: editForm.display_name,
-            phone: editForm.phone || undefined,
-            department: editForm.department || undefined,
+            phone: editForm.phone || null,
+            department: editForm.department || null,
           }
         : {
             display_name: editForm.display_name,
-            phone: editForm.phone || undefined,
-            department: editForm.department || undefined,
+            phone: editForm.phone || null,
+            department: editForm.department || null,
             role: editForm.role,
           }
       await usersService.updateUser(editUser.id, updateData)

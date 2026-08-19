@@ -1,5 +1,5 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.106.0'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -139,13 +139,20 @@ serve(async (req) => {
           )
         }
 
-        // 可选：更新 auth.user_metadata
+        const safeUserMetadata = { ...(existingUser.user_metadata ?? {}) }
+        delete safeUserMetadata.role
+        delete safeUserMetadata.invite_by_admin
+
+        // 授权数据只写入服务端控制的 app_metadata；user_metadata 仅保留展示信息。
         await adminClient.auth.admin.updateUserById(existingUser.id, {
           user_metadata: {
-            ...existingUser.user_metadata,
+            ...safeUserMetadata,
             display_name: normalizedDisplayName,
-            role: userRole,
-            invite_by_admin: 'true',
+          },
+          app_metadata: {
+            ...existingUser.app_metadata,
+            dji_invited_by_admin: true,
+            dji_initial_role: userRole,
           },
         })
 
@@ -201,12 +208,20 @@ serve(async (req) => {
         }
       }
 
-      // 更新 auth metadata
+      const safeUserMetadata = { ...(existingUser.user_metadata ?? {}) }
+      delete safeUserMetadata.role
+      delete safeUserMetadata.invite_by_admin
+
+      // 更新 auth metadata（授权字段仅放在 app_metadata）
       await adminClient.auth.admin.updateUserById(existingUser.id, {
         user_metadata: {
-          ...existingUser.user_metadata,
+          ...safeUserMetadata,
           display_name: normalizedDisplayName,
-          role: userRole,
+        },
+        app_metadata: {
+          ...existingUser.app_metadata,
+          dji_invited_by_admin: true,
+          dji_initial_role: userRole,
         },
       })
 
@@ -244,8 +259,10 @@ serve(async (req) => {
       email_confirm: true,
       user_metadata: {
         display_name: normalizedDisplayName,
-        role: userRole,
-        invite_by_admin: 'true',
+      },
+      app_metadata: {
+        dji_invited_by_admin: true,
+        dji_initial_role: userRole,
       },
     })
 
