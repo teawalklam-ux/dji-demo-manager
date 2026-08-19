@@ -42,7 +42,7 @@ export function BorrowReturn() {
       // 先按借用记录 ID 查找；路由也兼容申请单 ID，以便一单多台时选择待归还样机。
       const { data: directData, error: directError } = await supabase
         .from('borrow_records')
-        .select('*, item:items(*), borrower:profiles(*)')
+        .select('*, item:items(*), borrower:profiles!borrow_records_borrower_id_fkey(*)')
         .eq('id', recordId)
         .in('status', ['active', 'overdue'])
         .maybeSingle()
@@ -59,7 +59,7 @@ export function BorrowReturn() {
 
       const { data: requestRecords, error: allError } = await supabase
         .from('borrow_records')
-        .select('*, item:items(*), borrower:profiles(*)')
+        .select('*, item:items(*), borrower:profiles!borrow_records_borrower_id_fkey(*)')
         .eq('request_id', recordId)
         .in('status', ['active', 'overdue'])
         .order('created_at', { ascending: false })

@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
+import { Link } from 'react-router-dom'
 import { approvalService } from '@/services/approval.service'
 import { useAuth } from '@/contexts/auth-context'
 import { toast } from 'sonner'
@@ -21,6 +22,35 @@ import {
 } from '@/components/ui/dialog'
 import { Label } from '@/components/ui/label'
 
+type ProcessedFilter = 'all' | 'revokable' | 'revoked'
+
+const REVOCABLE_REQUEST_STATUSES = new Set([
+  'approved',
+  'borrowed',
+  'overdue',
+  'partially_returned',
+  'returned',
+])
+
+function canRevokeProcessedApproval(record: ApprovalRecord, isSuperAdmin: boolean) {
+  return Boolean(
+    isSuperAdmin &&
+    record.action === 'approved' &&
+    record.request &&
+    REVOCABLE_REQUEST_STATUSES.has(record.request.status),
+  )
+}
+
+function getRevokeImpact(status: string) {
+  if (status === 'approved') {
+    return '预约将被释放；申请、审批过程和撤销记录都会保留。'
+  }
+  if (status === 'returned') {
+    return '样机已归还不受影响；申请、借用记录和撤销记录都会保留。'
+  }
+  return '样机将恢复为在库；未归还的借用记录会保留并标记为已撤销。'
+}
+
 export function ApprovalQueue() {
   const { isSuperAdmin } = useAuth()
   const [loading, setLoading] = useState(true)
@@ -34,6 +64,7 @@ export function ApprovalQueue() {
   const [detailDialogOpen, setDetailDialogOpen] = useState<string | null>(null)
   const [approvalProgress, setApprovalProgress] = useState<ApprovalProgress | null>(null)
   const [progressLoading, setProgressLoading] = useState(false)
+  const [processedFilter, setProcessedFilter] = useState<ProcessedFilter>('all')
 
   const loadData = useCallback(async () => {
     setLoading(true)
@@ -130,6 +161,33 @@ export function ApprovalQueue() {
     if (!dateStr) return '-'
     return new Date(dateStr).toLocaleString('zh-CN')
   }
+
+  const revokableCount = processedApprovals.filter((record) =>
+    canRevokeProcessedApproval(record, isSuperAdmin),
+  ).length
+  const revokedCount = processedApprovals.filter(
+    (record) => record.request?.status === 'revoked',
+  ).length
+  const visibleProcessedApprovals = processedApprovals.filter((record) => {
+    if (processedFilter === 'revokable') {
+      return canRevokeProcessedApproval(record, isSuperAdmin)
+    }
+    if (processedFilter === 'revoked') {
+      return record.request?.status === 'revoked'
+    }
+    return true
+  })
+  const processedFilterOptions: Array<{
+    key: ProcessedFilter
+    label: string
+    count: number
+  }> = [
+    { key: 'all', label: '全部', count: processedApprovals.length },
+    ...(isSuperAdmin
+      ? [{ key: 'revokable' as const, label: '可撤销', count: revokableCount }]
+      : []),
+    { key: 'revoked', label: '撤销记录', count: revokedCount },
+  ]
 
   if (loading) {
     return (
@@ -354,22 +412,50 @@ export function ApprovalQueue() {
 
         {/* 已审批 */}
         <TabsContent value="processed" className="mt-4 space-y-4">
+          <div
+            className="flex flex-wrap items-center gap-2 rounded-md border bg-muted/20 p-2"
+            role="group"
+            aria-label="已审批记录筛选"
+          >
+            <span className="px-2 text-xs font-medium text-muted-foreground">快速筛选</span>
+            {processedFilterOptions.map((option) => (
+              <Button
+                key={option.key}
+                type="button"
+                size="sm"
+                variant={processedFilter === option.key ? 'default' : 'ghost'}
+                aria-pressed={processedFilter === option.key}
+                onClick={() => setProcessedFilter(option.key)}
+              >
+                {option.label}
+                <span className="ml-1.5 tabular-nums opacity-70">{option.count}</span>
+              </Button>
+            ))}
+          </div>
           {processedApprovals.length === 0 ? (
             <div className="py-12 text-center text-muted-foreground">
               暂无已审批记录
             </div>
+          ) : visibleProcessedApprovals.length === 0 ? (
+            <div className="py-12 text-center text-muted-foreground">
+              当前筛选下暂无记录
+            </div>
           ) : (
-            processedApprovals.map((record) => {
+            visibleProcessedApprovals.map((record) => {
               const request = record.request
               if (!request) return null
               const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
+              const isRevokedRequest = request.status === 'revoked'
               const actionLabel =
-                record.action === 'approved' ? '通过'
+                isRevokedRequest ? '已撤销'
+                : record.action === 'approved' ? '通过'
                 : record.action === 'rejected' ? '拒绝'
                 : record.action === 'revoked' ? '已撤销'
                 : '已取消'
               const actionColor =
-                record.action === 'approved'
+                isRevokedRequest
+                  ? 'bg-orange-100 text-orange-800'
+                  : record.action === 'approved'
                   ? 'bg-green-100 text-green-800'
                   : record.action === 'rejected'
                   ? 'bg-red-100 text-red-800'
@@ -377,12 +463,14 @@ export function ApprovalQueue() {
                   ? 'bg-orange-100 text-orange-800'
                   : 'bg-gray-100 text-gray-600'
               const statusInfo = REQUEST_STATUS_MAP[request.status]
-              const canRevoke =
-                isSuperAdmin &&
-                record.action === 'approved' &&
-                ['borrowed', 'overdue', 'returned'].includes(request.status)
+              const canRevoke = canRevokeProcessedApproval(record, isSuperAdmin)
+              const revokeReason = request.revocation_reason ||
+                request.rejection_reason?.replace(/^【审批撤销】/, '')
+              const revokedFromStatus = request.revoked_from_status
+                ? REQUEST_STATUS_MAP[request.revoked_from_status]?.label || request.revoked_from_status
+                : null
               return (
-                <Card key={record.id}>
+                <Card key={record.id} className={isRevokedRequest ? 'border-orange-200' : undefined}>
                   <CardHeader className="pb-3">
                     <div className="flex items-center justify-between">
                       <CardTitle className="text-base">
@@ -422,18 +510,29 @@ export function ApprovalQueue() {
                         {record.comment}
                       </div>
                     )}
-                    {request.status === 'revoked' && request.rejection_reason && (
-                      <div className="text-sm text-orange-700">
-                        <span className="text-muted-foreground">撤销原因: </span>
-                        {request.rejection_reason}
+                    {isRevokedRequest && (
+                      <div className="rounded-md bg-orange-50 p-3 text-sm text-orange-800">
+                        <div>
+                          <span className="font-medium">撤销原因：</span>
+                          {revokeReason || '未记录'}
+                        </div>
+                        <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-orange-700">
+                          <span>撤销人：{request.revoker?.display_name || '历史记录未留存'}</span>
+                          <span>撤销时间：{formatDateTime(request.revoked_at || request.updated_at)}</span>
+                          {revokedFromStatus && <span>撤销前状态：{revokedFromStatus}</span>}
+                        </div>
                       </div>
                     )}
                     <div className="flex items-center justify-between">
                       <div className="text-xs text-muted-foreground">
                         审批时间: {formatDateTime(record.acted_at)}
                       </div>
-                      {canRevoke && (
-                        <Dialog
+                      <div className="flex items-center gap-2">
+                        <Button asChild size="sm" variant="ghost">
+                          <Link to={`/approval/${request.id}`}>查看详情</Link>
+                        </Button>
+                        {canRevoke && (
+                          <Dialog
                           open={revokeDialogOpen === record.id}
                           onOpenChange={(open) => {
                             if (open) setRevokeDialogOpen(record.id)
@@ -459,16 +558,12 @@ export function ApprovalQueue() {
                             </DialogHeader>
                             <div className="space-y-4">
                               <div className="rounded-md bg-orange-50 p-3 text-sm text-orange-800">
-                                撤销后：
-                                {request.status === 'returned'
-                                  ? '该申请将标记为已撤销，样机已归还不受影响。'
-                                  : '借用记录将被删除，样机状态恢复为在库。'}
-                                此操作不可逆。
+                                撤销后：{getRevokeImpact(request.status)}此操作不可逆。
                               </div>
                               <div className="space-y-2">
-                                <Label htmlFor="revokeReason">撤销原因 *</Label>
+                                <Label htmlFor={`revokeReason-${record.id}`}>撤销原因 *</Label>
                                 <Textarea
-                                  id="revokeReason"
+                                  id={`revokeReason-${record.id}`}
                                   placeholder="请输入撤销原因"
                                   value={revokeReason}
                                   onChange={(e) => setRevokeReason(e.target.value)}
@@ -498,8 +593,9 @@ export function ApprovalQueue() {
                               </div>
                             </div>
                           </DialogContent>
-                        </Dialog>
-                      )}
+                          </Dialog>
+                        )}
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

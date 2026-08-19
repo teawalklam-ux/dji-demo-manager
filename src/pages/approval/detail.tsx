@@ -23,7 +23,7 @@ import {
 } from '@/components/ui/dialog'
 
 export function ApprovalDetail() {
-  const { requestId } = useParams<{ requestId: string }>()
+  const { id: requestId } = useParams<{ id: string }>()
   const { isSuperAdmin } = useAuth()
 
   const [loading, setLoading] = useState(true)
@@ -196,14 +196,28 @@ export function ApprovalDetail() {
               {request.purpose}
             </div>
           )}
-          {request.rejection_reason && (
-            <div className={`text-sm ${request.status === 'revoked' ? 'text-orange-700' : 'text-red-600'}`}>
-              <span className="text-muted-foreground">
-                {request.status === 'revoked' ? '撤销原因: ' : '拒绝原因: '}
-              </span>
+          {request.status === 'revoked' ? (
+            <div className="rounded-md bg-orange-50 p-3 text-sm text-orange-800">
+              <div>
+                <span className="font-medium">撤销原因：</span>
+                {request.revocation_reason || request.rejection_reason?.replace(/^【审批撤销】/, '') || '未记录'}
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-orange-700">
+                <span>撤销人：{request.revoker?.display_name || '历史记录未留存'}</span>
+                <span>撤销时间：{formatDateTime(request.revoked_at || request.updated_at)}</span>
+                {request.revoked_from_status && (
+                  <span>
+                    撤销前状态：{REQUEST_STATUS_MAP[request.revoked_from_status]?.label || request.revoked_from_status}
+                  </span>
+                )}
+              </div>
+            </div>
+          ) : request.rejection_reason ? (
+            <div className="text-sm text-red-600">
+              <span className="text-muted-foreground">拒绝原因: </span>
               {request.rejection_reason}
             </div>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
@@ -363,7 +377,7 @@ export function ApprovalDetail() {
         </Card>
       )}
 
-      {/* 撤销审批操作 (仅超级管理员，且状态为借用中/逾期/已归还) */}
+      {/* 撤销审批操作（仅超级管理员，且整单已经审批通过） */}
       {isSuperAdmin && ['approved', 'borrowed', 'overdue', 'partially_returned', 'returned'].includes(request.status) && (
         <Card className="border-orange-300">
           <CardHeader>
@@ -375,9 +389,11 @@ export function ApprovalDetail() {
           <CardContent>
             <div className="mb-4 rounded-md bg-orange-50 p-3 text-sm text-orange-800">
               撤销后：
-              {request.status === 'returned'
-                ? '该申请将标记为已撤销，样机已归还不受影响，借用记录保留。'
-                : '借用记录将被删除，样机状态恢复为在库。'}
+              {request.status === 'approved'
+                ? '预约将被释放；申请、审批过程和撤销记录都会保留。'
+                : request.status === 'returned'
+                  ? '样机已归还不受影响；申请、借用记录和撤销记录都会保留。'
+                  : '样机将恢复为在库；未归还的借用记录会保留并标记为已撤销。'}
               此操作不可逆，且会通知申请人。
             </div>
             <Dialog open={revokeDialogOpen} onOpenChange={setRevokeDialogOpen}>

@@ -6,13 +6,15 @@ import type { BorrowRequest } from '@/types'
 import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
 import type { BorrowRequestStatus } from '@/lib/constants'
 import { getErrorMessage } from '@/lib/errors'
+import { canEditBorrowRequest } from '@/lib/borrow-request'
+import { useAuth } from '@/contexts/auth-context'
 
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Camera } from 'lucide-react'
+import { Camera, Eye, Pencil } from 'lucide-react'
 
 type TabKey = 'all' | BorrowRequestStatus
 
@@ -31,6 +33,7 @@ const TABS: { key: TabKey; label: string }[] = [
 
 export function MyRequests() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<BorrowRequest[]>([])
   const [activeTab, setActiveTab] = useState<string>('all')
@@ -97,7 +100,7 @@ export function MyRequests() {
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="flex-wrap">
+        <TabsList className="h-auto min-h-9 w-full flex-wrap justify-start">
           {TABS.map((tab) => (
             <TabsTrigger key={tab.key} value={tab.key}>
               {tab.label}
@@ -116,22 +119,23 @@ export function MyRequests() {
               const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
               const returnableItemCount = request.request_items?.filter((line) => line.status === 'borrowed').length || 0
               const canReturn = returnableItemCount > 0 || ['borrowed', 'partially_returned', 'overdue'].includes(request.status)
+              const canEdit = canEditBorrowRequest(request, user?.id)
               return (
                 <Card key={request.id}>
                   <CardHeader className="pb-3">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col items-start gap-2 sm:flex-row sm:items-center sm:justify-between">
                       <CardTitle className="text-base">
                         {request.request_number}
                       </CardTitle>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         <Badge className={typeInfo.color}>{typeInfo.label}</Badge>
                         <Badge className={statusInfo.color}>{statusInfo.label}</Badge>
                       </div>
                     </div>
                   </CardHeader>
                   <CardContent className="space-y-3">
-                    <div className="grid grid-cols-2 gap-2 text-sm">
-                      <div className="col-span-2">
+                    <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
+                      <div className="sm:col-span-2">
                         <span className="text-muted-foreground">样机（{request.request_items?.length || 0} 台）: </span>
                         {request.request_items?.map((line) => line.item?.name || line.item_id).join('、') || '-'}
                       </div>
@@ -160,7 +164,7 @@ export function MyRequests() {
                         {request.purpose}
                       </div>
                     )}
-                    <div className="flex items-center gap-2 pt-2">
+                    <div className="flex flex-wrap items-center gap-2 pt-2">
                       {request.status === 'pending' && (
                         <Button
                           size="sm"
@@ -168,6 +172,24 @@ export function MyRequests() {
                           onClick={() => handleCancel(request.id)}
                         >
                           取消申请
+                        </Button>
+                      )}
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() => navigate(`/borrow/requests/${request.id}`)}
+                      >
+                        <Eye className="mr-1 size-4" />
+                        查看详情
+                      </Button>
+                      {canEdit && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => navigate(`/borrow/requests/${request.id}/edit`)}
+                        >
+                          <Pencil className="mr-1 size-4" />
+                          编辑申请
                         </Button>
                       )}
                       {canReturn && (

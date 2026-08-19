@@ -32,6 +32,7 @@ const borrowRecordStatusOptions = [
   { value: 'active', label: '借用中' },
   { value: 'returned', label: '已归还' },
   { value: 'overdue', label: '逾期' },
+  { value: 'revoked', label: '已撤销' },
 ]
 
 const approvalStatusOptions = Object.entries(REQUEST_STATUS_MAP).map(([key, val]) => ({
@@ -248,9 +249,16 @@ export function ReportsPage() {
                         <span className={`inline-block px-2 py-0.5 rounded text-xs ${
                           record.status === 'active' ? 'bg-blue-100 text-blue-800' :
                           record.status === 'returned' ? 'bg-green-100 text-green-800' :
+                          record.status === 'revoked' ? 'bg-orange-100 text-orange-800' :
                           'bg-red-100 text-red-800'
                         }`}>
-                          {record.status === 'active' ? '借用中' : record.status === 'returned' ? '已归还' : '逾期'}
+                          {record.status === 'active'
+                            ? '借用中'
+                            : record.status === 'returned'
+                              ? '已归还'
+                              : record.status === 'revoked'
+                                ? '已撤销'
+                                : '逾期'}
                         </span>
                       </TableCell>
                       <TableCell>{getCurrentOverdueDays(record)}</TableCell>
