@@ -13,7 +13,7 @@ export function getCurrentOverdueDays(
 ): number {
   const storedDays = record.overdue_days || 0
 
-  if (record.status === 'returned') return storedDays
+  if (record.status === 'returned' || record.status === 'revoked') return storedDays
 
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(record.due_date)
   if (!match) return storedDays

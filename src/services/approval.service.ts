@@ -1,5 +1,39 @@
 import { supabase } from '@/lib/supabase'
-import type { ApprovalRecord, ApprovalChain, ApprovalProgress } from '@/types'
+import type { ApprovalRecord, ApprovalChain, ApprovalProgress, Profile } from '@/types'
+
+async function attachRequestRevokers(records: ApprovalRecord[]): Promise<ApprovalRecord[]> {
+  const revokerIds = Array.from(new Set(
+    records
+      .map((record) => record.request?.revoked_by)
+      .filter((id): id is string => Boolean(id)),
+  ))
+
+  if (revokerIds.length === 0) return records
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .select('*')
+    .in('id', revokerIds)
+
+  // 撤销人是展示增强信息，查询失败不应再次阻断整个审批列表。
+  if (error) {
+    console.warn('[attachRequestRevokers] failed to load revoker profiles:', error)
+    return records
+  }
+
+  const revokerById = new Map(
+    ((data || []) as Profile[]).map((profile) => [profile.id, profile]),
+  )
+
+  for (const record of records) {
+    const revokerId = record.request?.revoked_by
+    if (record.request && revokerId) {
+      record.request.revoker = revokerById.get(revokerId)
+    }
+  }
+
+  return records
+}
 
 export const approvalService = {
   async getCurrentApprovalProgress(requestId: string): Promise<ApprovalProgress> {
@@ -26,7 +60,7 @@ export const approvalService = {
     // super_admin/admin 能看到所有未审批记录，其他角色只能看到自己的
     let query = supabase
       .from('approval_records')
-      .select('*, approver:profiles(*), request:borrow_requests(*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))), chain:approval_chains(*)')
+      .select('*, approver:profiles(*), request:borrow_requests(*, requester:profiles!borrow_requests_requester_id_fkey(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))), chain:approval_chains(*)')
       .is('acted_at', null)
       .order('created_at', { ascending: false })
 
@@ -46,7 +80,7 @@ export const approvalService = {
         seen.set(record.request_id, record)
       }
     }
-    return Array.from(seen.values())
+    return attachRequestRevokers(Array.from(seen.values()))
   },
 
   async getPendingApprovalsForDashboard(userId: string, isAdmin: boolean): Promise<ApprovalRecord[]> {
@@ -70,7 +104,7 @@ export const approvalService = {
           borrow_type,
           expected_borrow_date,
           status,
-          requester:profiles(id, display_name),
+          requester:profiles!borrow_requests_requester_id_fkey(id, display_name),
           item:items(id, name, model),
           request_items:borrow_request_items(id, item_id, item:items(id, name, model))
         )
@@ -111,7 +145,7 @@ export const approvalService = {
     // super_admin/admin 能看到所有已审批记录，其他角色只能看到自己的
     let query = supabase
       .from('approval_records')
-      .select('*, approver:profiles(*), request:borrow_requests(*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))), chain:approval_chains(*)')
+      .select('*, approver:profiles(*), request:borrow_requests(*, requester:profiles!borrow_requests_requester_id_fkey(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))), chain:approval_chains(*)')
       .not('acted_at', 'is', null)
       .order('acted_at', { ascending: false })
 
@@ -131,7 +165,7 @@ export const approvalService = {
         seen.set(record.request_id, record)
       }
     }
-    return Array.from(seen.values())
+    return attachRequestRevokers(Array.from(seen.values()))
   },
 
   async processApproval(requestId: string, action: 'approved' | 'rejected', comment?: string): Promise<void> {

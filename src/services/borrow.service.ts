@@ -1,5 +1,15 @@
 import { supabase } from '@/lib/supabase'
-import type { BorrowRequest, BorrowRequestInput, RenewInput, BorrowRecord } from '@/types'
+import type {
+  BorrowRequest,
+  BorrowRequestDetail,
+  BorrowRequestInput,
+  RenewInput,
+  BorrowRecord,
+  PaginatedResponse,
+  ReturnPhoto,
+  ReturnPhotoView,
+  Profile,
+} from '@/types'
 import type { PhotoData } from '@/components/borrow/return-photo-capture'
 import { TEST_BORROW_TYPE } from '@/lib/borrow-request-cleanup'
 
@@ -23,6 +33,13 @@ export interface DeleteBorrowRequestResult {
   deleted_movement_count: number
   queued_photo_count: number
   restored_item_count: number
+}
+
+export interface BorrowRequestHistoryFilters {
+  search?: string
+  status?: string
+  page?: number
+  page_size?: number
 }
 
 export const borrowService = {
@@ -91,7 +108,7 @@ export const borrowService = {
 
     const { data, error } = await supabase
       .from('borrow_requests')
-      .select('*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*)))')
+      .select('*, requester:profiles!borrow_requests_requester_id_fkey(*), request_items:borrow_request_items(*, item:items(*, category:categories(*))), approval_records(id, action, acted_at, step_level)')
       .eq('requester_id', user.id)
       .order('created_at', { ascending: false })
     if (error) throw error
@@ -104,7 +121,7 @@ export const borrowService = {
       .from('borrow_requests')
       .select(`
         *,
-        requester:profiles(id, display_name, department),
+        requester:profiles!borrow_requests_requester_id_fkey(id, display_name, department),
         request_items:borrow_request_items(id, request_id, item_id, status, item:items(id, name, model)),
         approval_records(id),
         borrow_records(id, item_id, status)
@@ -145,14 +162,131 @@ export const borrowService = {
   async getRequestById(id: string): Promise<BorrowRequest | null> {
     const { data, error } = await supabase
       .from('borrow_requests')
-      .select('*, requester:profiles(*), request_items:borrow_request_items(*, item:items(*, category:categories(*))), approval_records(*, approver:profiles(*), chain:approval_chains(*))')
+      .select('*, requester:profiles!borrow_requests_requester_id_fkey(*), request_items:borrow_request_items(*, item:items(*, category:categories(*))), approval_records(*, approver:profiles(*), chain:approval_chains(*))')
       .eq('id', id)
-      .single()
+      .maybeSingle()
     if (error) {
       console.error('[getRequestById] error:', error)
       throw error
     }
-    return data as BorrowRequest | null
+    const request = data as BorrowRequest | null
+    if (!request?.revoked_by) return request
+
+    const { data: revoker, error: revokerError } = await supabase
+      .from('profiles')
+      .select('*')
+      .eq('id', request.revoked_by)
+      .maybeSingle()
+
+    // 撤销记录本身已经在申请单中，姓名补齐失败时仍应允许查看详情。
+    if (revokerError) {
+      console.warn('[getRequestById] failed to load revoker profile:', revokerError)
+      return request
+    }
+
+    if (revoker) request.revoker = revoker as Profile
+    return request
+  },
+
+  async getRequestDetail(id: string): Promise<BorrowRequestDetail | null> {
+    const [request, recordsResult] = await Promise.all([
+      this.getRequestById(id),
+      supabase
+        .from('borrow_records')
+        .select('*, borrower:profiles!borrow_records_borrower_id_fkey(*), item:items(*), request_item:borrow_request_items(*)')
+        .eq('request_id', id)
+        .order('created_at', { ascending: true }),
+    ])
+
+    if (!request) return null
+    if (recordsResult.error) throw recordsResult.error
+
+    const borrowRecords = (recordsResult.data || []) as BorrowRecord[]
+    if (borrowRecords.length === 0) {
+      return { request, borrow_records: [], return_photos: [] }
+    }
+
+    const recordById = new Map(borrowRecords.map((record) => [record.id, record]))
+    const { data: photoRows, error: photosError } = await supabase
+      .from('return_photos')
+      .select('*, uploader:profiles(*)')
+      .in('borrow_record_id', borrowRecords.map((record) => record.id))
+      .order('captured_at', { ascending: false })
+
+    if (photosError) throw photosError
+
+    const returnPhotos = await Promise.all(
+      ((photoRows || []) as ReturnPhoto[]).map(async (photo): Promise<ReturnPhotoView> => {
+        const basePhoto = {
+          ...photo,
+          borrow_record: recordById.get(photo.borrow_record_id),
+        }
+
+        if (photo.photo_deleted_at) {
+          return { ...basePhoto, signed_url: null, load_error: null }
+        }
+
+        const { data, error } = await supabase.storage
+          .from('return-photos')
+          .createSignedUrl(photo.storage_path, 10 * 60)
+
+        return {
+          ...basePhoto,
+          signed_url: data?.signedUrl || null,
+          load_error: error?.message || null,
+        }
+      }),
+    )
+
+    return { request, borrow_records: borrowRecords, return_photos: returnPhotos }
+  },
+
+  async getRequestHistory(filters?: BorrowRequestHistoryFilters): Promise<PaginatedResponse<BorrowRequest>> {
+    const page = Math.max(filters?.page || 1, 1)
+    const pageSize = Math.min(Math.max(filters?.page_size || 20, 1), 100)
+
+    let query = supabase
+      .from('borrow_requests')
+      .select(`
+        *,
+        requester:profiles!borrow_requests_requester_id_fkey(id, display_name, department, email, phone),
+        request_items:borrow_request_items(*, item:items(id, name, model, barcode, serial_number, status)),
+        approval_records(id, action, acted_at, step_level)
+      `, { count: 'exact' })
+
+    const search = filters?.search?.trim().replace(/[%_(),]/g, ' ')
+    if (search) {
+      query = query.or(`request_number.ilike.%${search}%,purpose.ilike.%${search}%`)
+    }
+    if (filters?.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status)
+    }
+
+    const { data, count, error } = await query
+      .order('created_at', { ascending: false })
+      .range((page - 1) * pageSize, page * pageSize - 1)
+
+    if (error) throw error
+    return {
+      data: (data || []) as unknown as BorrowRequest[],
+      count: count || 0,
+    }
+  },
+
+  async updateRequest(id: string, data: BorrowRequestInput): Promise<void> {
+    const { error } = await supabase.rpc('update_borrow_request', {
+      p_request_id: id,
+      p_item_ids: data.item_ids,
+      p_borrow_type: data.borrow_type,
+      p_purpose: data.purpose,
+      p_customer_name: data.customer_name || null,
+      p_customer_contact: data.customer_contact || null,
+      p_expected_borrow_date: data.expected_borrow_date,
+      p_expected_return_date: data.expected_return_date,
+    })
+    if (error) throw error
+
+    this.triggerApprovalNotification(id).catch(console.error)
   },
 
   async processReturn(recordId: string, data: ProcessReturnData): Promise<void> {
@@ -254,11 +388,17 @@ export const borrowService = {
     return requestId
   },
 
-  async checkAvailability(itemIds: string[], expectedBorrowDate: string, expectedReturnDate: string) {
+  async checkAvailability(
+    itemIds: string[],
+    expectedBorrowDate: string,
+    expectedReturnDate: string,
+    excludeRequestId?: string,
+  ) {
     const { data, error } = await supabase.rpc('check_borrow_availability', {
       p_item_ids: itemIds,
       p_expected_borrow_date: expectedBorrowDate,
       p_expected_return_date: expectedReturnDate,
+      p_exclude_request_id: excludeRequestId || null,
     })
     if (error) throw error
     return data as Array<{ item_id: string; item_name: string; occupied_start_date: string; occupied_end_date: string; occupied_status: string }>
@@ -268,7 +408,7 @@ export const borrowService = {
     // 关联 borrower 和 item 以支持导出借用人/样机名称/样机型号
     let query = supabase
       .from('borrow_records')
-      .select('*, borrower:profiles(*), item:items(*), request_item:borrow_request_items(*)')
+      .select('*, borrower:profiles!borrow_records_borrower_id_fkey(*), item:items(*), request_item:borrow_request_items(*)')
       .order('created_at', { ascending: false })
 
     if (filters?.status) query = query.eq('status', filters.status)
@@ -305,7 +445,7 @@ export const borrowService = {
   async getActiveBorrowForItem(itemId: string): Promise<BorrowRecord | null> {
     const { data, error } = await supabase
       .from('borrow_records')
-      .select('*, item:items(*), borrower:profiles(*)')
+      .select('*, item:items(*), borrower:profiles!borrow_records_borrower_id_fkey(*)')
       .eq('item_id', itemId)
       .in('status', ['active', 'overdue'])
       .single()

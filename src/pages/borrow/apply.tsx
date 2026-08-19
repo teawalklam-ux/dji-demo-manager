@@ -5,9 +5,12 @@ import { borrowService } from '@/services/borrow.service'
 import { approvalService } from '@/services/approval.service'
 import { customerService } from '@/services/customer.service'
 import { toast } from 'sonner'
-import type { Item, BorrowRequestInput, ApprovalChain, UserCustomer } from '@/types'
-import { getBorrowTypeInfo, getBorrowTypeOptions } from '@/lib/constants'
+import type { Item, BorrowRequest, BorrowRequestInput, ApprovalChain, UserCustomer } from '@/types'
+import { getBorrowTypeInfo, getBorrowTypeOptions, ITEM_STATUS_MAP } from '@/lib/constants'
 import type { BorrowType } from '@/lib/constants'
+import { canEditBorrowRequest } from '@/lib/borrow-request'
+import { useAuth } from '@/contexts/auth-context'
+import { getErrorMessage } from '@/lib/errors'
 
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -27,6 +30,9 @@ import {
 } from '@/components/ui/select'
 
 function getItemAvailabilityLabel(item: Item) {
+  if (!['in_stock', 'borrowed'].includes(item.status)) {
+    return ITEM_STATUS_MAP[item.status]?.label || item.status
+  }
   if (item.availability_status === 'reserved') {
     return item.reservation_start_date && item.reservation_end_date
       ? `预定（${item.reservation_start_date} 至 ${item.reservation_end_date}）`
@@ -39,21 +45,32 @@ function getItemAvailabilityLabel(item: Item) {
 }
 
 function getItemAvailabilityClass(item: Item) {
+  if (!['in_stock', 'borrowed'].includes(item.status)) {
+    return ITEM_STATUS_MAP[item.status]?.color || 'bg-muted text-muted-foreground'
+  }
   if (item.availability_status === 'reserved') return 'bg-violet-100 text-violet-800'
   if (item.availability_status === 'borrowed') return 'bg-blue-100 text-blue-800'
   return 'bg-green-100 text-green-800'
 }
 
 function getItemSerialLabel(item: Item) {
-  return item.serial_number_last4 ? `SN ****${item.serial_number_last4}` : 'SN ----'
+  const lastFour = item.serial_number_last4 || item.serial_number?.slice(-4)
+  return lastFour ? `SN ****${lastFour}` : 'SN ----'
+}
+
+function isItemSelectable(item: Item) {
+  return item.status === 'in_stock' || item.status === 'borrowed'
 }
 
 export function BorrowApply() {
   const navigate = useNavigate()
-  const { itemId } = useParams<{ itemId: string }>()
+  const { itemId, requestId } = useParams<{ itemId: string; requestId: string }>()
+  const { user } = useAuth()
 
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [editingRequest, setEditingRequest] = useState<BorrowRequest | null>(null)
   const [items, setItems] = useState<Item[]>([])
   const [chains, setChains] = useState<ApprovalChain[]>([])
 
@@ -82,33 +99,68 @@ export function BorrowApply() {
 
   const loadInitialData = useCallback(async () => {
     setLoading(true)
+    setLoadError(null)
     try {
-      const [itemsData, chainsData, customersData] = await Promise.all([
+      const [itemsData, chainsData, customersData, requestData] = await Promise.all([
         itemsService.getBorrowableItems(),
         approvalService.getChains(),
         customerService.getMine(),
+        requestId ? borrowService.getRequestById(requestId) : Promise.resolve(null),
       ])
-      setItems(itemsData)
-      if (itemId && !itemsData.some((item) => item.id === itemId)) {
-        setSelectedItemIds([])
-        toast.error('该样机当前为逾期、维修或退役状态，不能提交预约申请')
-      }
       setChains(chainsData.filter((c) => c.is_active))
       setCustomers(customersData)
+
+      if (requestId) {
+        if (!requestData) {
+          setItems(itemsData)
+          setLoadError('未找到申请，或当前账号没有查看权限。')
+          return
+        }
+        if (!canEditBorrowRequest(requestData, user?.id)) {
+          setItems(itemsData)
+          setLoadError('该申请已进入审批或处理流程，不能再编辑。')
+          return
+        }
+
+        const mergedItems = [...itemsData]
+        for (const line of requestData.request_items || []) {
+          if (line.item && !mergedItems.some((item) => item.id === line.item!.id)) {
+            mergedItems.push(line.item)
+          }
+        }
+
+        setItems(mergedItems)
+        setEditingRequest(requestData)
+        setSelectedItemIds((requestData.request_items || []).map((line) => line.item_id))
+        setBorrowType(requestData.borrow_type)
+        setPurpose(requestData.purpose || '')
+        setCustomerName(requestData.customer_name || '')
+        setCustomerContact(requestData.customer_contact || '')
+        setExpectedBorrowDate(requestData.expected_borrow_date)
+        setExpectedReturnDate(requestData.expected_return_date)
+        setSaveCustomer(false)
+      } else {
+        setItems(itemsData)
+        if (itemId && !itemsData.some((item) => item.id === itemId)) {
+          setSelectedItemIds([])
+          toast.error('该样机当前为逾期、维修或退役状态，不能提交预约申请')
+        }
+      }
     } catch (error) {
       toast.error('加载数据失败')
+      setLoadError(getErrorMessage(error, '申请表单加载失败，请稍后重试。'))
       console.error(error)
     } finally {
       setLoading(false)
     }
-  }, [itemId])
+  }, [itemId, requestId, user?.id])
 
   useEffect(() => {
     loadInitialData()
   }, [loadInitialData])
 
   useEffect(() => {
-    if (!expectedBorrowDate || !expectedReturnDate || expectedReturnDate < expectedBorrowDate || selectedItemIds.length === 0) {
+    if (loadError || !expectedBorrowDate || !expectedReturnDate || expectedReturnDate < expectedBorrowDate || selectedItemIds.length === 0) {
       setAvailabilityConflicts([])
       setAvailabilityChecking(false)
       setAvailabilityCheckFailed(false)
@@ -117,7 +169,7 @@ export function BorrowApply() {
     let cancelled = false
     setAvailabilityChecking(true)
     setAvailabilityCheckFailed(false)
-    borrowService.checkAvailability(selectedItemIds, expectedBorrowDate, expectedReturnDate)
+    borrowService.checkAvailability(selectedItemIds, expectedBorrowDate, expectedReturnDate, requestId)
       .then((conflicts) => {
         if (!cancelled) {
           setAvailabilityConflicts(conflicts)
@@ -135,7 +187,7 @@ export function BorrowApply() {
         if (!cancelled) setAvailabilityChecking(false)
       })
     return () => { cancelled = true }
-  }, [selectedItemIds, expectedBorrowDate, expectedReturnDate])
+  }, [selectedItemIds, expectedBorrowDate, expectedReturnDate, requestId, loadError])
 
   const borrowTypeOptions = getBorrowTypeOptions(chains.map(chain => chain.borrow_type))
 
@@ -176,6 +228,13 @@ export function BorrowApply() {
   const handleSubmit = async () => {
     if (selectedItemIds.length === 0) {
       toast.error('请至少选择一台样机')
+      return
+    }
+    if (selectedItemIds.some((id) => {
+      const item = items.find((candidate) => candidate.id === id)
+      return !item || !isItemSelectable(item)
+    })) {
+      toast.error('已选样机中包含当前不可申请的设备，请移除后再保存')
       return
     }
     if (!purpose.trim()) {
@@ -228,15 +287,19 @@ export function BorrowApply() {
         expected_borrow_date: expectedBorrowDate,
         expected_return_date: expectedReturnDate,
       }
-      await borrowService.createRequest(input)
+      if (requestId) {
+        await borrowService.updateRequest(requestId, input)
+      } else {
+        await borrowService.createRequest(input)
+      }
       // 保存客户到地址簿（异步，不阻塞跳转）
       if (borrowType === 'customer' && saveCustomer && customerName.trim()) {
         customerService.save(customerName.trim(), customerContact.trim()).catch(console.error)
       }
-      toast.success('借用申请已提交')
-      navigate(`/borrow/my-requests`)
+      toast.success(requestId ? '申请已更新' : '借用申请已提交')
+      navigate(requestId ? `/borrow/requests/${requestId}` : '/borrow/my-requests')
     } catch (error: unknown) {
-      toast.error(error instanceof Error ? error.message : '提交失败')
+      toast.error(getErrorMessage(error, requestId ? '申请更新失败' : '提交失败'))
       console.error(error)
     } finally {
       setSubmitting(false)
@@ -251,11 +314,34 @@ export function BorrowApply() {
     )
   }
 
+  if (loadError) {
+    return (
+      <div className="mx-auto max-w-2xl space-y-5 p-6">
+        <Card>
+          <CardContent className="flex min-h-48 flex-col items-start justify-center gap-3 p-6">
+            <h1 className="text-xl font-semibold">无法编辑申请</h1>
+            <p className="text-sm text-muted-foreground">{loadError}</p>
+            <div className="flex flex-wrap gap-2">
+              {requestId && (
+                <Button onClick={() => navigate(`/borrow/requests/${requestId}`)}>返回申请详情</Button>
+              )}
+              <Button variant="outline" onClick={() => navigate('/borrow/my-requests')}>返回我的申请</Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   return (
     <div className="mx-auto max-w-2xl space-y-6 p-6">
       <div>
-        <h1 className="text-2xl font-bold">借用申请</h1>
-        <p className="text-muted-foreground mt-1">填写借用信息，提交审批流程</p>
+        <h1 className="text-2xl font-bold">{requestId ? '编辑申请' : '借用申请'}</h1>
+        <p className="text-muted-foreground mt-1">
+          {requestId
+            ? `修改 ${editingRequest?.request_number || ''}；保存后会按最新信息重新建立未处理的审批步骤`
+            : '填写借用信息，提交审批流程'}
+        </p>
       </div>
 
       {/* 样机选择 */}
@@ -275,7 +361,7 @@ export function BorrowApply() {
               <SelectValue placeholder="请选择样机" />
             </SelectTrigger>
             <SelectContent>
-              {filteredItems.filter((item) => !selectedItemIds.includes(item.id)).map((item) => (
+              {filteredItems.filter((item) => !selectedItemIds.includes(item.id) && isItemSelectable(item)).map((item) => (
                 <SelectItem key={item.id} value={item.id}>
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="truncate">
@@ -313,6 +399,9 @@ export function BorrowApply() {
                       <Badge className={`${getItemAvailabilityClass(selectedItem)} text-xs`}>
                         {getItemAvailabilityLabel(selectedItem)}
                       </Badge>
+                      {!isItemSelectable(selectedItem) && (
+                        <span className="text-xs text-destructive">当前不可申请，请移除后再保存</span>
+                      )}
                     </div>
                     <Button type="button" variant="ghost" size="sm" onClick={() => removeItem(id)}>移除</Button>
                   </div>
@@ -422,12 +511,13 @@ export function BorrowApply() {
               rows={3}
             />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
               <Label htmlFor="borrowDate">预计借用日期 *</Label>
               <Input
                 id="borrowDate"
                 type="date"
+                min={new Date().toLocaleDateString('en-CA')}
                 value={expectedBorrowDate}
                 onChange={(e) => setExpectedBorrowDate(e.target.value)}
               />
@@ -437,6 +527,7 @@ export function BorrowApply() {
               <Input
                 id="returnDate"
                 type="date"
+                min={expectedBorrowDate || new Date().toLocaleDateString('en-CA')}
                 value={expectedReturnDate}
                 onChange={(e) => setExpectedReturnDate(e.target.value)}
               />
@@ -512,7 +603,7 @@ export function BorrowApply() {
         </Button>
         <Button onClick={handleSubmit} disabled={submitting || availabilityChecking || availabilityCheckFailed || availabilityConflicts.length > 0}>
           {submitting && <Spinner className="mr-2 size-4" />}
-          提交申请
+          {requestId ? '保存修改' : '提交申请'}
         </Button>
       </div>
     </div>

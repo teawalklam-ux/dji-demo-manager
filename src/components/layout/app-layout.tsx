@@ -21,6 +21,7 @@ import {
   CheckCheck,
   Clock,
   AlertCircle,
+  History,
   type LucideIcon,
 } from 'lucide-react'
 import { ROLE_MAP } from '@/lib/constants'
@@ -46,6 +47,7 @@ const mainNavItems: MainNavItem[] = [
 ]
 
 const adminNavItems = [
+  { title: '申请历史', href: '/admin/request-history', icon: History, superAdminOnly: false },
   { title: '用户管理', href: '/admin/users', icon: Users, superAdminOnly: true },
   { title: '客户地址簿', href: '/admin/customers', icon: Contact, superAdminOnly: true },
   { title: '分类管理', href: '/admin/categories', icon: Tags, superAdminOnly: false },
@@ -89,7 +91,14 @@ function AppSidebar() {
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={location.pathname === item.href || (item.href !== '/' && location.pathname.startsWith(item.href))}
+                  isActive={
+                    location.pathname === item.href
+                    || (item.href !== '/' && location.pathname.startsWith(item.href))
+                    || (
+                      item.href === '/borrow/my-requests'
+                      && location.pathname.startsWith('/borrow/requests/')
+                    )
+                  }
                   className="hm-sidebar-link h-10 rounded-[var(--radius-input)] px-3 text-sidebar-foreground/70 hover:text-sidebar-foreground data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
                 >
                   <Link to={item.href}>
@@ -231,6 +240,7 @@ function TopHeader() {
     if (location.pathname.startsWith('/borrow')) return '我的申请'
     if (location.pathname.startsWith('/approval')) return '审批队列'
     if (location.pathname.startsWith('/reports')) return '报表导出'
+    if (location.pathname.startsWith('/admin/request-history')) return '申请历史'
     if (location.pathname.startsWith('/admin')) return '管理后台'
     return '工作区'
   })()

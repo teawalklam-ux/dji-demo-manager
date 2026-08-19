@@ -14,6 +14,7 @@ const BorrowApply = lazy(() => import('@/pages/borrow/apply').then((m) => ({ def
 const MyRequests = lazy(() => import('@/pages/borrow/my-requests').then((m) => ({ default: m.MyRequests })))
 const BorrowReturn = lazy(() => import('@/pages/borrow/return').then((m) => ({ default: m.BorrowReturn })))
 const BorrowRenew = lazy(() => import('@/pages/borrow/renew').then((m) => ({ default: m.BorrowRenew })))
+const BorrowRequestDetail = lazy(() => import('@/pages/borrow/request-detail').then((m) => ({ default: m.BorrowRequestDetail })))
 const ApprovalQueue = lazy(() => import('@/pages/approval/queue').then((m) => ({ default: m.ApprovalQueue })))
 const ApprovalDetail = lazy(() => import('@/pages/approval/detail').then((m) => ({ default: m.ApprovalDetail })))
 const UsersPage = lazy(() => import('@/pages/admin/users').then((m) => ({ default: m.UsersPage })))
@@ -22,6 +23,7 @@ const ApprovalChainsPage = lazy(() => import('@/pages/admin/approval-chains').th
 const SettingsPage = lazy(() => import('@/pages/admin/settings').then((m) => ({ default: m.SettingsPage })))
 const CustomersPage = lazy(() => import('@/pages/admin/customers').then((m) => ({ default: m.CustomersPage })))
 const RequestCleanupPage = lazy(() => import('@/pages/admin/request-cleanup').then((m) => ({ default: m.RequestCleanupPage })))
+const RequestHistoryPage = lazy(() => import('@/pages/admin/request-history').then((m) => ({ default: m.RequestHistoryPage })))
 const ReportsPage = lazy(() => import('@/pages/reports/index').then((m) => ({ default: m.ReportsPage })))
 const PendingApproval = lazy(() => import('@/pages/pending-approval').then((m) => ({ default: m.PendingApproval })))
 const AccountDisabled = lazy(() => import('@/pages/account-disabled').then((m) => ({ default: m.AccountDisabled })))
@@ -59,6 +61,8 @@ function App() {
             <Route path="borrow/apply" element={<BorrowApply />} />
             <Route path="borrow/apply/:itemId" element={<BorrowApply />} />
             <Route path="borrow/my-requests" element={<MyRequests />} />
+            <Route path="borrow/requests/:id" element={<BorrowRequestDetail mode="mine" />} />
+            <Route path="borrow/requests/:requestId/edit" element={<BorrowApply />} />
             <Route path="borrow/return/:id" element={<BorrowReturn />} />
             <Route path="borrow/renew/:id" element={<BorrowRenew />} />
             <Route path="approval/queue" element={
@@ -95,6 +99,16 @@ function App() {
             <Route path="admin/request-cleanup" element={
               <AuthGuard requireRole={['super_admin', 'admin']}>
                 <RequestCleanupPage />
+              </AuthGuard>
+            } />
+            <Route path="admin/request-history" element={
+              <AuthGuard requireRole={['super_admin', 'admin']}>
+                <RequestHistoryPage />
+              </AuthGuard>
+            } />
+            <Route path="admin/request-history/:id" element={
+              <AuthGuard requireRole={['super_admin', 'admin']}>
+                <BorrowRequestDetail mode="admin" />
               </AuthGuard>
             } />
             <Route path="reports" element={<ReportsPage />} />
