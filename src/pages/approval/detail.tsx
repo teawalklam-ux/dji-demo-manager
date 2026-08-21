@@ -292,6 +292,9 @@ export function ApprovalDetail() {
                           </span>
                           {statusBadge}
                         </div>
+                        <p className="text-xs text-muted-foreground">
+                          {record.step_label || `第 ${record.step_level} 级审批`}
+                        </p>
                         {record.comment && (
                           <p className="text-sm text-muted-foreground">
                             {record.comment}
@@ -378,7 +381,7 @@ export function ApprovalDetail() {
       )}
 
       {/* 撤销审批操作（仅超级管理员，且整单已经审批通过） */}
-      {isSuperAdmin && ['approved', 'borrowed', 'overdue', 'partially_returned', 'returned'].includes(request.status) && (
+      {isSuperAdmin && ['approved', 'borrowed', 'overdue', 'partially_returned', 'partially_transferred', 'returned', 'transferred'].includes(request.status) && (
         <Card className="border-orange-300">
           <CardHeader>
             <CardTitle className="text-orange-700">撤销审批</CardTitle>
@@ -391,8 +394,10 @@ export function ApprovalDetail() {
               撤销后：
               {request.status === 'approved'
                 ? '预约将被释放；申请、审批过程和撤销记录都会保留。'
-                : request.status === 'returned'
-                  ? '样机已归还不受影响；申请、借用记录和撤销记录都会保留。'
+                : request.status === 'returned' || request.status === 'transferred'
+                  ? '已结束的设备归属不受影响；申请、借用记录和撤销记录都会保留。'
+                  : request.status === 'partially_transferred'
+                    ? '仍由本单持有的未归还设备将恢复在库；已转借设备及其新借用关系不受影响。'
                   : '样机将恢复为在库；未归还的借用记录会保留并标记为已撤销。'}
               此操作不可逆，且会通知申请人。
             </div>

@@ -66,7 +66,7 @@ function App() {
             <Route path="borrow/return/:id" element={<BorrowReturn />} />
             <Route path="borrow/renew/:id" element={<BorrowRenew />} />
             <Route path="approval/queue" element={
-              <AuthGuard requireRole={['super_admin', 'admin', 'approver']}>
+              <AuthGuard>
                 <ApprovalQueue />
               </AuthGuard>
             } />

@@ -26,7 +26,9 @@ const TABS: { key: TabKey; label: string }[] = [
   { key: 'rejected', label: '已拒绝' },
   { key: 'borrowed', label: '借用中' },
   { key: 'partially_returned', label: '部分归还' },
+  { key: 'partially_transferred', label: '部分转借' },
   { key: 'returned', label: '已归还' },
+  { key: 'transferred', label: '已转借' },
   { key: 'overdue', label: '逾期' },
   { key: 'cancelled', label: '已取消' },
 ]
@@ -118,7 +120,7 @@ export function MyRequests() {
               const statusInfo = REQUEST_STATUS_MAP[request.status]
               const typeInfo = BORROW_TYPE_MAP[request.borrow_type]
               const returnableItemCount = request.request_items?.filter((line) => line.status === 'borrowed').length || 0
-              const canReturn = returnableItemCount > 0 || ['borrowed', 'partially_returned', 'overdue'].includes(request.status)
+              const canReturn = returnableItemCount > 0 || ['borrowed', 'partially_returned', 'partially_transferred', 'overdue'].includes(request.status)
               const canEdit = canEditBorrowRequest(request, user?.id)
               return (
                 <Card key={request.id}>
@@ -140,8 +142,10 @@ export function MyRequests() {
                         {request.request_items?.map((line) => line.item?.name || line.item_id).join('、') || '-'}
                       </div>
                       <div>
-                        <span className="text-muted-foreground">借用日期: </span>
-                        {formatDate(request.expected_borrow_date)}
+                        <span className="text-muted-foreground">
+                          {request.borrow_type === 'transfer' ? '生效方式: ' : '借用日期: '}
+                        </span>
+                        {request.borrow_type === 'transfer' ? '最终审批通过即生效' : formatDate(request.expected_borrow_date)}
                       </div>
                       <div>
                         <span className="text-muted-foreground">归还日期: </span>
@@ -201,7 +205,7 @@ export function MyRequests() {
                             <Camera className="mr-1 size-4" />
                             拍照归还{returnableItemCount > 1 ? `（${returnableItemCount} 台待归还）` : ''}
                           </Button>
-                          {request.status === 'borrowed' && <Button
+                          {['borrowed', 'partially_transferred'].includes(request.status) && request.borrow_type !== 'transfer' && <Button
                             size="sm"
                             variant="outline"
                             onClick={() => handleRenewal(request.id)}

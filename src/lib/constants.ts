@@ -22,17 +22,19 @@ export type BorrowRequestStatus =
   | 'cancelled'
   | 'borrowed'
   | 'partially_returned'
+  | 'partially_transferred'
   | 'returned'
+  | 'transferred'
   | 'overdue'
   | 'renewal_requested'
   | 'revoked'
   | 'invalidated'
 
 // 借用记录状态
-export type BorrowRecordStatus = 'active' | 'returned' | 'overdue' | 'revoked'
+export type BorrowRecordStatus = 'active' | 'returned' | 'transferred' | 'overdue' | 'revoked'
 
 // 库存变动类型
-export type MovementType = 'borrow_out' | 'return_in' | 'new_entry' | 'maintenance' | 'retire' | 'revoke'
+export type MovementType = 'borrow_out' | 'return_in' | 'new_entry' | 'maintenance' | 'retire' | 'revoke' | 'transfer'
 
 // 通知类型
 export type NotificationType = 'email' | 'push' | 'sms' | 'wecom'
@@ -59,6 +61,7 @@ export const ITEM_STATUS_MAP: Record<ItemDisplayStatus, StatusInfo> = {
 const BUILT_IN_BORROW_TYPE_MAP: Record<string, StatusInfo> = {
   customer: { label: '客户试用', color: 'bg-purple-100 text-purple-800' },
   marketing: { label: '营销演示', color: 'bg-cyan-100 text-cyan-800' },
+  transfer: { label: '转借', color: 'bg-amber-100 text-amber-800' },
 }
 
 export const BORROW_TYPE_MAP: Record<string, StatusInfo> = new Proxy(BUILT_IN_BORROW_TYPE_MAP, {
@@ -74,6 +77,7 @@ export const BORROW_TYPE_MAP: Record<string, StatusInfo> = new Proxy(BUILT_IN_BO
 export const BUILT_IN_BORROW_TYPE_OPTIONS = [
   { value: 'customer', label: BORROW_TYPE_MAP.customer.label },
   { value: 'marketing', label: BORROW_TYPE_MAP.marketing.label },
+  { value: 'transfer', label: BORROW_TYPE_MAP.transfer.label },
 ] as const
 
 export function getBorrowTypeInfo(borrowType: string): StatusInfo {
@@ -99,11 +103,13 @@ export const REQUEST_STATUS_MAP: Record<string, StatusInfo> = {
   cancelled: { label: '已取消', color: 'bg-gray-100 text-gray-800' },
   borrowed: { label: '借用中', color: 'bg-blue-100 text-blue-800' },
   partially_returned: { label: '部分归还', color: 'bg-cyan-100 text-cyan-800' },
+  partially_transferred: { label: '部分转借', color: 'bg-amber-100 text-amber-800' },
   returned: { label: '已归还', color: 'bg-green-100 text-green-800' },
+  transferred: { label: '已转借', color: 'bg-amber-100 text-amber-800' },
   overdue: { label: '已逾期', color: 'bg-red-100 text-red-800' },
   renewal_requested: { label: '续借申请', color: 'bg-orange-100 text-orange-800' },
   revoked: { label: '已撤销', color: 'bg-orange-100 text-orange-800' },
-  invalidated: { label: '预约失效', color: 'bg-red-100 text-red-800' },
+  invalidated: { label: '申请失效', color: 'bg-red-100 text-red-800' },
 }
 
 export const ROLE_MAP: Record<string, StatusInfo> = {

@@ -9,6 +9,7 @@ assert.deepEqual(
   [
     { value: 'customer', label: '客户试用' },
     { value: 'marketing', label: '营销演示' },
+    { value: 'transfer', label: '转借' },
     { value: '内部培训', label: '内部培训' },
   ]
 )

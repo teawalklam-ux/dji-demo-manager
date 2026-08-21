@@ -210,7 +210,8 @@ export function ApprovalChainsPage() {
 
   const borrowTypeOptions = [
     { value: 'all', label: '全部' },
-    ...getBorrowTypeOptions(chains.map(chain => chain.borrow_type)),
+    ...getBorrowTypeOptions(chains.map(chain => chain.borrow_type))
+      .filter(option => option.value !== 'transfer'),
   ]
 
   if (loading) {

@@ -51,6 +51,9 @@ serve(async (req) => {
           purpose,
           requester_id,
           items (name, model, barcode),
+          request_items (
+            items (name, model, barcode)
+          ),
           requester:profiles!borrow_requests_requester_id_fkey (display_name, email, phone)
         ),
         recipient:profiles!overdue_notifications_recipient_id_fkey (display_name, email, phone, role)
@@ -118,7 +121,17 @@ serve(async (req) => {
         if (!req || !recipient) continue
 
         const borrowTypeLabel = req.borrow_type === 'customer' ? '客户试用' :
-          req.borrow_type === 'marketing' ? '营销演示' : req.borrow_type
+          req.borrow_type === 'marketing' ? '营销演示' :
+          req.borrow_type === 'transfer' ? '转借' : req.borrow_type
+
+        const requestItems = (req.request_items || [])
+          .map((line) => line.items)
+          .filter(Boolean)
+        const itemSummary = requestItems.length > 0
+          ? requestItems.map((item) => (
+              `${item.name || '未知'}${item.model ? ` (${item.model})` : ''}${item.barcode ? ` [${item.barcode}]` : ''}`
+            )).join('、')
+          : `${req.items?.name || '未知'}${req.items?.model ? ` (${req.items.model})` : ''}${req.items?.barcode ? ` [${req.items.barcode}]` : ''}`
 
         const recipientName = recipient.display_name || recipient.email || '未知'
         const requesterName = req.requester?.display_name || '未知'
@@ -134,8 +147,7 @@ serve(async (req) => {
             `【新审批申请】`,
             `申请单号：${req.request_number}`,
             `申请人：${requesterName}`,
-            `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
-            `条码：${req.items?.barcode || '-'}`,
+            `样机：${itemSummary}`,
             `借用类型：${borrowTypeLabel}`,
             `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
             `用途：${req.purpose || '-'}`,
@@ -151,13 +163,14 @@ serve(async (req) => {
             title,
             `申请单号：${req.request_number}`,
             `申请人：${requesterName}`,
-            `样机：${req.items?.name || '未知'}${req.items?.model ? ' (' + req.items.model + ')' : ''}`,
-            `条码：${req.items?.barcode || '-'}`,
+            `样机：${itemSummary}`,
             `借用类型：${borrowTypeLabel}`,
             `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
             isRejected
               ? `您的申请已被拒绝，请查看详情`
-              : `您的申请已全部审批通过，请前往领取样机`,
+              : req.borrow_type === 'transfer'
+                ? `转借已生效，设备当前借用关系已变更至您名下`
+                : `您的申请已全部审批通过，请前往领取样机`,
           ].join('\n')
         }
 

@@ -29,7 +29,12 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 
-function getItemAvailabilityLabel(item: Item) {
+function getItemAvailabilityLabel(item: Item, isTransfer = false) {
+  if (isTransfer && item.source_borrow_record_id) {
+    const state = item.source_borrow_status === 'overdue' ? '逾期未还' : '借出中'
+    const due = item.current_due_date ? `，应还 ${item.current_due_date}` : ''
+    return `${state}${due}`
+  }
   if (!['in_stock', 'borrowed'].includes(item.status)) {
     return ITEM_STATUS_MAP[item.status]?.label || item.status
   }
@@ -44,7 +49,12 @@ function getItemAvailabilityLabel(item: Item) {
   return '在库'
 }
 
-function getItemAvailabilityClass(item: Item) {
+function getItemAvailabilityClass(item: Item, isTransfer = false) {
+  if (isTransfer && item.source_borrow_record_id) {
+    return item.source_borrow_status === 'overdue'
+      ? 'bg-red-100 text-red-800'
+      : 'bg-blue-100 text-blue-800'
+  }
   if (!['in_stock', 'borrowed'].includes(item.status)) {
     return ITEM_STATUS_MAP[item.status]?.color || 'bg-muted text-muted-foreground'
   }
@@ -58,7 +68,14 @@ function getItemSerialLabel(item: Item) {
   return lastFour ? `SN ****${lastFour}` : 'SN ----'
 }
 
-function isItemSelectable(item: Item) {
+function isItemSelectable(item: Item, borrowType: BorrowType, sourceBorrowerId?: string | null) {
+  if (borrowType === 'transfer') {
+    return Boolean(
+      item.source_borrow_record_id
+      && item.source_borrower_id
+      && (!sourceBorrowerId || item.source_borrower_id === sourceBorrowerId),
+    )
+  }
   return item.status === 'in_stock' || item.status === 'borrowed'
 }
 
@@ -89,7 +106,17 @@ export function BorrowApply() {
   const [availabilityChecking, setAvailabilityChecking] = useState(false)
   const [availabilityCheckFailed, setAvailabilityCheckFailed] = useState(false)
 
-  const filteredItems = items.filter(
+  const selectedSourceBorrowerId = selectedItemIds
+    .map((id) => items.find((item) => item.id === id)?.source_borrower_id)
+    .find((id): id is string => Boolean(id))
+
+  const candidateItems = items.filter((item) => (
+    borrowType === 'transfer'
+      ? Boolean(item.source_borrow_record_id)
+      : item.status === 'in_stock' || item.status === 'borrowed'
+  ))
+
+  const filteredItems = candidateItems.filter(
     (item) =>
       item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       item.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -101,28 +128,38 @@ export function BorrowApply() {
     setLoading(true)
     setLoadError(null)
     try {
-      const [itemsData, chainsData, customersData, requestData] = await Promise.all([
+      const [itemsData, transferableItemsData, chainsData, customersData, requestData] = await Promise.all([
         itemsService.getBorrowableItems(),
+        itemsService.getTransferableItems(),
         approvalService.getChains(),
         customerService.getMine(),
         requestId ? borrowService.getRequestById(requestId) : Promise.resolve(null),
       ])
+      const mergedItemMap = new Map(itemsData.map((item) => [item.id, item]))
+      for (const transferItem of transferableItemsData) {
+        mergedItemMap.set(transferItem.id, {
+          ...mergedItemMap.get(transferItem.id),
+          ...transferItem,
+        } as Item)
+      }
+      const mergedAvailableItems = Array.from(mergedItemMap.values())
+
       setChains(chainsData.filter((c) => c.is_active))
       setCustomers(customersData)
 
       if (requestId) {
         if (!requestData) {
-          setItems(itemsData)
+          setItems(mergedAvailableItems)
           setLoadError('未找到申请，或当前账号没有查看权限。')
           return
         }
         if (!canEditBorrowRequest(requestData, user?.id)) {
-          setItems(itemsData)
+          setItems(mergedAvailableItems)
           setLoadError('该申请已进入审批或处理流程，不能再编辑。')
           return
         }
 
-        const mergedItems = [...itemsData]
+        const mergedItems = [...mergedAvailableItems]
         for (const line of requestData.request_items || []) {
           if (line.item && !mergedItems.some((item) => item.id === line.item!.id)) {
             mergedItems.push(line.item)
@@ -140,10 +177,14 @@ export function BorrowApply() {
         setExpectedReturnDate(requestData.expected_return_date)
         setSaveCustomer(false)
       } else {
-        setItems(itemsData)
-        if (itemId && !itemsData.some((item) => item.id === itemId)) {
+        setItems(mergedAvailableItems)
+        const initialItem = itemId ? mergedAvailableItems.find((item) => item.id === itemId) : null
+        if (itemId && !initialItem) {
           setSelectedItemIds([])
-          toast.error('该样机当前为逾期、维修或退役状态，不能提交预约申请')
+          toast.error('该样机当前不可申请借用或转借')
+        } else if (initialItem?.source_borrow_record_id) {
+          setBorrowType('transfer')
+          setExpectedBorrowDate(new Date().toLocaleDateString('en-CA'))
         }
       }
     } catch (error) {
@@ -160,6 +201,12 @@ export function BorrowApply() {
   }, [loadInitialData])
 
   useEffect(() => {
+    if (borrowType === 'transfer') {
+      setAvailabilityConflicts([])
+      setAvailabilityChecking(false)
+      setAvailabilityCheckFailed(false)
+      return
+    }
     if (loadError || !expectedBorrowDate || !expectedReturnDate || expectedReturnDate < expectedBorrowDate || selectedItemIds.length === 0) {
       setAvailabilityConflicts([])
       setAvailabilityChecking(false)
@@ -187,13 +234,43 @@ export function BorrowApply() {
         if (!cancelled) setAvailabilityChecking(false)
       })
     return () => { cancelled = true }
-  }, [selectedItemIds, expectedBorrowDate, expectedReturnDate, requestId, loadError])
+  }, [selectedItemIds, expectedBorrowDate, expectedReturnDate, requestId, loadError, borrowType])
+
+  useEffect(() => {
+    if (loading || editingRequest) return
+
+    if (borrowType === 'transfer') {
+      const today = new Date().toLocaleDateString('en-CA')
+      setExpectedBorrowDate(today)
+      setSelectedItemIds((current) => current.filter((id) => {
+        const item = items.find((candidate) => candidate.id === id)
+        return Boolean(item?.source_borrow_record_id)
+      }))
+      return
+    }
+
+    setSelectedItemIds((current) => current.filter((id) => {
+      const item = items.find((candidate) => candidate.id === id)
+      return Boolean(item && ['in_stock', 'borrowed'].includes(item.status))
+    }))
+  }, [borrowType, editingRequest, items, loading])
 
   const borrowTypeOptions = getBorrowTypeOptions(chains.map(chain => chain.borrow_type))
 
-  const currentChain = chains.find((c) => c.borrow_type === borrowType)
+  const customerChain = chains.find((c) => c.borrow_type === 'customer')
     || chains.find((c) => c.borrow_type === 'all')
+  const currentChain = borrowType === 'transfer'
+    ? customerChain
+    : chains.find((c) => c.borrow_type === borrowType)
+      || chains.find((c) => c.borrow_type === 'all')
   const borrowTypeInfo = getBorrowTypeInfo(borrowType)
+
+  const approvalPreviewSteps = borrowType === 'transfer' && currentChain
+    ? [
+        { level: 1, type: 'person' as const, label: '当前借用人确认' },
+        ...currentChain.steps.map((step) => ({ ...step, level: step.level + 1 })),
+      ]
+    : currentChain?.steps || []
 
   const maxBorrowDays = currentChain?.max_borrow_days ?? null
 
@@ -218,6 +295,11 @@ export function BorrowApply() {
   }
 
   const addItem = (id: string) => {
+    const item = items.find((candidate) => candidate.id === id)
+    if (!item || !isItemSelectable(item, borrowType, selectedSourceBorrowerId)) {
+      toast.error(borrowType === 'transfer' ? '同一张转借申请只能选择同一当前借用人的设备' : '该设备当前不可申请')
+      return
+    }
     setSelectedItemIds((current) => current.includes(id) ? current : [...current, id])
   }
 
@@ -226,16 +308,29 @@ export function BorrowApply() {
   }
 
   const handleSubmit = async () => {
+    if (borrowType === 'transfer' && !currentChain) {
+      toast.error('客户借用审批链未启用，暂时无法提交转借申请')
+      return
+    }
     if (selectedItemIds.length === 0) {
       toast.error('请至少选择一台样机')
       return
     }
     if (selectedItemIds.some((id) => {
       const item = items.find((candidate) => candidate.id === id)
-      return !item || !isItemSelectable(item)
+      return !item || !isItemSelectable(item, borrowType, selectedSourceBorrowerId)
     })) {
       toast.error('已选样机中包含当前不可申请的设备，请移除后再保存')
       return
+    }
+    if (borrowType === 'transfer') {
+      const sourceBorrowerIds = new Set(selectedItemIds.map((id) => (
+        items.find((candidate) => candidate.id === id)?.source_borrower_id
+      )))
+      if (sourceBorrowerIds.size !== 1 || sourceBorrowerIds.has(undefined)) {
+        toast.error('同一张转借申请中的设备必须属于同一当前借用人')
+        return
+      }
     }
     if (!purpose.trim()) {
       toast.error('请填写借用用途')
@@ -296,7 +391,7 @@ export function BorrowApply() {
       if (borrowType === 'customer' && saveCustomer && customerName.trim()) {
         customerService.save(customerName.trim(), customerContact.trim()).catch(console.error)
       }
-      toast.success(requestId ? '申请已更新' : '借用申请已提交')
+      toast.success(requestId ? '申请已更新' : borrowType === 'transfer' ? '转借申请已提交' : '借用申请已提交')
       navigate(requestId ? `/borrow/requests/${requestId}` : '/borrow/my-requests')
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, requestId ? '申请更新失败' : '提交失败'))
@@ -348,7 +443,11 @@ export function BorrowApply() {
       <Card>
         <CardHeader>
           <CardTitle>选择样机</CardTitle>
-          <CardDescription>选择在申请日期内无冲突的样机；正常借出设备可申请未来日期，逾期设备不可预约</CardDescription>
+          <CardDescription>
+            {borrowType === 'transfer'
+              ? '选择同一当前借用人的借出或逾期设备；最终审批通过后立即完成保管权交接'
+              : '选择在申请日期内无冲突的样机；正常借出设备可申请未来日期，逾期设备不可预约'}
+          </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Input
@@ -361,7 +460,10 @@ export function BorrowApply() {
               <SelectValue placeholder="请选择样机" />
             </SelectTrigger>
             <SelectContent>
-              {filteredItems.filter((item) => !selectedItemIds.includes(item.id) && isItemSelectable(item)).map((item) => (
+              {filteredItems.filter((item) => (
+                !selectedItemIds.includes(item.id)
+                && isItemSelectable(item, borrowType, selectedSourceBorrowerId)
+              )).map((item) => (
                 <SelectItem key={item.id} value={item.id}>
                   <span className="flex min-w-0 items-center gap-2">
                     <span className="truncate">
@@ -371,15 +473,20 @@ export function BorrowApply() {
                     <span className="shrink-0 font-mono text-xs text-muted-foreground">
                       {getItemSerialLabel(item)}
                     </span>
-                    <Badge className={`${getItemAvailabilityClass(item)} shrink-0 text-xs`}>
-                      {getItemAvailabilityLabel(item)}
+                    {borrowType === 'transfer' && item.source_borrower_name && (
+                      <span className="shrink-0 text-xs text-muted-foreground">
+                        当前：{item.source_borrower_name}
+                      </span>
+                    )}
+                    <Badge className={`${getItemAvailabilityClass(item, borrowType === 'transfer')} shrink-0 text-xs`}>
+                      {getItemAvailabilityLabel(item, borrowType === 'transfer')}
                     </Badge>
                   </span>
                 </SelectItem>
               ))}
               {filteredItems.length === 0 && (
                 <div className="px-2 py-1.5 text-sm text-muted-foreground">
-                  未找到可预约样机
+                  {borrowType === 'transfer' ? '未找到可转借设备' : '未找到可预约样机'}
                 </div>
               )}
             </SelectContent>
@@ -396,10 +503,15 @@ export function BorrowApply() {
                       <span className="font-medium">{selectedItem.name}</span>
                       <span className="text-muted-foreground">{selectedItem.model} · {selectedItem.barcode}</span>
                       <span className="font-mono text-xs text-muted-foreground">{getItemSerialLabel(selectedItem)}</span>
-                      <Badge className={`${getItemAvailabilityClass(selectedItem)} text-xs`}>
-                        {getItemAvailabilityLabel(selectedItem)}
+                      {borrowType === 'transfer' && selectedItem.source_borrower_name && (
+                        <span className="text-xs text-muted-foreground">
+                          当前借用人：{selectedItem.source_borrower_name}
+                        </span>
+                      )}
+                      <Badge className={`${getItemAvailabilityClass(selectedItem, borrowType === 'transfer')} text-xs`}>
+                        {getItemAvailabilityLabel(selectedItem, borrowType === 'transfer')}
                       </Badge>
-                      {!isItemSelectable(selectedItem) && (
+                      {!isItemSelectable(selectedItem, borrowType, selectedSourceBorrowerId) && (
                         <span className="text-xs text-destructive">当前不可申请，请移除后再保存</span>
                       )}
                     </div>
@@ -435,6 +547,12 @@ export function BorrowApply() {
               )
             })}
           </RadioGroup>
+
+          {borrowType === 'transfer' && (
+            <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
+              转借仅适用于其他人当前借出或逾期未还的设备。同一申请可选择多台设备，但必须属于同一当前借用人。
+            </div>
+          )}
 
           {borrowType === 'customer' && (
             <div className="mt-4 space-y-4">
@@ -513,14 +631,20 @@ export function BorrowApply() {
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
-              <Label htmlFor="borrowDate">预计借用日期 *</Label>
+              <Label htmlFor="borrowDate">
+                {borrowType === 'transfer' ? '转借生效日期' : '预计借用日期 *'}
+              </Label>
               <Input
                 id="borrowDate"
                 type="date"
                 min={new Date().toLocaleDateString('en-CA')}
                 value={expectedBorrowDate}
                 onChange={(e) => setExpectedBorrowDate(e.target.value)}
+                disabled={borrowType === 'transfer'}
               />
+              {borrowType === 'transfer' && (
+                <p className="text-xs text-muted-foreground">实际以最终审批通过当天为准</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="returnDate">预计归还日期 *</Label>
@@ -548,6 +672,11 @@ export function BorrowApply() {
               无法确认所选样机的可用性。为避免重复预约，本次申请已暂停提交，请刷新后重试。
             </div>
           )}
+          {borrowType === 'transfer' && selectedItemIds.length > 0 && (
+            <div className="rounded-md bg-blue-50 p-3 text-sm text-blue-700">
+              系统会在提交和最终审批时再次校验设备归属及未来预约；任一设备状态发生变化时整张转借申请不会部分执行。
+            </div>
+          )}
           {maxBorrowDays !== null && (
             <div className={`rounded-md p-3 text-sm ${exceedsMaxDays ? 'bg-red-50 text-red-700' : 'bg-blue-50 text-blue-700'}`}>
               {borrowTypeInfo.label}最多可申请 <strong>{maxBorrowDays}</strong> 天
@@ -573,7 +702,7 @@ export function BorrowApply() {
         <CardContent>
           {currentChain ? (
             <div className="space-y-3">
-              {currentChain.steps.map((step, index) => (
+              {approvalPreviewSteps.map((step, index) => (
                 <div key={index} className="flex items-center gap-3">
                   <div className="flex size-8 items-center justify-center rounded-full bg-primary/10 text-sm font-medium text-primary">
                     {step.level}
@@ -584,14 +713,16 @@ export function BorrowApply() {
                       {step.type === 'role' ? '角色审批' : '指定人员审批'}
                     </div>
                   </div>
-                  {index < currentChain.steps.length - 1 && (
+                   {index < approvalPreviewSteps.length - 1 && (
                     <div className="ml-4 h-6 w-px bg-border" />
                   )}
                 </div>
               ))}
             </div>
           ) : (
-            <p className="text-sm text-muted-foreground">暂无对应审批流程配置</p>
+            <p className="text-sm text-muted-foreground">
+              {borrowType === 'transfer' ? '客户借用审批链未启用，暂时无法提交转借申请' : '暂无对应审批流程配置'}
+            </p>
           )}
         </CardContent>
       </Card>
@@ -601,7 +732,16 @@ export function BorrowApply() {
         <Button variant="outline" onClick={() => navigate(-1)}>
           取消
         </Button>
-        <Button onClick={handleSubmit} disabled={submitting || availabilityChecking || availabilityCheckFailed || availabilityConflicts.length > 0}>
+        <Button
+          onClick={handleSubmit}
+          disabled={
+            submitting
+            || availabilityChecking
+            || availabilityCheckFailed
+            || availabilityConflicts.length > 0
+            || (borrowType === 'transfer' && !currentChain)
+          }
+        >
           {submitting && <Spinner className="mr-2 size-4" />}
           {requestId ? '保存修改' : '提交申请'}
         </Button>

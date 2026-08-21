@@ -31,6 +31,7 @@ function formatDateTime(value: string | null) {
 }
 
 function getApprovalStepLabel(record: ApprovalRecord) {
+  if (record.step_label) return record.step_label
   const step = record.chain?.steps?.find((candidate) => candidate.level === record.step_level)
   return step?.label || `第 ${record.step_level} 级审批`
 }
@@ -121,7 +122,7 @@ export function BorrowRequestDetail({ mode }: BorrowRequestDetailProps) {
   const editable = mode === 'mine' && canEditBorrowRequest(request, user?.id)
   const firstPendingStep = approvalRecords.find((record) => record.action === null)?.step_level
   const hasCompletedReturn = ['returned', 'partially_returned'].includes(request.status)
-    || detail.borrow_records.some((record) => record.status === 'returned' || Boolean(record.return_date))
+    || detail.borrow_records.some((record) => record.status === 'returned')
 
   return (
     <div className="hm-page mx-auto max-w-5xl space-y-6">
@@ -172,9 +173,17 @@ export function BorrowRequestDetail({ mode }: BorrowRequestDetailProps) {
                   <dd className="mt-1 break-all font-medium">{request.requester?.email || '-'}</dd>
                 </div>
                 <div>
-                  <dt className="text-muted-foreground">预计借用日期</dt>
+                  <dt className="text-muted-foreground">
+                    {request.borrow_type === 'transfer' ? '转借申请日期' : '预计借用日期'}
+                  </dt>
                   <dd className="mt-1 font-medium tabular-nums">{formatDate(request.expected_borrow_date)}</dd>
                 </div>
+                {request.borrow_type === 'transfer' && request.actual_borrow_date && (
+                  <div>
+                    <dt className="text-muted-foreground">转借生效日期</dt>
+                    <dd className="mt-1 font-medium tabular-nums">{formatDate(request.actual_borrow_date)}</dd>
+                  </div>
+                )}
                 <div>
                   <dt className="text-muted-foreground">预计归还日期</dt>
                   <dd className="mt-1 font-medium tabular-nums">{formatDate(request.expected_return_date)}</dd>
@@ -210,23 +219,55 @@ export function BorrowRequestDetail({ mode }: BorrowRequestDetailProps) {
                   <h2 className="text-sm font-semibold">申请样机（{request.request_items?.length || 0} 台）</h2>
                 </div>
                 <div className="divide-y rounded-[var(--radius-card)] border">
-                  {(request.request_items || []).map((line) => (
-                    <div key={line.id} className="flex min-w-0 flex-col gap-1 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0">
-                        <p className="truncate font-medium">{line.item?.name || line.item_id}</p>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                          {line.item?.model || '-'}{line.item?.barcode ? ` · ${line.item.barcode}` : ''}
-                        </p>
+                  {(request.request_items || []).map((line) => {
+                    const sourceRecord = line.source_borrow_record
+                    const ownRecord = detail.borrow_records.find((record) => record.request_item_id === line.id)
+                    const successor = ownRecord?.transferred_to
+                    const lineState = line.status === 'transferred'
+                      ? '已转借'
+                      : line.status === 'borrowed'
+                        ? '借用中'
+                        : line.status === 'returned'
+                          ? '已归还'
+                          : line.status === 'reserved'
+                            ? '已预约'
+                            : '处理中'
+
+                    return (
+                      <div key={line.id} className="flex min-w-0 flex-col gap-2 px-4 py-3 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <p className="truncate font-medium">{line.item?.name || line.item_id}</p>
+                            <Badge variant="outline">{lineState}</Badge>
+                          </div>
+                          <p className="mt-0.5 text-sm text-muted-foreground">
+                            {line.item?.model || '-'}{line.item?.barcode ? ` · ${line.item.barcode}` : ''}
+                          </p>
+                          {sourceRecord && (
+                            <p className="mt-1 text-xs text-amber-700">
+                              来源：{sourceRecord.borrower?.display_name || '原借用人'}
+                              {sourceRecord.request?.request_number ? ` · ${sourceRecord.request.request_number}` : ''}
+                            </p>
+                          )}
+                          {successor && (
+                            <p className="mt-1 text-xs text-amber-700">
+                              已转借给：{successor.borrower?.display_name || '新借用人'}
+                              {successor.request?.request_number ? ` · ${successor.request.request_number}` : ''}
+                            </p>
+                          )}
+                        </div>
+                        <span className="text-sm text-muted-foreground tabular-nums">
+                          {line.status === 'transferred' && line.actual_return_date
+                            ? `转借于 ${formatDate(line.actual_return_date)}`
+                            : line.actual_return_date
+                              ? `归还于 ${formatDate(line.actual_return_date)}`
+                              : line.actual_borrow_date
+                                ? `借出于 ${formatDate(line.actual_borrow_date)}`
+                                : '尚未借出'}
+                        </span>
                       </div>
-                      <span className="text-sm text-muted-foreground tabular-nums">
-                        {line.actual_return_date
-                          ? `归还于 ${formatDate(line.actual_return_date)}`
-                          : line.actual_borrow_date
-                            ? `借出于 ${formatDate(line.actual_borrow_date)}`
-                            : '尚未借出'}
-                      </span>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               </div>
 

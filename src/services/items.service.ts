@@ -10,6 +10,15 @@ type BorrowableItemStatusDetail = {
   serial_number_last4: string | null
 }
 
+type TransferableItemStatusDetail = {
+  item_id: string
+  source_borrow_record_id: string
+  source_borrower_id: string
+  source_borrower_name: string
+  source_borrow_status: 'active' | 'overdue'
+  due_date: string
+}
+
 type DashboardSummaryRow = {
   total: number
   in_stock: number
@@ -324,6 +333,44 @@ export const itemsService = {
         reservation_start_date: detail?.reserved_start_date || null,
         reservation_end_date: detail?.reserved_end_date || null,
         current_due_date: detail?.due_date || null,
+      }
+    })
+  },
+
+  /** 可转借样机：仅返回其他活跃用户当前正常借出或逾期未还的设备。 */
+  async getTransferableItems(): Promise<Item[]> {
+    if (import.meta.env.DEV) {
+      const { isDemoSessionActive } = await import('@/lib/demo-mode')
+      if (isDemoSessionActive()) return []
+    }
+
+    const { data: detailRows, error: detailError } = await supabase.rpc(
+      'get_transferable_item_status_details',
+    )
+    if (detailError) throw detailError
+
+    const details = (detailRows || []) as TransferableItemStatusDetail[]
+    if (details.length === 0) return []
+
+    const { data: itemRows, error: itemError } = await supabase
+      .from('items')
+      .select('*, category:categories(*), current_borrower:profiles(*)')
+      .in('id', details.map((detail) => detail.item_id))
+      .order('name')
+    if (itemError) throw itemError
+
+    const detailByItemId = new Map(details.map((detail) => [detail.item_id, detail]))
+
+    return ((itemRows || []) as Item[]).map((item) => {
+      const detail = detailByItemId.get(item.id)!
+      return {
+        ...item,
+        availability_status: 'borrowed',
+        current_due_date: detail.due_date,
+        source_borrow_record_id: detail.source_borrow_record_id,
+        source_borrower_id: detail.source_borrower_id,
+        source_borrower_name: detail.source_borrower_name,
+        source_borrow_status: detail.source_borrow_status,
       }
     })
   },

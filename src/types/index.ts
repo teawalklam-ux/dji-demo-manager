@@ -69,6 +69,11 @@ export interface Item {
   reservation_start_date?: string | null
   reservation_end_date?: string | null
   current_due_date?: string | null
+  /** 转借申请选择器中的来源借用关系。 */
+  source_borrow_record_id?: string | null
+  source_borrower_id?: string | null
+  source_borrower_name?: string | null
+  source_borrow_status?: 'active' | 'overdue' | null
   /** 借用申请选择器中展示的 SN 后四位。 */
   serial_number_last4?: string | null
   specs: Record<string, string>
@@ -152,12 +157,14 @@ export interface BorrowRequestItem {
   id: string
   request_id: string
   item_id: string
-  status: 'pending' | 'reserved' | 'borrowed' | 'returned' | 'cancelled' | 'invalidated' | 'revoked'
+  status: 'pending' | 'reserved' | 'borrowed' | 'returned' | 'transferred' | 'cancelled' | 'invalidated' | 'revoked'
+  source_borrow_record_id?: string | null
   actual_borrow_date: string | null
   actual_return_date: string | null
   created_at: string
   updated_at: string
   item?: Item
+  source_borrow_record?: BorrowRecord
 }
 
 export interface RenewInput {
@@ -192,6 +199,7 @@ export interface ApprovalRecord {
   chain_id: string
   approver_id: string
   step_level: number
+  step_label?: string | null
   action: ApprovalAction | null
   comment: string | null
   acted_at: string | null
@@ -236,12 +244,15 @@ export interface BorrowRecord {
   revoked_by: string | null
   revocation_reason: string | null
   revoked_from_status: 'active' | 'overdue' | null
+  transferred_from_record_id?: string | null
   created_at: string
   updated_at: string
   // Joined
   borrower?: Profile
   item?: Item
   request?: BorrowRequest
+  transferred_from?: BorrowRecord
+  transferred_to?: BorrowRecord
 }
 
 // ===== 库存变动 =====
