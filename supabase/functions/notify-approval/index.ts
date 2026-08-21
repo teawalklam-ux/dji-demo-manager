@@ -49,6 +49,7 @@ serve(async (req) => {
           expected_borrow_date,
           expected_return_date,
           purpose,
+          customer_name,
           requester_id,
           items (name, model, barcode),
           request_items (
@@ -149,6 +150,9 @@ serve(async (req) => {
             `申请人：${requesterName}`,
             `样机：${itemSummary}`,
             `借用类型：${borrowTypeLabel}`,
+            ...(['customer', 'transfer'].includes(req.borrow_type) && req.customer_name
+              ? [`客户：${req.customer_name}`]
+              : []),
             `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
             `用途：${req.purpose || '-'}`,
             `待审批人：${recipientName}`,
@@ -165,6 +169,9 @@ serve(async (req) => {
             `申请人：${requesterName}`,
             `样机：${itemSummary}`,
             `借用类型：${borrowTypeLabel}`,
+            ...(['customer', 'transfer'].includes(req.borrow_type) && req.customer_name
+              ? [`客户：${req.customer_name}`]
+              : []),
             `借用日期：${req.expected_borrow_date} ~ ${req.expected_return_date}`,
             isRejected
               ? `您的申请已被拒绝，请查看详情`

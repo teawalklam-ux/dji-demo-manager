@@ -360,11 +360,13 @@ export function BorrowApply() {
       toast.error(availabilityChecking ? '正在校验样机可用性，请稍候' : '样机可用性校验失败，请刷新后重试')
       return
     }
-    if (borrowType === 'customer') {
+    if (borrowType === 'customer' || borrowType === 'transfer') {
       if (!customerName.trim()) {
         toast.error('请填写客户名称')
         return
       }
+    }
+    if (borrowType === 'customer') {
       if (!customerContact.trim()) {
         toast.error('请填写客户联系方式')
         return
@@ -377,7 +379,7 @@ export function BorrowApply() {
         item_ids: selectedItemIds,
         borrow_type: borrowType,
         purpose: purpose.trim(),
-        customer_name: borrowType === 'customer' ? customerName.trim() : undefined,
+        customer_name: ['customer', 'transfer'].includes(borrowType) ? customerName.trim() : undefined,
         customer_contact: borrowType === 'customer' ? customerContact.trim() : undefined,
         expected_borrow_date: expectedBorrowDate,
         expected_return_date: expectedReturnDate,
@@ -554,7 +556,7 @@ export function BorrowApply() {
             </div>
           )}
 
-          {borrowType === 'customer' && (
+          {(borrowType === 'customer' || borrowType === 'transfer') && (
             <div className="mt-4 space-y-4">
               {customers.length > 0 && (
                 <div className="space-y-2">
@@ -586,28 +588,32 @@ export function BorrowApply() {
                   }}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="customerContact">客户联系方式 *</Label>
-                <Input
-                  id="customerContact"
-                  placeholder="请输入客户联系方式"
-                  value={customerContact}
-                  onChange={(e) => {
-                    setCustomerContact(e.target.value)
-                    setSelectedCustomerId('')
-                  }}
-                />
-              </div>
-              <div className="flex items-center space-x-2">
-                <Checkbox
-                  id="saveCustomer"
-                  checked={saveCustomer}
-                  onCheckedChange={(v) => setSaveCustomer(v === true)}
-                />
-                <Label htmlFor="saveCustomer" className="cursor-pointer text-sm text-muted-foreground">
-                  保存到客户地址簿，下次可直接选择
-                </Label>
-              </div>
+              {borrowType === 'customer' && (
+                <>
+                  <div className="space-y-2">
+                    <Label htmlFor="customerContact">客户联系方式 *</Label>
+                    <Input
+                      id="customerContact"
+                      placeholder="请输入客户联系方式"
+                      value={customerContact}
+                      onChange={(e) => {
+                        setCustomerContact(e.target.value)
+                        setSelectedCustomerId('')
+                      }}
+                    />
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <Checkbox
+                      id="saveCustomer"
+                      checked={saveCustomer}
+                      onCheckedChange={(v) => setSaveCustomer(v === true)}
+                    />
+                    <Label htmlFor="saveCustomer" className="cursor-pointer text-sm text-muted-foreground">
+                      保存到客户地址簿，下次可直接选择
+                    </Label>
+                  </div>
+                </>
+              )}
             </div>
           )}
         </CardContent>

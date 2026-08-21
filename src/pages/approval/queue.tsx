@@ -272,10 +272,10 @@ export function ApprovalQueue() {
                         {request.purpose}
                       </div>
                     )}
-                    {request.borrow_type === 'customer' && request.customer_name && (
+                    {['customer', 'transfer'].includes(request.borrow_type) && request.customer_name && (
                       <div className="text-sm">
                         <span className="text-muted-foreground">客户: </span>
-                        {request.customer_name} ({request.customer_contact || '-'})
+                        {request.customer_name}{request.customer_contact ? ` (${request.customer_contact})` : ''}
                       </div>
                     )}
                     <div className="flex items-center gap-2 pt-2">
