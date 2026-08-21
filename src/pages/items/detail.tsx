@@ -21,7 +21,7 @@ type ItemBorrowHistoryRecord = {
   borrowDate: string
   dueDate: string
   returnDate: string | null
-  status: 'reserved' | 'active' | 'returned' | 'overdue' | 'revoked'
+  status: 'reserved' | 'active' | 'returned' | 'transferred' | 'overdue' | 'revoked'
   createdAt: string
 }
 
@@ -137,12 +137,14 @@ export function ItemDetail() {
     maintenance: '维修',
     retire: '退役',
     revoke: '审批撤销',
+    transfer: '转借',
   }
 
   const recordStatusLabels: Record<string, { label: string; color: string }> = {
     reserved: { label: '预定', color: 'bg-violet-100 text-violet-800' },
     active: { label: '借用中', color: 'bg-blue-100 text-blue-800' },
     returned: { label: '已归还', color: 'bg-green-100 text-green-800' },
+    transferred: { label: '已转借', color: 'bg-amber-100 text-amber-800' },
     overdue: { label: '逾期', color: 'bg-red-100 text-red-800' },
     revoked: { label: '已撤销', color: 'bg-orange-100 text-orange-800' },
   }
@@ -184,20 +186,18 @@ export function ItemDetail() {
           </Badge>
         </div>
         <div className="flex items-center gap-2">
-          {!isDemoMode && (item.status === 'in_stock' || item.status === 'borrowed' ? (
+          {!isDemoMode && (['in_stock', 'borrowed', 'overdue'].includes(item.status) ? (
             <Link to={`/borrow/apply/${item.id}`}>
               <Button>
                 <FileText className="size-4" />
-                申请借用
+                {item.status === 'in_stock' ? '申请借用' : '申请转借'}
               </Button>
             </Link>
           ) : (
             <Button
               variant="outline"
               onClick={() => toast.error(
-                item.status === 'overdue'
-                  ? '该样机已逾期且没有可靠的预计归还时间，不能提交预约申请'
-                  : `该样机当前${ITEM_STATUS_MAP[item.status]?.label || item.status}，不能提交预约申请`
+                `该样机当前${ITEM_STATUS_MAP[item.status]?.label || item.status}，不能提交申请`
               )}
             >
               <FileText className="size-4" />

@@ -15,6 +15,7 @@ const pendingRequest = {
 assert.equal(canEditBorrowRequest(pendingRequest, 'user-1'), true)
 assert.equal(canEditBorrowRequest(pendingRequest, 'user-2'), false)
 assert.equal(canEditBorrowRequest({ ...pendingRequest, status: 'approved' }, 'user-1'), false)
+assert.equal(canEditBorrowRequest({ ...pendingRequest, borrow_type: 'transfer' }, 'user-1'), false)
 assert.equal(
   canEditBorrowRequest({
     ...pendingRequest,

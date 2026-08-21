@@ -176,6 +176,18 @@ export const approvalService = {
     })
     if (error) throw error
 
+    if (action === 'approved') {
+      const { data: requestState, error: stateError } = await supabase
+        .from('borrow_requests')
+        .select('status, invalidation_reason')
+        .eq('id', requestId)
+        .maybeSingle()
+      if (stateError) throw stateError
+      if (requestState?.status === 'invalidated') {
+        throw new Error(`审批已记录，但申请已自动失效：${requestState.invalidation_reason || '设备状态发生变化'}`)
+      }
+    }
+
     // 审批后触发企业微信通知（通知下一步审批人 / 通知申请人审批结果）
     this.triggerApprovalNotification(requestId).catch(console.error)
   },
