@@ -42,7 +42,7 @@ const mainNavItems: MainNavItem[] = [
   { title: '样机管理', href: '/items', icon: Package },
   { title: '借用申请', href: '/borrow/apply', icon: FileText },
   { title: '我的申请', href: '/borrow/my-requests', icon: CheckSquare },
-  { title: '审批队列', href: '/approval/queue', icon: CheckSquare, roles: ['super_admin', 'admin', 'approver'] },
+  { title: '审批队列', href: '/approval/queue', icon: CheckSquare },
   { title: '报表导出', href: '/reports', icon: BarChart3 },
 ]
 

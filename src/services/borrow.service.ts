@@ -47,16 +47,23 @@ export const borrowService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')
 
-    const { data: requestId, error } = await supabase.rpc('create_borrow_request', {
-      p_requester_id: user.id,
-      p_item_ids: data.item_ids,
-      p_borrow_type: data.borrow_type,
-      p_purpose: data.purpose,
-      p_customer_name: data.customer_name || null,
-      p_customer_contact: data.customer_contact || null,
-      p_expected_borrow_date: data.expected_borrow_date,
-      p_expected_return_date: data.expected_return_date,
-    })
+    const { data: requestId, error } = data.borrow_type === 'transfer'
+      ? await supabase.rpc('create_transfer_request', {
+          p_requester_id: user.id,
+          p_item_ids: data.item_ids,
+          p_purpose: data.purpose,
+          p_expected_return_date: data.expected_return_date,
+        })
+      : await supabase.rpc('create_borrow_request', {
+          p_requester_id: user.id,
+          p_item_ids: data.item_ids,
+          p_borrow_type: data.borrow_type,
+          p_purpose: data.purpose,
+          p_customer_name: data.customer_name || null,
+          p_customer_contact: data.customer_contact || null,
+          p_expected_borrow_date: data.expected_borrow_date,
+          p_expected_return_date: data.expected_return_date,
+        })
 
     if (error) throw error
 
@@ -162,7 +169,20 @@ export const borrowService = {
   async getRequestById(id: string): Promise<BorrowRequest | null> {
     const { data, error } = await supabase
       .from('borrow_requests')
-      .select('*, requester:profiles!borrow_requests_requester_id_fkey(*), request_items:borrow_request_items(*, item:items(*, category:categories(*))), approval_records(*, approver:profiles(*), chain:approval_chains(*))')
+      .select(`
+        *,
+        requester:profiles!borrow_requests_requester_id_fkey(*),
+        request_items:borrow_request_items(
+          *,
+          item:items(*, category:categories(*)),
+          source_borrow_record:borrow_records!borrow_request_items_source_borrow_record_id_fkey(
+            *,
+            borrower:profiles!borrow_records_borrower_id_fkey(*),
+            request:borrow_requests(id, request_number)
+          )
+        ),
+        approval_records(*, approver:profiles(*), chain:approval_chains(*))
+      `)
       .eq('id', id)
       .maybeSingle()
     if (error) {
@@ -193,7 +213,16 @@ export const borrowService = {
       this.getRequestById(id),
       supabase
         .from('borrow_records')
-        .select('*, borrower:profiles!borrow_records_borrower_id_fkey(*), item:items(*), request_item:borrow_request_items(*)')
+        .select(`
+          *,
+          borrower:profiles!borrow_records_borrower_id_fkey(*),
+          item:items(*),
+          request_item:borrow_request_items(*),
+          transferred_from:borrow_records!borrow_records_transferred_from_record_id_fkey(
+            *,
+            borrower:profiles!borrow_records_borrower_id_fkey(*)
+          )
+        `)
         .eq('request_id', id)
         .order('created_at', { ascending: true }),
     ])
@@ -201,9 +230,24 @@ export const borrowService = {
     if (!request) return null
     if (recordsResult.error) throw recordsResult.error
 
-    const borrowRecords = (recordsResult.data || []) as BorrowRecord[]
+    const borrowRecords = (recordsResult.data || []) as unknown as BorrowRecord[]
     if (borrowRecords.length === 0) {
       return { request, borrow_records: [], return_photos: [] }
+    }
+
+    const { data: successorRows, error: successorsError } = await supabase
+      .from('borrow_records')
+      .select('*, borrower:profiles!borrow_records_borrower_id_fkey(*), request:borrow_requests(*)')
+      .in('transferred_from_record_id', borrowRecords.map((record) => record.id))
+    if (successorsError) throw successorsError
+
+    const successorBySourceId = new Map(
+      ((successorRows || []) as unknown as BorrowRecord[])
+        .filter((record) => record.transferred_from_record_id)
+        .map((record) => [record.transferred_from_record_id!, record]),
+    )
+    for (const record of borrowRecords) {
+      record.transferred_to = successorBySourceId.get(record.id)
     }
 
     const recordById = new Map(borrowRecords.map((record) => [record.id, record]))
@@ -362,7 +406,7 @@ export const borrowService = {
     // 获取原申请信息
     const { data: originalRequest } = await supabase
       .from('borrow_requests')
-      .select('*, request_items:borrow_request_items(item_id)')
+      .select('*, borrow_records(item_id, status)')
       .eq('id', parentRequestId)
       .single()
 
@@ -371,9 +415,14 @@ export const borrowService = {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')
 
+    const activeItemIds = (originalRequest.borrow_records || [])
+      .filter((record: { item_id: string; status: string }) => ['active', 'overdue'].includes(record.status))
+      .map((record: { item_id: string }) => record.item_id)
+    if (activeItemIds.length === 0) throw new Error('原申请中没有可续借的设备')
+
     const { data: requestId, error } = await supabase.rpc('create_borrow_request', {
       p_requester_id: user.id,
-      p_item_ids: (originalRequest.request_items || []).map((line: { item_id: string }) => line.item_id),
+      p_item_ids: activeItemIds,
       p_borrow_type: originalRequest.borrow_type,
       p_purpose: data.purpose || `续借申请 (原申请: ${originalRequest.request_number})`,
       p_customer_name: originalRequest.customer_name,

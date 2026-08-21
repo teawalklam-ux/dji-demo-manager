@@ -29,7 +29,9 @@ const REVOCABLE_REQUEST_STATUSES = new Set([
   'borrowed',
   'overdue',
   'partially_returned',
+  'partially_transferred',
   'returned',
+  'transferred',
 ])
 
 function canRevokeProcessedApproval(record: ApprovalRecord, isSuperAdmin: boolean) {
@@ -45,8 +47,11 @@ function getRevokeImpact(status: string) {
   if (status === 'approved') {
     return '预约将被释放；申请、审批过程和撤销记录都会保留。'
   }
-  if (status === 'returned') {
-    return '样机已归还不受影响；申请、借用记录和撤销记录都会保留。'
+  if (status === 'returned' || status === 'transferred') {
+    return '已结束的设备归属不受影响；申请、借用记录和撤销记录都会保留。'
+  }
+  if (status === 'partially_transferred') {
+    return '仍由本单持有的未归还设备将恢复在库；已转借设备及其新借用关系不受影响。'
   }
   return '样机将恢复为在库；未归还的借用记录会保留并标记为已撤销。'
 }

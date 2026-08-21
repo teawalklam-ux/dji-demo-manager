@@ -31,6 +31,7 @@ const itemStatusOptions = Object.entries(ITEM_STATUS_MAP).map(([key, val]) => ({
 const borrowRecordStatusOptions = [
   { value: 'active', label: '借用中' },
   { value: 'returned', label: '已归还' },
+  { value: 'transferred', label: '已转借' },
   { value: 'overdue', label: '逾期' },
   { value: 'revoked', label: '已撤销' },
 ]
