@@ -198,7 +198,7 @@ export function BorrowRequestDetail({ mode }: BorrowRequestDetailProps) {
                 </div>
               </dl>
 
-              {request.borrow_type === 'customer' && (
+              {['customer', 'transfer'].includes(request.borrow_type) && (
                 <div className="border-t pt-4 text-sm">
                   <p className="text-muted-foreground">客户信息</p>
                   <p className="mt-1 font-medium">

@@ -151,7 +151,7 @@ export function MyRequests() {
                         <span className="text-muted-foreground">归还日期: </span>
                         {formatDate(request.expected_return_date)}
                       </div>
-                      {request.borrow_type === 'customer' && request.customer_name && (
+                      {['customer', 'transfer'].includes(request.borrow_type) && request.customer_name && (
                         <div>
                           <span className="text-muted-foreground">客户: </span>
                           {request.customer_name}

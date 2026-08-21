@@ -51,6 +51,7 @@ export const borrowService = {
       ? await supabase.rpc('create_transfer_request', {
           p_requester_id: user.id,
           p_item_ids: data.item_ids,
+          p_customer_name: data.customer_name || null,
           p_purpose: data.purpose,
           p_expected_return_date: data.expected_return_date,
         })
