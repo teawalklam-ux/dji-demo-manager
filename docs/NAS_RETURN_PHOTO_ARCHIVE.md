@@ -7,7 +7,7 @@
 - NAS 主动从 Supabase 拉取，不开放 NAS 管理端口给公网。
 - 每张照片在最终 NAS 路径落盘、`fsync`、回读后计算 SHA-256；Supabase Edge Function 再独立下载源文件计算 SHA-256，大小和哈希全部一致才标记已验证。
 - 低于 Storage 配额 80% 时永不自动清理 Supabase；达到 80% 后，才允许通过 Supabase Storage API 清理已完成 NAS 双哈希校验且同步成功 Webhook 已送达的文件，目标降回 70%。
-- 数据库中的归还照片元数据、申请、审批和借用记录永久保留。无关联 Storage 对象不进入自动归档清理；监控每日发一次 Webhook 要求人工核查。
+- 数据库中的归还照片元数据、申请、审批和借用记录永久保留。无关联 Storage 对象不进入自动归档清理；监控保留数量和日志，但不发送额外群消息。
 - 归档后照片只通过内网 HTTPS 网关查看。网关将当前 Supabase JWT 交回 Data API，由原有 `return_photos` RLS 决定是否允许读取。
 - 每张照片同时生成 `.metadata.json` 证据清单并写入 NAS SQLite 索引，固定保存照片、借出记录、申请、样机之间的对应关系。
 
@@ -22,12 +22,14 @@ pending
   -> verified
   -> 同步 Webhook delivered
   -> Storage >= 80%
+  -> 当日清理前预告 Webhook delivered
+  -> 至少等待 5 分钟
   -> deleting
   -> Storage API 删除并复查对象已不存在
   -> deleted（元数据仍保留）
 ```
 
-任一步骤失败都会保留 Supabase 源文件。租约过期后可安全重试；归档完成和清理完成均使用幂等键。Webhook 使用数据库 outbox，失败后以最长 6 小时间隔持续重试。
+任一步骤失败都会保留 Supabase 源文件。租约过期后可安全重试；归档与删除状态使用幂等写入。Webhook 使用数据库 outbox，失败后以最长 6 小时间隔持续重试。
 
 ## 组件
 
@@ -60,7 +62,7 @@ NAS SQLite 对申请号、机型和 SN 后四位建立索引。前端「我的�
 - `monitor_return_photo_archive` 使用 `3,13,23,33,43,53 * * * *`，每小时第 03/13/23/33/43/53 分钟检查 Webhook、Supabase Storage/Database 容量和可清理任务；与现有每 5 分钟通知任务错峰。
 - 容量快照最多每小时写入一次；告警事件按类型和北京时间日期去重。
 - 低于 80% 时清理领取数量固定为 0；达到 80% 时每轮最多清理 100 张最早完成验证的文件，直到估算用量降至 70% 或没有满足证据条件的文件。
-- 清理开关默认关闭；同步成功 Webhook 未送达时，即使达到容量阈值也不能领取清理任务。
+- 清理开关首次部署默认关闭；生产验收后已启用。同步结果或当日清理前预告未送达、或清理前预告送达不足 5 分钟时，即使达到容量阈值也不能领取清理任务。
 
 现有 `storage_cleanup_queue` 和 `cleanup-return-photos` 继续只负责管理员明确删除测试或取消记录产生的无主文件，不与 NAS 归档队列混用。
 
@@ -88,11 +90,12 @@ NAS 不保存 `service_role`，也不使用会绕过 RLS 且能访问全部 buck
 ## 告警规则
 
 - Storage 达 70%：每天一次预警 Webhook。
-- Storage 达 80%：开始清理已验证且 Webhook 已送达的文件，目标降到 70%；低于该阈值不因照片年龄清理。
+- Storage 达 80%：每天最多发送一次清理前预告；预告成功送达并等待至少 5 分钟后，才开始清理已验证文件，目标降到 70%。
 - Storage 达 90%：每天一次严重预警。
 - Database 达 70% / 90%：普通 / 严重预警。
-- `return-photos` 桶出现没有对应 `return_photos` 记录的对象：每天一次预警，永不自动删除。
-- 同步连续失败、清理失败、同步成功、清理成功：专用 Webhook 通知。
+- `return-photos` 桶出现没有对应 `return_photos` 记录的对象：写入容量统计和函数日志，永不自动删除，不额外发送群消息。
+- 同步完成或连续失败：Webhook 通知。
+- 清理完成和清理失败：只写数据库状态与函数日志，不额外发送群消息；删除前预告是唯一的清理类 Webhook。
 
 当前组织只有一个 Supabase 项目，因此项目内 `storage.objects` 汇总等于组织 Storage 用量。若以后同一组织增加项目，必须改为组织级用量 API 或汇总全部项目，否则本项目监控会低估组织级 1 GB 配额。
 
@@ -112,7 +115,7 @@ NAS 不保存 `service_role`，也不使用会绕过 RLS 且能访问全部 buck
 
 - 停止自动清理：把 `return_photo_archive_config.cleanup_enabled` 设为 `false`。同步与查看仍可继续。
 - 停止全部 NAS 处理：停止 `dji-return-photo-archive` 容器。未验证任务不会被清理。
-- Webhook 不可用：删除自动暂停，因为清理任务要求对应的同步成功事件已经投递。
+- Webhook 不可用：删除自动暂停，因为清理任务同时要求同步结果及当日清理前预告已经投递。
 - NAS 文件异常：在 Supabase 副本尚未清理时可重新领取并覆盖归档；清理后需从 NAS 快照或第二份备份恢复。
 
 ### 按原路径导回 Supabase
