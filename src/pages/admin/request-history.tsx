@@ -28,6 +28,7 @@ import { BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
 import { getErrorMessage } from '@/lib/errors'
 import { borrowService } from '@/services/borrow.service'
 import type { BorrowRequest } from '@/types'
+import { NasArchiveSearch } from '@/components/borrow/nas-archive-search'
 
 const PAGE_SIZE = 20
 
@@ -134,6 +135,8 @@ export function RequestHistoryPage() {
           共 {count} 条申请
         </div>
       </div>
+
+      <NasArchiveSearch mode="admin" />
 
       <div className="hm-tool-rail flex flex-col gap-3 py-4 lg:flex-row lg:items-end">
         <form className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row" onSubmit={handleSearch}>

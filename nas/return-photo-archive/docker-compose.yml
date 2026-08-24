@@ -1,0 +1,29 @@
+services:
+  return-photo-archive:
+    image: dji-return-photo-archive:1.63
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: dji-return-photo-archive
+    restart: unless-stopped
+    env_file:
+      - .env
+    user: "${PUID:-1000}:${PGID:-1000}"
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - "${ARCHIVE_HOST_PATH}:/archive"
+      - "${STATE_HOST_PATH:-./data}:/data"
+      - "${CERTS_HOST_PATH:-./certs}:/certs:ro"
+    ports:
+      - "${VIEW_BIND_ADDRESS:-0.0.0.0}:${VIEW_PORT:-8787}:8787"
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "5"

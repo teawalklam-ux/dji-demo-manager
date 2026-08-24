@@ -1,0 +1,11 @@
+.env
+certs/
+pki/
+archive/
+data/
+__pycache__/
+*.db
+*.db-shm
+*.db-wal
+test_archive_agent.py
+README.md

@@ -15,6 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Camera, Eye, Pencil } from 'lucide-react'
+import { NasArchiveSearch } from '@/components/borrow/nas-archive-search'
 
 type TabKey = 'all' | BorrowRequestStatus
 
@@ -100,6 +101,8 @@ export function MyRequests() {
         <h1 className="text-2xl font-bold">我的申请</h1>
         <p className="text-muted-foreground mt-1">查看和管理我的借用申请</p>
       </div>
+
+      <NasArchiveSearch mode="mine" />
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
         <TabsList className="h-auto min-h-9 w-full flex-wrap justify-start">

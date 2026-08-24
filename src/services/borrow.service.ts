@@ -8,6 +8,8 @@ import type {
   PaginatedResponse,
   ReturnPhoto,
   ReturnPhotoView,
+  NasArchiveSearchFilters,
+  NasArchiveSearchResult,
   Profile,
 } from '@/types'
 import type { PhotoData } from '@/components/borrow/return-photo-capture'
@@ -43,6 +45,16 @@ export interface BorrowRequestHistoryFilters {
 }
 
 export const borrowService = {
+  async getNasArchiveViewerBaseUrl(): Promise<string | null> {
+    const { data, error } = await supabase
+      .from('return_photo_archive_config')
+      .select('nas_view_base_url')
+      .eq('id', 1)
+      .maybeSingle()
+    if (error) throw error
+    return data?.nas_view_base_url?.trim().replace(/\/+$/, '') || null
+  },
+
   async createRequest(data: BorrowRequestInput): Promise<string> {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) throw new Error('未登录')
@@ -260,6 +272,19 @@ export const borrowService = {
 
     if (photosError) throw photosError
 
+    // NAS 归档查看地址是非敏感的内网 HTTPS 地址。读取照片时，NAS 网关仍会
+    // 使用当前用户 JWT 回查 return_photos RLS，不会仅凭这个地址放行。
+    const { data: archiveConfig, error: archiveConfigError } = await supabase
+      .from('return_photo_archive_config')
+      .select('nas_view_base_url')
+      .eq('id', 1)
+      .maybeSingle()
+    if (archiveConfigError) {
+      console.error('[getRequestDetail] 无法读取 NAS 归档配置:', archiveConfigError)
+    }
+
+    const nasViewBaseUrl = archiveConfig?.nas_view_base_url?.trim().replace(/\/+$/, '') || null
+
     const returnPhotos = await Promise.all(
       ((photoRows || []) as ReturnPhoto[]).map(async (photo): Promise<ReturnPhotoView> => {
         const basePhoto = {
@@ -267,8 +292,12 @@ export const borrowService = {
           borrow_record: recordById.get(photo.borrow_record_id),
         }
 
-        if (photo.photo_deleted_at) {
-          return { ...basePhoto, signed_url: null, load_error: null }
+        const nasUrl = photo.nas_archived_at && nasViewBaseUrl
+          ? `${nasViewBaseUrl}/photos/${encodeURIComponent(photo.id)}`
+          : null
+
+        if (photo.photo_deleted_at || photo.supabase_deleted_at) {
+          return { ...basePhoto, signed_url: null, nas_url: nasUrl, load_error: null }
         }
 
         const { data, error } = await supabase.storage
@@ -278,12 +307,60 @@ export const borrowService = {
         return {
           ...basePhoto,
           signed_url: data?.signedUrl || null,
+          nas_url: nasUrl,
           load_error: error?.message || null,
         }
       }),
     )
 
     return { request, borrow_records: borrowRecords, return_photos: returnPhotos }
+  },
+
+  async searchNasArchives(filters: NasArchiveSearchFilters): Promise<NasArchiveSearchResult[]> {
+    const requestNumber = filters.request_number?.trim() || ''
+    const itemModel = filters.item_model?.trim() || ''
+    const serialLast4 = filters.serial_number_last4?.trim() || ''
+    if (!requestNumber && !itemModel && !serialLast4) {
+      throw new Error('请至少填写申请号、机型或 SN 后四位中的一项')
+    }
+    if (serialLast4 && serialLast4.length !== 4) {
+      throw new Error('SN 后四位必须填写 4 个字符')
+    }
+
+    const [{ data: { session }, error: sessionError }, baseUrl] = await Promise.all([
+      supabase.auth.getSession(),
+      this.getNasArchiveViewerBaseUrl(),
+    ])
+    if (sessionError || !session) throw new Error('登录状态已失效')
+    if (!baseUrl) throw new Error('NAS 归档查询尚未完成配置')
+
+    const parameters = new URLSearchParams()
+    if (requestNumber) parameters.set('request_number', requestNumber)
+    if (itemModel) parameters.set('model', itemModel)
+    if (serialLast4) parameters.set('sn_last4', serialLast4)
+
+    let response: Response
+    try {
+      response = await fetch(`${baseUrl}/search?${parameters.toString()}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+        cache: 'no-store',
+      })
+    } catch {
+      throw new Error('无法连接内网 NAS，请确认当前设备位于公司内网且已信任归档证书')
+    }
+
+    const payload = await response.json().catch(() => null) as {
+      results?: Omit<NasArchiveSearchResult, 'photo_url'>[]
+      error?: string
+    } | null
+    if (!response.ok) {
+      throw new Error(payload?.error || `NAS 查询返回 HTTP ${response.status}`)
+    }
+
+    return (payload?.results || []).map((result) => ({
+      ...result,
+      photo_url: `${baseUrl}/photos/${encodeURIComponent(result.return_photo_id)}`,
+    }))
   },
 
   async getRequestHistory(filters?: BorrowRequestHistoryFilters): Promise<PaginatedResponse<BorrowRequest>> {
@@ -365,7 +442,12 @@ export const borrowService = {
     if (error) {
       // 如果 RPC 失败，尝试清理已上传的照片
       try {
-        await supabase.storage.from('return-photos').remove([filePath])
+        const { error: cleanupError } = await supabase.storage
+          .from('return-photos')
+          .remove([filePath])
+        if (cleanupError) {
+          console.error('[processReturn] 清理上传照片失败:', cleanupError)
+        }
       } catch (cleanupErr) {
         console.error('[processReturn] 清理上传照片失败:', cleanupErr)
       }
