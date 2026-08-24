@@ -313,6 +313,10 @@ export interface ReturnPhoto {
   address: string | null
   /** 仅兼容永久保留策略启用前的历史清理记录。 */
   photo_deleted_at: string | null
+  /** NAS 文件写入、回读及服务端源文件哈希均校验成功的时间。 */
+  nas_archived_at: string | null
+  /** NAS 归档验证成功后，Supabase Storage 副本被清理的时间。 */
+  supabase_deleted_at: string | null
   created_at: string
   // Joined
   uploader?: Profile
@@ -321,7 +325,34 @@ export interface ReturnPhoto {
 
 export interface ReturnPhotoView extends ReturnPhoto {
   signed_url: string | null
+  /** 仅在内网可访问；读取时仍需携带当前 Supabase JWT 并经过原有 RLS。 */
+  nas_url: string | null
   load_error: string | null
+}
+
+export interface NasArchiveSearchFilters {
+  request_number?: string
+  item_model?: string
+  serial_number_last4?: string
+}
+
+export interface NasArchiveSearchResult {
+  return_photo_id: string
+  source_bucket_id: string
+  source_storage_path: string
+  borrow_record_id: string
+  request_id: string
+  request_number: string
+  item_id: string
+  item_name: string
+  item_model: string
+  serial_number_last4: string | null
+  captured_at: string
+  archive_path: string
+  size_bytes: number
+  sha256: string
+  server_verified_at: string
+  photo_url: string
 }
 
 export interface BorrowRequestDetail {
