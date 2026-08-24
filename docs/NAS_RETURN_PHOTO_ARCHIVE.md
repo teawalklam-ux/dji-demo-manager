@@ -32,7 +32,7 @@ pending
 ## 组件
 
 - `return_photo_archive_jobs`：服务角色专用归档状态机。
-- `return_photo_archive_events`：专用 Webhook outbox，不保存 Webhook URL。
+- `return_photo_archive_events`：独立 Webhook outbox，不保存 Webhook URL；专用地址未配置时复用现有企业微信机器人。
 - `return_photo_storage_usage_snapshots`：每小时容量快照。
 - `nas-photo-archive`：NAS 领取任务、短时下载 URL 与完成校验 API；使用独立 `NAS_ARCHIVE_TOKEN`。
 - `monitor-return-photo-archive`：每 10 分钟重试 Webhook、检查容量并清理满足条件的文件。
@@ -70,7 +70,7 @@ Edge Function Secrets：
 
 - `NAS_ARCHIVE_TOKEN`：至少 32 个随机字节，仅 NAS 与 `nas-photo-archive` 持有。
 - `RETURN_PHOTO_ARCHIVE_CRON_SECRET`：Cron 调用专用随机密钥。
-- `RETURN_PHOTO_ARCHIVE_WEBHOOK_URL`：新的专用 Webhook，不复用现有企业微信配置。
+- `RETURN_PHOTO_ARCHIVE_WEBHOOK_URL`：可选的专用 Webhook；未配置时回退到现有 `WECOM_WEBHOOK_URL`。
 - `RETURN_PHOTO_ARCHIVE_WEBHOOK_FORMAT`：`wecom`、`generic` 或 `auto`。
 - `RETURN_PHOTO_ARCHIVE_WEBHOOK_BEARER_TOKEN`：仅通用 Webhook 需要，可选。
 
@@ -100,7 +100,7 @@ NAS 不保存 `service_role`，也不使用会绕过 RLS 且能访问全部 buck
 
 1. 确认 NAS 存储池、共享目录权限、快照策略及第二份备份策略。
 2. 配置内网 HTTPS 域名和受客户端信任的证书；GitHub Pages 是 HTTPS，不能读取 HTTP NAS 地址。
-3. 创建新的专用 Webhook，并把 URL 仅写入 Supabase Edge Function Secret。
+3. 确认现有 `WECOM_WEBHOOK_URL` 可接收归档告警；如需消息隔离，再创建专用 Webhook 并写入 `RETURN_PHOTO_ARCHIVE_WEBHOOK_URL`。
 4. 应用数据库迁移并部署两个 Edge Function；此时 `cleanup_enabled=false`。
 5. 在 UGREEN NAS 通过 Docker Compose 启动归档代理，确认 `/health` 正常。
 6. 让 5 条现有照片全部完成 NAS 与服务端双哈希校验，核对文件数量、总字节数和 Webhook。
