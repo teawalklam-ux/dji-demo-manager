@@ -149,34 +149,48 @@ Deno.serve(async (req) => {
     } else if (databaseRatio >= config.warning_ratio) {
       await addThresholdEvent(supabase, 'database_warning', 'database', usage.database_bytes, config.database_quota_bytes, usage)
     }
-    if (usage.unlinked_return_photo_object_count > 0) {
-      const { error: orphanEventError } = await supabase
+
+    const capacityEmergency = storageRatio >= config.cleanup_trigger_ratio
+    if (config.cleanup_enabled && capacityEmergency) {
+      const { error: cleanupNoticeError } = await supabase
         .from('return_photo_archive_events')
         .upsert({
-          event_type: 'unlinked_storage_objects',
-          dedupe_key: `unlinked_storage_objects:${localDateKey()}`,
+          event_type: 'cleanup_planned',
+          dedupe_key: `cleanup_planned:${localDateKey()}`,
           payload: {
-            object_count: usage.unlinked_return_photo_object_count,
-            total_bytes: usage.unlinked_return_photo_object_bytes,
-            action: 'manual_review_required',
+            metric: 'storage',
+            total_bytes: usage.total_storage_bytes,
+            quota_bytes: config.storage_quota_bytes,
+            ratio: storageRatio,
+            target_ratio: config.warning_ratio,
+            max_files_per_run: 100,
+            notice_lead_minutes: 5,
+            action: 'supabase_cleanup_planned',
           },
         }, { onConflict: 'dedupe_key', ignoreDuplicates: true })
-      if (orphanEventError) {
-        throw new Error(`Failed to enqueue unlinked Storage warning: ${orphanEventError.message}`)
+      if (cleanupNoticeError) {
+        throw new Error(`Failed to enqueue pre-cleanup notice: ${cleanupNoticeError.message}`)
       }
     }
 
-    // Deliver sync/capacity notifications before claiming cleanup jobs. The
-    // database claim itself also requires a delivered sync_verified event.
+    if (usage.unlinked_return_photo_object_count > 0) {
+      console.warn(
+        `[monitor-return-photo-archive] ${usage.unlinked_return_photo_object_count} unlinked Storage objects `
+        + `(${usage.unlinked_return_photo_object_bytes} bytes) remain excluded from automatic cleanup`,
+      )
+    }
+
+    // Only synchronization, capacity, and pre-cleanup notifications are
+    // claimable. The database cleanup claim requires today's pre-cleanup
+    // notice to have been delivered for at least five minutes.
     const preCleanupWebhook = await deliverArchiveWebhookEvents(supabase, 50)
 
-    const capacityEmergency = storageRatio >= config.cleanup_trigger_ratio
     let estimatedStorageBytes = usage.total_storage_bytes
     let deleted = 0
     let deleteErrors = 0
     // Capacity is the only cleanup trigger. Below 80%, the monitor still
     // delivers Webhooks and records usage but never claims a delete job.
-    const cleanupLimit = capacityEmergency ? 100 : 0
+    const cleanupLimit = config.cleanup_enabled && capacityEmergency ? 100 : 0
 
     for (let index = 0; index < cleanupLimit; index++) {
       if (capacityEmergency && estimatedStorageBytes <= config.storage_quota_bytes * config.warning_ratio) break
