@@ -112,11 +112,11 @@ export function ReturnPhotoGallery({ photos, hasCompletedReturn }: ReturnPhotoGa
                 <div className="max-w-64 text-sm text-muted-foreground">
                   <ImageOff className="mx-auto mb-3 size-7" aria-hidden="true" />
                   <p className="font-medium text-foreground">
-                    {photo.photo_deleted_at ? '照片已到期清理' : '照片暂时无法加载'}
+                    {photo.photo_deleted_at ? '历史照片文件已被清理' : '照片暂时无法加载'}
                   </p>
                   <p className="mt-1">
                     {photo.photo_deleted_at
-                      ? '照片按 30 天保留规则清理，拍摄信息仍会保留。'
+                      ? '该文件在永久保留策略启用前已被清理，拍摄信息仍会保留。'
                       : '请刷新页面重试，或联系管理员检查存储权限。'}
                   </p>
                 </div>
