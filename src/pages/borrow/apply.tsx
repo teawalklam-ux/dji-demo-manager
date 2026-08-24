@@ -8,6 +8,7 @@ import { toast } from 'sonner'
 import type { Item, BorrowRequest, BorrowRequestInput, ApprovalChain, UserCustomer } from '@/types'
 import { getBorrowTypeInfo, getBorrowTypeOptions, ITEM_STATUS_MAP } from '@/lib/constants'
 import type { BorrowType } from '@/lib/constants'
+import { getApplicableApprovalChain } from '@/lib/approval-chain'
 import { canEditBorrowRequest } from '@/lib/borrow-request'
 import { useAuth } from '@/contexts/auth-context'
 import { getErrorMessage } from '@/lib/errors'
@@ -255,14 +256,9 @@ export function BorrowApply() {
     }))
   }, [borrowType, editingRequest, items, loading])
 
-  const borrowTypeOptions = getBorrowTypeOptions(chains.map(chain => chain.borrow_type))
-
-  const customerChain = chains.find((c) => c.borrow_type === 'customer')
-    || chains.find((c) => c.borrow_type === 'all')
-  const currentChain = borrowType === 'transfer'
-    ? customerChain
-    : chains.find((c) => c.borrow_type === borrowType)
-      || chains.find((c) => c.borrow_type === 'all')
+  const activeChains = chains.filter((chain) => chain.is_active)
+  const borrowTypeOptions = getBorrowTypeOptions(activeChains.map(chain => chain.borrow_type))
+  const currentChain = getApplicableApprovalChain(chains, borrowType)
   const borrowTypeInfo = getBorrowTypeInfo(borrowType)
 
   const approvalPreviewSteps = borrowType === 'transfer' && currentChain
@@ -309,7 +305,7 @@ export function BorrowApply() {
 
   const handleSubmit = async () => {
     if (borrowType === 'transfer' && !currentChain) {
-      toast.error('客户借用审批链未启用，暂时无法提交转借申请')
+      toast.error('转借审批链未启用，暂时无法提交转借申请')
       return
     }
     if (selectedItemIds.length === 0) {
@@ -719,7 +715,7 @@ export function BorrowApply() {
                       {step.type === 'role' ? '角色审批' : '指定人员审批'}
                     </div>
                   </div>
-                   {index < approvalPreviewSteps.length - 1 && (
+                  {index < approvalPreviewSteps.length - 1 && (
                     <div className="ml-4 h-6 w-px bg-border" />
                   )}
                 </div>
@@ -727,7 +723,7 @@ export function BorrowApply() {
             </div>
           ) : (
             <p className="text-sm text-muted-foreground">
-              {borrowType === 'transfer' ? '客户借用审批链未启用，暂时无法提交转借申请' : '暂无对应审批流程配置'}
+              {borrowType === 'transfer' ? '转借审批链未启用，暂时无法提交转借申请' : '暂无对应审批流程配置'}
             </p>
           )}
         </CardContent>

@@ -23,6 +23,7 @@ interface StepForm {
 
 const emptyStep: StepForm = { type: 'role', role: 'approver', user_id: '', label: '' }
 const NEW_BORROW_TYPE = '__new_borrow_type__'
+const TRANSFER_CONFIRMATION_LABEL = '当前借用人确认'
 
 export function ApprovalChainsPage() {
   const [chains, setChains] = useState<ApprovalChain[]>([])
@@ -199,19 +200,22 @@ export function ApprovalChainsPage() {
   }
 
   function getStepsPreview(chain: ApprovalChain) {
-    return chain.steps
+    const configuredSteps = chain.steps
       .map(s => {
         if (s.type === 'role') return `${s.label}(${ROLE_MAP[s.role!]?.label || s.role})`
         const person = profiles.find(p => p.id === s.user_id)
         return `${s.label}(${person?.display_name || '未知用户'})`
       })
-      .join(' → ')
+
+    return [
+      ...(chain.borrow_type === 'transfer' ? [`${TRANSFER_CONFIRMATION_LABEL}(动态人员)`] : []),
+      ...configuredSteps,
+    ].join(' → ')
   }
 
   const borrowTypeOptions = [
     { value: 'all', label: '全部' },
-    ...getBorrowTypeOptions(chains.map(chain => chain.borrow_type))
-      .filter(option => option.value !== 'transfer'),
+    ...getBorrowTypeOptions(chains.map(chain => chain.borrow_type)),
   ]
 
   if (loading) {
@@ -355,6 +359,11 @@ export function ApprovalChainsPage() {
                   “全部”是未匹配到专属类型时使用的兜底流程，不会成为借用申请选项。
                 </p>
               )}
+              {borrowType === 'transfer' && (
+                <p className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                  转借流程会自动把“{TRANSFER_CONFIRMATION_LABEL}”作为固定第 1 步；下方配置从第 2 步开始，修改后只影响新提交的转借申请。
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">
@@ -377,10 +386,21 @@ export function ApprovalChainsPage() {
                   添加步骤
                 </Button>
               </div>
+              {borrowType === 'transfer' && (
+                <div className="rounded-lg border border-amber-200 bg-amber-50 p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="text-sm font-medium text-amber-950">第 1 步 · {TRANSFER_CONFIRMATION_LABEL}</span>
+                    <Badge variant="outline" className="border-amber-300 bg-white text-amber-900">系统固定</Badge>
+                  </div>
+                  <p className="mt-1 text-xs text-amber-800">审批人按所选设备的当前借用人动态确定，不能改成固定角色或人员。</p>
+                </div>
+              )}
               {steps.map((step, index) => (
                 <div key={index} className="border rounded-lg p-3 space-y-3">
                   <div className="flex items-center justify-between">
-                    <span className="text-sm font-medium text-muted-foreground">第 {index + 1} 步</span>
+                    <span className="text-sm font-medium text-muted-foreground">
+                      第 {index + (borrowType === 'transfer' ? 2 : 1)} 步
+                    </span>
                     {steps.length > 1 && (
                       <Button variant="ghost" size="sm" onClick={() => removeStep(index)}>
                         <X className="size-3.5" />
