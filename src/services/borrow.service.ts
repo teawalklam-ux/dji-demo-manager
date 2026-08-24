@@ -222,6 +222,8 @@ export const borrowService = {
   },
 
   async getRequestDetail(id: string): Promise<BorrowRequestDetail | null> {
+    // PostgREST 不能直接消歧 borrow_records 的递归外键关系：来源记录随申请明细读取，
+    // 后继记录在下方单独查询，避免在这里加入 borrow_records 的自关联嵌入。
     const [request, recordsResult] = await Promise.all([
       this.getRequestById(id),
       supabase
@@ -230,11 +232,7 @@ export const borrowService = {
           *,
           borrower:profiles!borrow_records_borrower_id_fkey(*),
           item:items(*),
-          request_item:borrow_request_items!borrow_records_request_item_id_fkey(*),
-          transferred_from:borrow_records!borrow_records_transferred_from_record_id_fkey(
-            *,
-            borrower:profiles!borrow_records_borrower_id_fkey(*)
-          )
+          request_item:borrow_request_items!borrow_records_request_item_id_fkey(*)
         `)
         .eq('request_id', id)
         .order('created_at', { ascending: true }),
