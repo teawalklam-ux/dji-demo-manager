@@ -119,8 +119,7 @@ function isWeComWebhook(url: string, configuredFormat: string) {
   }
 }
 
-async function postArchiveWebhook(event: ArchiveEvent, url: string) {
-  const configuredFormat = (Deno.env.get('RETURN_PHOTO_ARCHIVE_WEBHOOK_FORMAT') || 'auto').toLowerCase()
+async function postArchiveWebhook(event: ArchiveEvent, url: string, configuredFormat: string) {
   const weCom = isWeComWebhook(url, configuredFormat)
   const headers: Record<string, string> = { 'Content-Type': 'application/json' }
   const genericBearer = Deno.env.get('RETURN_PHOTO_ARCHIVE_WEBHOOK_BEARER_TOKEN')
@@ -168,10 +167,15 @@ export async function deliverArchiveWebhookEvents(
   supabase: SupabaseClient,
   limit = 20,
 ) {
-  const webhookUrl = Deno.env.get('RETURN_PHOTO_ARCHIVE_WEBHOOK_URL')
+  const dedicatedWebhookUrl = Deno.env.get('RETURN_PHOTO_ARCHIVE_WEBHOOK_URL')
+  const sharedWeComWebhookUrl = Deno.env.get('WECOM_WEBHOOK_URL')
+  const webhookUrl = dedicatedWebhookUrl || sharedWeComWebhookUrl
   if (!webhookUrl) {
     return { processed: 0, delivered: 0, failed: 0, skipped: 'webhook-not-configured' }
   }
+  const webhookFormat = dedicatedWebhookUrl
+    ? (Deno.env.get('RETURN_PHOTO_ARCHIVE_WEBHOOK_FORMAT') || 'auto').toLowerCase()
+    : 'wecom'
 
   const { data, error } = await supabase.rpc('claim_return_photo_archive_events', {
     p_limit: limit,
@@ -184,7 +188,7 @@ export async function deliverArchiveWebhookEvents(
 
   for (const event of events) {
     try {
-      await postArchiveWebhook(event, webhookUrl)
+      await postArchiveWebhook(event, webhookUrl, webhookFormat)
       const { error: completeError } = await supabase.rpc('complete_return_photo_archive_event', {
         p_event_id: event.event_id,
       })
