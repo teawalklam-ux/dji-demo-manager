@@ -1,7 +1,9 @@
+import hashlib
 import json
 import tempfile
 import threading
 import unittest
+import urllib.error
 import urllib.parse
 import urllib.request
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
@@ -18,6 +20,7 @@ from archive_agent import (
 
 
 PHOTO_ID = "00000000-0000-4000-8000-000000000001"
+PHOTO_BYTES = b"0123456789"
 
 
 def add_verified_archive(store: StateStore) -> None:
@@ -27,7 +30,7 @@ def add_verified_archive(store: StateStore) -> None:
         lease_token="00000000-0000-4000-8000-000000000003",
         relative_path="2026/08/24/photo.jpg",
         size_bytes=10,
-        sha256="a" * 64,
+        sha256=hashlib.sha256(PHOTO_BYTES).hexdigest(),
         source_bucket_id="return-photos",
         source_storage_path="user-id/borrow-record-id/1724457600000.jpg",
         captured_at="2026-08-24T00:00:00+00:00",
@@ -47,8 +50,23 @@ class RlsStubHandler(BaseHTTPRequestHandler):
         return
 
     def do_GET(self) -> None:
-        rows = [{"id": PHOTO_ID}] if self.headers.get("Authorization") == "Bearer allowed" else []
+        rows = [{"id": PHOTO_ID}] if self.headers.get("Authorization") in {
+            "Bearer allowed",
+            "Bearer photo-reader",
+        } else []
         payload = json.dumps(rows).encode("utf-8")
+        self.send_response(200)
+        self.send_header("Content-Type", "application/json")
+        self.send_header("Content-Length", str(len(payload)))
+        self.end_headers()
+        self.wfile.write(payload)
+
+    def do_POST(self) -> None:
+        allowed = (
+            self.path == "/rest/v1/rpc/can_search_nas_archives"
+            and self.headers.get("Authorization") == "Bearer allowed"
+        )
+        payload = json.dumps(allowed).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(payload)))
@@ -139,11 +157,14 @@ class StateStoreTests(unittest.TestCase):
 
 
 class ViewerSearchTests(unittest.TestCase):
-    def test_search_filters_results_through_supabase_rls(self) -> None:
+    def test_search_requires_super_admin_without_restricting_detail_rls(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             store = StateStore(root / "archive.db")
             add_verified_archive(store)
+            photo_path = root / "2026" / "08" / "24" / "photo.jpg"
+            photo_path.parent.mkdir(parents=True)
+            photo_path.write_bytes(PHOTO_BYTES)
 
             rls_server = ThreadingHTTPServer(("127.0.0.1", 0), RlsStubHandler)
             rls_thread = threading.Thread(target=rls_server.serve_forever, daemon=True)
@@ -188,10 +209,17 @@ class ViewerSearchTests(unittest.TestCase):
                         "user-id/borrow-record-id/1724457600000.jpg",
                     )
 
-                denied_request = urllib.request.Request(url, headers={"Authorization": "Bearer denied"})
-                with urllib.request.urlopen(denied_request) as response:
-                    payload = json.loads(response.read().decode("utf-8"))
-                    self.assertEqual(payload["count"], 0)
+                denied_request = urllib.request.Request(url, headers={"Authorization": "Bearer photo-reader"})
+                with self.assertRaises(urllib.error.HTTPError) as denied:
+                    urllib.request.urlopen(denied_request)
+                self.assertEqual(denied.exception.code, 403)
+
+                photo_request = urllib.request.Request(
+                    f"http://127.0.0.1:{viewer.server_address[1]}/photos/{PHOTO_ID}",
+                    headers={"Authorization": "Bearer photo-reader"},
+                )
+                with urllib.request.urlopen(photo_request) as response:
+                    self.assertEqual(response.read(), PHOTO_BYTES)
             finally:
                 viewer.shutdown()
                 viewer.server_close()

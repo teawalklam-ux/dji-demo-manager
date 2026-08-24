@@ -29,6 +29,7 @@ import { getErrorMessage } from '@/lib/errors'
 import { borrowService } from '@/services/borrow.service'
 import type { BorrowRequest } from '@/types'
 import { NasArchiveSearch } from '@/components/borrow/nas-archive-search'
+import { useAuth } from '@/contexts/auth-context'
 
 const PAGE_SIZE = 20
 
@@ -69,6 +70,7 @@ function RequestStatusBadge({ request }: { request: BorrowRequest }) {
 
 export function RequestHistoryPage() {
   const navigate = useNavigate()
+  const { isSuperAdmin } = useAuth()
   const [loading, setLoading] = useState(true)
   const [requests, setRequests] = useState<BorrowRequest[]>([])
   const [count, setCount] = useState(0)
@@ -136,7 +138,7 @@ export function RequestHistoryPage() {
         </div>
       </div>
 
-      <NasArchiveSearch mode="admin" />
+      {isSuperAdmin && <NasArchiveSearch />}
 
       <div className="hm-tool-rail flex flex-col gap-3 py-4 lg:flex-row lg:items-end">
         <form className="flex min-w-0 flex-1 flex-col gap-2 sm:flex-row" onSubmit={handleSearch}>
