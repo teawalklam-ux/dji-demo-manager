@@ -230,7 +230,7 @@ export const borrowService = {
           *,
           borrower:profiles!borrow_records_borrower_id_fkey(*),
           item:items(*),
-          request_item:borrow_request_items(*),
+          request_item:borrow_request_items!borrow_records_request_item_id_fkey(*),
           transferred_from:borrow_records!borrow_records_transferred_from_record_id_fkey(
             *,
             borrower:profiles!borrow_records_borrower_id_fkey(*)
@@ -540,7 +540,7 @@ export const borrowService = {
     // 关联 borrower 和 item 以支持导出借用人/样机名称/样机型号
     let query = supabase
       .from('borrow_records')
-      .select('*, borrower:profiles!borrow_records_borrower_id_fkey(*), item:items(*), request_item:borrow_request_items(*)')
+      .select('*, borrower:profiles!borrow_records_borrower_id_fkey(*), item:items(*), request_item:borrow_request_items!borrow_records_request_item_id_fkey(*)')
       .order('created_at', { ascending: false })
 
     if (filters?.status) query = query.eq('status', filters.status)
