@@ -59,6 +59,7 @@ function eventTitle(eventType: string) {
   const titles: Record<string, string> = {
     sync_verified: 'NAS 归还照片同步校验成功',
     sync_failed: 'NAS 归还照片同步失败',
+    cleanup_planned: 'Supabase 归还照片清理前预告',
     cleanup_deleted: 'Supabase 归还照片已清理',
     cleanup_failed: 'Supabase 归还照片清理失败',
     storage_warning: 'Supabase Storage 容量预警',
@@ -92,6 +93,9 @@ function eventLines(event: ArchiveEvent) {
   if (payload.ratio !== undefined) {
     lines.push(`使用比例：${(Number(payload.ratio) * 100).toFixed(1)}%`)
   }
+  if (payload.target_ratio !== undefined) {
+    lines.push(`清理目标：降至 ${(Number(payload.target_ratio) * 100).toFixed(1)}%`)
+  }
   if (payload.pending_archive_count !== undefined) {
     lines.push(`待同步任务：${payload.pending_archive_count}`)
   }
@@ -103,6 +107,10 @@ function eventLines(event: ArchiveEvent) {
   }
   if (payload.action === 'manual_review_required') {
     lines.push('处理要求：人工核查，系统不会自动删除')
+  }
+  if (payload.action === 'supabase_cleanup_planned') {
+    lines.push(`计划：最早 ${Number(payload.notice_lead_minutes || 5)} 分钟后清理已完成 NAS 双哈希校验的最早文件`)
+    lines.push(`单轮上限：${Number(payload.max_files_per_run || 100)} 个；NAS 文件、业务元数据及原恢复路径永久保留`)
   }
   if (payload.error) lines.push(`错误：${String(payload.error).slice(0, 800)}`)
   lines.push(`事件时间：${new Date(event.created_at).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai' })}`)

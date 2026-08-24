@@ -22,7 +22,7 @@
 
 ## 数据保护
 
-服务端在 Storage 低于 80% 时永久保留 Supabase 热副本；达到 80% 后才清理已验证且同步 Webhook 已送达的对象，目标回落到 70%。SQLite 和 `.metadata.json` 都保留原 `return-photos/<storage_path>`，可用受控服务端流程以 `upsert=false` 按原路径导回并重新校验。RAID 不能替代备份，建议为归档目录启用定期快照，并增加另一台设备或离线盘作为第二份备份。
+服务端在 Storage 低于 80% 时永久保留 Supabase 热副本；达到 80% 后先发送删除前 Webhook 并等待至少 5 分钟，才清理已验证且同步通知已送达的对象，目标回落到 70%。SQLite 和 `.metadata.json` 都保留原 `return-photos/<storage_path>`，可用受控服务端流程以 `upsert=false` 按原路径导回并重新校验。RAID 不能替代备份，建议为归档目录启用定期快照，并增加另一台设备或离线盘作为第二份备份。
 
 ## 本地测试
 
