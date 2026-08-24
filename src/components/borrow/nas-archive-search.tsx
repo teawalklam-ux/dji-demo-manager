@@ -7,6 +7,7 @@ import { toast } from 'sonner'
 import { borrowService } from '@/services/borrow.service'
 import { supabase } from '@/lib/supabase'
 import type { NasArchiveSearchResult } from '@/types'
+import { useAuth } from '@/contexts/auth-context'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -16,10 +17,6 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
-
-interface NasArchiveSearchProps {
-  mode: 'mine' | 'admin'
-}
 
 function formatDateTime(value: string | null) {
   if (!value) return '-'
@@ -123,8 +120,9 @@ function ArchivePhotoDialog({
   )
 }
 
-export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
+export function NasArchiveSearch() {
   const navigate = useNavigate()
+  const { isSuperAdmin } = useAuth()
   const [configured, setConfigured] = useState<boolean | null>(null)
   const [requestNumber, setRequestNumber] = useState('')
   const [itemModel, setItemModel] = useState('')
@@ -135,6 +133,8 @@ export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
   const [selected, setSelected] = useState<NasArchiveSearchResult | null>(null)
 
   useEffect(() => {
+    if (!isSuperAdmin) return
+
     let active = true
     borrowService.getNasArchiveViewerBaseUrl()
       .then((url) => {
@@ -146,7 +146,7 @@ export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
     return () => {
       active = false
     }
-  }, [])
+  }, [isSuperAdmin])
 
   const handleSearch = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -168,10 +168,10 @@ export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
   }
 
   const openRequest = (requestId: string) => {
-    navigate(mode === 'admin'
-      ? `/admin/request-history/${requestId}`
-      : `/borrow/requests/${requestId}`)
+    navigate(`/admin/request-history/${requestId}`)
   }
+
+  if (!isSuperAdmin) return null
 
   return (
     <section className="overflow-hidden rounded-[var(--radius-card)] border bg-card shadow-xs">
@@ -185,21 +185,21 @@ export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
             {configured === true && (
               <Badge variant="outline" className="gap-1 text-success">
                 <ShieldCheck className="size-3.5" aria-hidden="true" />
-                内网鉴权
+                超级管理员
               </Badge>
             )}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">
-            按申请号、机型或 SN 后四位查找归还照片；结果仍受当前账号权限限制。
+            仅超级管理员可按申请号、机型或 SN 后四位检索内网归档照片。
           </p>
         </div>
       </div>
 
       <form className="grid gap-3 p-4 sm:grid-cols-2 sm:p-5 lg:grid-cols-[1fr_1fr_10rem_auto] lg:items-end" onSubmit={handleSearch}>
         <div>
-          <label htmlFor={`nas-request-number-${mode}`} className="mb-1.5 block text-sm font-medium">申请号</label>
+          <label htmlFor="nas-request-number" className="mb-1.5 block text-sm font-medium">申请号</label>
           <Input
-            id={`nas-request-number-${mode}`}
+            id="nas-request-number"
             value={requestNumber}
             onChange={(event) => setRequestNumber(event.target.value)}
             placeholder="BR-20260824-001"
@@ -207,9 +207,9 @@ export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
           />
         </div>
         <div>
-          <label htmlFor={`nas-item-model-${mode}`} className="mb-1.5 block text-sm font-medium">机型</label>
+          <label htmlFor="nas-item-model" className="mb-1.5 block text-sm font-medium">机型</label>
           <Input
-            id={`nas-item-model-${mode}`}
+            id="nas-item-model"
             value={itemModel}
             onChange={(event) => setItemModel(event.target.value)}
             placeholder="如 DJI Air 3S"
@@ -217,9 +217,9 @@ export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
           />
         </div>
         <div>
-          <label htmlFor={`nas-sn-last4-${mode}`} className="mb-1.5 block text-sm font-medium">SN 后四位</label>
+          <label htmlFor="nas-sn-last4" className="mb-1.5 block text-sm font-medium">SN 后四位</label>
           <Input
-            id={`nas-sn-last4-${mode}`}
+            id="nas-sn-last4"
             value={serialLast4}
             onChange={(event) => setSerialLast4(event.target.value.toUpperCase())}
             placeholder="A1B2"
@@ -246,7 +246,7 @@ export function NasArchiveSearch({ mode }: NasArchiveSearchProps) {
             <div className="flex min-h-24 items-start gap-3 rounded-[var(--radius-card)] border border-dashed p-4 text-sm text-muted-foreground">
               <FileSearch className="mt-0.5 size-5 shrink-0" aria-hidden="true" />
               <div>
-                <p className="font-medium text-foreground">没有找到有权查看的归档照片</p>
+                <p className="font-medium text-foreground">没有找到归档照片</p>
                 <p className="mt-1">请检查标签，或确认对应申请已完成照片归档。</p>
               </div>
             </div>

@@ -9,7 +9,7 @@
 - 浏览器角色不能更新或删除照片元数据；包含照片的借用记录不能通过级联删除移除照片证据。
 - `cleanup-return-photos` 仅处理管理员明确删除测试/取消记录时形成的无主文件队列，不按文件年龄扫描。
 - NAS 自动清理由独立状态机执行，必须先完成文件大小、SHA-256、内网可读路径、同步通知及删除前预告投递证明；删除只使用 Storage API。
-- 每张 NAS 归档包含申请号、借出记录 ID、机型、SN 后四位及原 Supabase bucket/object path 的 SQLite 索引和 JSON 侧车清单，可从「我的申请」或「申请历史」组合检索、回到原申请详情，并按原路径导回 Supabase。
+- 每张 NAS 归档包含申请号、借出记录 ID、机型、SN 后四位及原 Supabase bucket/object path 的 SQLite 索引和 JSON 侧车清单；组合检索仅供超级管理员从「申请历史」使用，普通用户仍可在自己的申请详情查看有权访问的单张照片，归档文件可按原路径导回 Supabase。
 - “永久”不等同于不可篡改 WORM。NAS 归档目录仍需快照与第二份离线或异机备份，详见 `docs/NAS_RETURN_PHOTO_ARCHIVE.md`。
 
 ## 生产快照

@@ -8,7 +8,7 @@
 - 提供只读内网照片接口。每次读取都把用户的 Supabase JWT 交回 Data API，由原有 RLS 判断是否有查看权限。
 - 为每张照片生成同名 `.metadata.json`，固定记录申请号、借出记录、机型、SN 后四位、哈希、验证时间及原 Supabase bucket/object path。
 - 本地 SQLite 为申请号、机型和 SN 后四位建立查询索引，不保存用户密码或 Supabase `service_role`。
-- `/search` 先查询本地标签，再用当前用户 JWT 回查 `return_photos` RLS，只返回该账号有权查看的结果。
+- `/search` 仅接受启用状态的超级管理员：先用当前用户 JWT 调用数据库权限函数复核角色，再查询本地标签并通过 `return_photos` RLS 过滤结果。普通用户的单张照片查看仍沿用申请详情中的原有 RLS。
 
 ## UGOS 部署
 
