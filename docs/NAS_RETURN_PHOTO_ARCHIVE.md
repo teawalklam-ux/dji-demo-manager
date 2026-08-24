@@ -8,7 +8,7 @@
 - 每张照片在最终 NAS 路径落盘、`fsync`、回读后计算 SHA-256；Supabase Edge Function 再独立下载源文件计算 SHA-256，大小和哈希全部一致才标记已验证。
 - 低于 Storage 配额 80% 时永不自动清理 Supabase；达到 80% 后，才允许通过 Supabase Storage API 清理已完成 NAS 双哈希校验且同步成功 Webhook 已送达的文件，目标降回 70%。
 - 数据库中的归还照片元数据、申请、审批和借用记录永久保留。无关联 Storage 对象不进入自动归档清理；监控保留数量和日志，但不发送额外群消息。
-- 归档后照片只通过内网 HTTPS 网关查看。网关将当前 Supabase JWT 交回 Data API，由原有 `return_photos` RLS 决定是否允许读取。
+- 归档后照片只通过内网 HTTPS 网关查看。单张照片读取仍将当前 Supabase JWT 交回 Data API，由原有 `return_photos` RLS 决定是否允许读取；标签检索则额外要求当前账号是启用状态的超级管理员。
 - 每张照片同时生成 `.metadata.json` 证据清单并写入 NAS SQLite 索引，固定保存照片、借出记录、申请、样机之间的对应关系。
 
 ## 状态机
@@ -54,7 +54,7 @@ return_photo_id
 
 物理文件使用 `YYYY/MM/DD/<return_photo_id>.<ext>`，避免中文、型号变更或重名造成路径冲突；同目录生成 `<文件名>.metadata.json`，记录上述业务标签、拍摄时间、文件大小、SHA-256、服务端验证时间以及 `return-photos/<原 storage_path>`。数据库归档任务和 NAS SQLite 也保留相同来源路径；即使 SQLite 索引损坏，也能从侧车清单重建并按原路径导回 Supabase。
 
-NAS SQLite 对申请号、机型和 SN 后四位建立索引。前端「我的申请」和管理员「申请历史」均提供组合查询入口；NAS 先查本地索引，再携带浏览器当前 JWT 回查 Supabase `return_photos` RLS，只返回该账号有权查看的照片。申请号或照片 UUID 本身不构成授权凭据。
+NAS SQLite 对申请号、机型和 SN 后四位建立索引。组合查询入口只显示在「申请历史」，且仅超级管理员可见；NAS `/search` 还会携带浏览器当前 JWT 调用数据库权限函数复核启用状态和 `super_admin` 角色，再按 `return_photos` RLS 过滤结果。普通用户仍可在自己的申请详情查看其有权访问的单张归还照片。申请号或照片 UUID 本身不构成授权凭据。
 
 ## 调度
 

@@ -707,6 +707,29 @@ class ViewerHandler(BaseHTTPRequestHandler):
             LOGGER.warning("viewer_authorization_failed photo_count=%s error=%s", len(photo_ids), error)
             return set()
 
+    def can_search_archives(self) -> bool:
+        authorization = self.headers.get("Authorization", "")
+        if not authorization.lower().startswith("bearer "):
+            return False
+        request = urllib.request.Request(
+            f"{self.app.config.supabase_url}/rest/v1/rpc/can_search_nas_archives",
+            data=b"{}",
+            method="POST",
+            headers={
+                "apikey": self.app.config.publishable_key,
+                "Authorization": authorization,
+                "Accept": "application/json",
+                "Content-Type": "application/json",
+                "User-Agent": "dji-return-photo-viewer/1.0",
+            },
+        )
+        try:
+            with urllib.request.urlopen(request, timeout=10) as response:
+                return json.loads(response.read().decode("utf-8")) is True
+        except Exception as error:
+            LOGGER.warning("viewer_search_authorization_failed error=%s", error)
+            return False
+
     def authorize(self, photo_id: str) -> bool:
         return photo_id in self.authorized_photo_ids([photo_id])
 
@@ -731,6 +754,10 @@ class ViewerHandler(BaseHTTPRequestHandler):
             return
 
         if parsed.path == "/search":
+            if not self.can_search_archives():
+                self.json_error(HTTPStatus.FORBIDDEN, "NAS archive search requires super administrator access")
+                return
+
             parameters = urllib.parse.parse_qs(parsed.query, keep_blank_values=False)
 
             def parameter(name: str, max_length: int) -> str:
