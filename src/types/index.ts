@@ -311,6 +311,7 @@ export interface ReturnPhoto {
   latitude: number | null
   longitude: number | null
   address: string | null
+  /** 仅兼容永久保留策略启用前的历史清理记录。 */
   photo_deleted_at: string | null
   created_at: string
   // Joined
