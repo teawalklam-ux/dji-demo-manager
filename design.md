@@ -28,6 +28,12 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
 
 标题与批量操作构成工具头，搜索筛选构成工具轨，数据表是主要工作面。移动端继续使用原有卡片式数据重排，不更改选择、排序、分页、扫码、导入或导出逻辑。
 
+### SOP 指引：Narrative Workflow / Liquid
+
+页面以真实工作阶段组织内容：物料准备、现场工作、后续交接。应用侧栏仍是全局导航，页面内部使用三列 Mega Menu 切换选址、部署、维修等业务流程；阶段按钮以 circle-to-pill 表达当前步骤，清单面板以 pill-to-card 和 reverse-collapse 表达展开与收起。
+
+Liquid 只承载导航和阶段切换，不用于正文装饰。视觉代理使用独立 SVG silhouette，真实按钮、文字、焦点环与点击区域保持清晰。机场选址使用已确认的业务内容；未确认的部署与维修流程显示待配置空状态，不生成假流程。
+
 ## 交互约束
 
 - 所有按钮和可点击标签保持单行。
@@ -35,6 +41,7 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
 - 输入框边框宽度在默认、悬停、焦点、禁用和错误状态保持不变。
 - 动效只使用明确属性；禁止 `transition-all`。
 - 默认微交互只有按钮按压和统计操作面的轻微位移。
+- SOP 页面额外允许 circle-to-pill、pill-to-card、reverse-collapse 三种关联动效；动效关闭时保留完整状态变化。
 - `prefers-reduced-motion: reduce` 下关闭空间位移。
 - 触控设备的点击目标不小于 44 × 44 CSS px。
 
@@ -102,6 +109,9 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --color-sidebar-text: oklch(94% 0.012 252);
   --color-sidebar-accent: oklch(67% 0.16 258);
   --color-reserved: oklch(50% 0.15 300);
+  --color-liquid-surface: oklch(97.6% 0.012 252);
+  --color-liquid-shadow: oklch(20.6% 0.039 265.5 / 0.12);
+  --color-liquid-scrim: oklch(20.6% 0.039 265.5 / 0.24);
   --color-chart-in-stock: var(--color-success);
   --color-chart-reserved: var(--color-reserved);
   --color-chart-borrowed: var(--color-accent);
@@ -128,6 +138,8 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --radius-card: 0.625rem;
   --radius-pill: 999px;
   --radius-input: 0.5rem;
+  --radius-liquid-card: 1.75rem;
+  --radius-liquid-pill: 999px;
   --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
   --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
   --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
@@ -160,6 +172,9 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
     "sidebar-text": { "$value": "oklch(94% 0.012 252)", "$type": "color" },
     "sidebar-accent": { "$value": "oklch(67% 0.16 258)", "$type": "color" },
     "reserved": { "$value": "oklch(50% 0.15 300)", "$type": "color" },
+    "liquid-surface": { "$value": "oklch(97.6% 0.012 252)", "$type": "color" },
+    "liquid-shadow": { "$value": "oklch(20.6% 0.039 265.5 / 0.12)", "$type": "color" },
+    "liquid-scrim": { "$value": "oklch(20.6% 0.039 265.5 / 0.24)", "$type": "color" },
     "chart-in-stock": { "$value": "{color.success}", "$type": "color" },
     "chart-reserved": { "$value": "{color.reserved}", "$type": "color" },
     "chart-borrowed": { "$value": "{color.accent}", "$type": "color" },
@@ -194,6 +209,10 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
     "micro": { "$value": "120ms", "$type": "duration" },
     "short": { "$value": "180ms", "$type": "duration" },
     "long": { "$value": "420ms", "$type": "duration" }
+  },
+  "radius": {
+    "liquid-card": { "$value": "1.75rem", "$type": "dimension" },
+    "liquid-pill": { "$value": "999px", "$type": "dimension" }
   }
 }
 ```
@@ -230,5 +249,9 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --sidebar-border: 34% 0.035 260;
   --sidebar-ring: 76% 0.12 258;
   --radius: 0.625rem;
+  --sop-liquid-surface: 97.6% 0.012 252;
+  --sop-liquid-shadow: 20.6% 0.039 265.5 / 0.12;
+  --sop-liquid-scrim: 20.6% 0.039 265.5 / 0.24;
+  --sop-liquid-radius: 1.75rem;
 }
 ```

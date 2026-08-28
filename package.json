@@ -1,7 +1,7 @@
 {
   "name": "my-app",
   "private": true,
-  "version": "1.63.0",
+  "version": "1.64.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -47,6 +47,7 @@
     "html5-qrcode": "^2.3.8",
     "input-otp": "^1.4.2",
     "jsbarcode": "^3.12.3",
+    "liquid-gooey": "^0.1.0",
     "lucide-react": "^0.562.0",
     "next-themes": "^0.4.6",
     "qr-scanner": "^1.4.2",
