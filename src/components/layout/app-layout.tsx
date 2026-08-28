@@ -22,6 +22,7 @@ import {
   Clock,
   AlertCircle,
   History,
+  BookOpenCheck,
   type LucideIcon,
 } from 'lucide-react'
 import { ROLE_MAP } from '@/lib/constants'
@@ -43,6 +44,7 @@ const mainNavItems: MainNavItem[] = [
   { title: '借用申请', href: '/borrow/apply', icon: FileText },
   { title: '我的申请', href: '/borrow/my-requests', icon: CheckSquare },
   { title: '审批队列', href: '/approval/queue', icon: CheckSquare },
+  { title: 'SOP 指引', href: '/sop', icon: BookOpenCheck },
   { title: '报表导出', href: '/reports', icon: BarChart3 },
 ]
 
@@ -62,7 +64,7 @@ function AppSidebar() {
 
   const filteredMainNav = mainNavItems.filter(
     item => (!item.roles || item.roles.some(r => hasRole(r)))
-      && (!isDemoMode || item.href === '/' || item.href === '/items')
+      && (!isDemoMode || item.href === '/' || item.href === '/items' || item.href === '/sop')
   )
 
   return (
@@ -239,6 +241,7 @@ function TopHeader() {
     if (location.pathname.startsWith('/borrow/apply')) return '借用申请'
     if (location.pathname.startsWith('/borrow')) return '我的申请'
     if (location.pathname.startsWith('/approval')) return '审批队列'
+    if (location.pathname.startsWith('/sop')) return 'SOP 指引'
     if (location.pathname.startsWith('/reports')) return '报表导出'
     if (location.pathname.startsWith('/admin/request-history')) return '申请历史'
     if (location.pathname.startsWith('/admin')) return '管理后台'
@@ -247,7 +250,7 @@ function TopHeader() {
 
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 border-b bg-card px-3 sm:gap-4 sm:px-6">
-      <SidebarTrigger className="size-10" aria-label="切换侧栏" />
+      <SidebarTrigger className="size-11" aria-label="切换侧栏" />
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium text-foreground">{currentSection}</p>
         <p className="hidden truncate text-xs text-muted-foreground sm:block">DJI 样机管理系统</p>

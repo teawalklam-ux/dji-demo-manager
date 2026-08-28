@@ -29,6 +29,7 @@ export function AuthGuard({ children, requireRole }: AuthGuardProps) {
       && location.pathname !== '/items/new'
     const isAllowedDemoRoute = location.pathname === '/'
       || location.pathname === '/items'
+      || location.pathname === '/sop'
       || isDemoItemDetail
     if (!isAllowedDemoRoute) {
       return <Navigate to="/" replace />
