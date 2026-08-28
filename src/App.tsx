@@ -25,6 +25,7 @@ const CustomersPage = lazy(() => import('@/pages/admin/customers').then((m) => (
 const RequestCleanupPage = lazy(() => import('@/pages/admin/request-cleanup').then((m) => ({ default: m.RequestCleanupPage })))
 const RequestHistoryPage = lazy(() => import('@/pages/admin/request-history').then((m) => ({ default: m.RequestHistoryPage })))
 const ReportsPage = lazy(() => import('@/pages/reports/index').then((m) => ({ default: m.ReportsPage })))
+const SopGuidePage = lazy(() => import('@/pages/sop/index').then((m) => ({ default: m.SopGuidePage })))
 const PendingApproval = lazy(() => import('@/pages/pending-approval').then((m) => ({ default: m.PendingApproval })))
 const AccountDisabled = lazy(() => import('@/pages/account-disabled').then((m) => ({ default: m.AccountDisabled })))
 const ResetPassword = lazy(() => import('@/pages/reset-password').then((m) => ({ default: m.ResetPassword })))
@@ -112,6 +113,7 @@ function App() {
               </AuthGuard>
             } />
             <Route path="reports" element={<ReportsPage />} />
+            <Route path="sop" element={<SopGuidePage />} />
           </Route>
 
           <Route path="*" element={<Navigate to="/" replace />} />

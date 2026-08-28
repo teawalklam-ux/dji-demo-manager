@@ -36,6 +36,11 @@
   --color-info-surface: var(--color-accent-surface);
   --color-reserved: oklch(50% 0.15 300);
 
+  /* SOP liquid surfaces: soft enough to merge, quiet enough for operational content */
+  --color-liquid-surface: oklch(97.6% 0.012 252);
+  --color-liquid-shadow: oklch(20.6% 0.039 265.5 / 0.12);
+  --color-liquid-scrim: oklch(20.6% 0.039 265.5 / 0.24);
+
   /* Data visualisation */
   --color-chart-1: var(--color-accent);
   --color-chart-2: var(--color-success);
@@ -86,6 +91,8 @@
   --radius-card: 0.625rem;
   --radius-pill: 999px;
   --radius-input: 0.5rem;
+  --radius-liquid-card: 1.75rem;
+  --radius-liquid-pill: 999px;
   --shadow-card: 0 1px 2px oklch(20.6% 0.039 265.5 / 0.06);
   --shadow-popover: 0 18px 48px oklch(20.6% 0.039 265.5 / 0.14);
 
