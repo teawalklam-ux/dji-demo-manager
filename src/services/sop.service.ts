@@ -8,6 +8,9 @@ export type PersistedSopRoleGroup = 'user' | 'admin' | 'super_admin'
 export interface PersistedSopItem {
   id: string
   label: string
+  /** Optional for legacy checklists; system guides resolve bundled screenshots by item ID. */
+  screenshot?: string
+  screenshot_caption?: string
 }
 
 export interface PersistedSopProcess {
