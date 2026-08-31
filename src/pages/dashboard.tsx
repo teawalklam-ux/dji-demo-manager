@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label'
 import {
   Package, ArrowRightLeft, AlertTriangle, FileText,
   CheckSquare, ClipboardList, ArrowRight, ChevronRight,
-  CircleCheckBig, History, ChartPie, type LucideIcon,
+  CircleCheckBig, History, ChartPie, BookOpenCheck, type LucideIcon,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { supabase } from '@/lib/supabase'
@@ -210,7 +210,7 @@ export function Dashboard() {
 
   return (
     <div className="hm-page hm-dashboard space-y-8 sm:space-y-10">
-      <section className="hm-dashboard-heading">
+      <section className="hm-dashboard-heading flex-wrap">
         <div className="min-w-0">
           <h1 className="hm-page-title">仪表盘</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
@@ -222,6 +222,12 @@ export function Dashboard() {
             <Link to="/borrow/apply">
               <FileText className="size-4" />
               申请借用
+            </Link>
+          </Button>
+          <Button asChild variant="outline" size="lg">
+            <Link to="/sop">
+              <BookOpenCheck className="size-4" aria-hidden="true" />
+              SOP 指引
             </Link>
           </Button>
           <Button asChild variant="outline" size="lg">
