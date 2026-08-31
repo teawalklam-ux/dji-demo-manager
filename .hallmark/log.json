@@ -1,6 +1,19 @@
 [
   {
     "date": "2026-08-31",
+    "scope": "app-feature-redesign",
+    "macrostructure": "Workbench Guided Sequence / Narrative Workflow",
+    "theme": "locked DJI cool system",
+    "theme_axes": "light workspace / soft liquid surface / cool accent",
+    "vibe": "soft, lively, focused, operational",
+    "enrichment": "105 real app screenshots using synthetic training data",
+    "brief": "Replace system SOP checklists with one-step screenshot dialogs and bottom-right liquid next; keep operational checklists unchanged",
+    "variation_delta": "System content changes from three checklist tabs to a modal sequential reader; mobile full-screen, desktop rounded overlay",
+    "critique": "P5 H5 E4 S5 R4 V5",
+    "verification": "Four role catalogs, 105 images, paging, keyboard focus, upload/save/reload fixture, error recovery and 320-1920px QA; no production writes"
+  },
+  {
+    "date": "2026-08-31",
     "scope": "app-feature",
     "macrostructure": "Narrative Workflow / permission-aware dual SOP catalog",
     "theme": "custom",

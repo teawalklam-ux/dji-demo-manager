@@ -3,7 +3,7 @@
   "date": "2026-08-31",
   "project": "DJI Demo Manager",
   "branch": "main",
-  "base_commit": "4486a6b7",
+  "base_commit": "6cd8ba9f",
   "framework": {
     "runtime": "React 19",
     "bundler": "Vite 7",
@@ -12,23 +12,26 @@
   },
   "design": {
     "genre": "modern-minimal",
-    "macrostructure": "Narrative Workflow with permission-aware dual SOP catalog",
+    "macrostructure": "Workbench Guided Sequence / Narrative Workflow with permission-aware dual SOP catalog",
     "theme": "custom",
     "theme_axes": "light workspace / soft liquid surface / cool accent",
     "vibe": "soft, lively, operational, trustworthy",
-    "enrichment": "icon-led system route map"
+    "enrichment": "105 real app screenshots with isolated synthetic training data"
   },
   "scope": {
-    "create": [],
+    "create": [
+      "src/pages/sop/system-sop-reader.tsx",
+      "src/pages/sop/system-sop-screenshots.ts",
+      "public/sop-steps/*.jpg",
+      "scripts/sop-capture-fixtures.mjs",
+      "scripts/capture-sop-screenshots.mjs",
+      "scripts/verify-sop-reader.mjs",
+      "docs/SOP_SCREENSHOTS.md"
+    ],
     "modify": [
       "src/pages/sop/index.tsx",
       "src/pages/sop/sop-guide.css",
       "src/services/sop.service.ts",
-      "supabase/migrations/20260831024713_sop_guide_persistence.sql",
-      "supabase/migrations/20260831025056_index_sop_process_audit_foreign_keys.sql",
-      "supabase/migrations/20260831030345_fix_sop_replace_role_resolution.sql",
-      "supabase/migrations/20260831030827_allow_admin_default_sop_initialization.sql",
-      "supabase/migrations/20260831031150_restrict_admin_sop_write_scope.sql",
       "design.md",
       ".hallmark/preflight.json",
       ".hallmark/log.json",
@@ -55,7 +58,11 @@
     "secret_files_read": false,
     "secret_values_copied": false,
     "backend_contract_changes": true,
-    "deployment_changes": true
+    "deployment_changes": false,
+    "database_migrations": false,
+    "production_writes": false,
+    "screenshot_source": "Local app UI, isolated fixture module, external network blocked",
+    "contract_extension": "Optional screenshot and screenshot_caption fields within existing JSONB; RPC and RLS unchanged"
   },
   "follow_up": {
     "date": "2026-07-28",
