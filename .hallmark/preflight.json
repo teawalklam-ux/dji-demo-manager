@@ -1,9 +1,9 @@
 {
   "hallmark_version": "1.1",
-  "date": "2026-07-27",
+  "date": "2026-08-31",
   "project": "DJI Demo Manager",
-  "branch": "codex/test1.5",
-  "base_commit": "9c490494",
+  "branch": "main",
+  "base_commit": "4486a6b7",
   "framework": {
     "runtime": "React 19",
     "bundler": "Vite 7",
@@ -12,30 +12,30 @@
   },
   "design": {
     "genre": "modern-minimal",
-    "macrostructure": "Workbench with Stat-Led dashboard and Index-First inventory",
+    "macrostructure": "Narrative Workflow with permission-aware dual SOP catalog",
     "theme": "custom",
-    "theme_axes": "light / system-native / cool",
-    "vibe": "precise, calm, operational, trustworthy",
-    "enrichment": "none"
+    "theme_axes": "light workspace / soft liquid surface / cool accent",
+    "vibe": "soft, lively, operational, trustworthy",
+    "enrichment": "icon-led system route map"
   },
   "scope": {
-    "create": [
-      "design.md",
-      "tokens.css",
-      ".hallmark/preflight.json",
-      ".hallmark/log.json"
-    ],
+    "create": [],
     "modify": [
-      "tailwind.config.js",
-      "src/index.css",
-      "src/components/layout/app-layout.tsx",
-      "src/components/ui/button.tsx",
-      "src/components/ui/card.tsx",
-      "src/components/ui/input.tsx",
-      "src/components/ui/table.tsx",
-      "src/components/ui/badge.tsx",
-      "src/pages/dashboard.tsx",
-      "src/pages/items/index.tsx"
+      "src/pages/sop/index.tsx",
+      "src/pages/sop/sop-guide.css",
+      "src/services/sop.service.ts",
+      "supabase/migrations/20260831024713_sop_guide_persistence.sql",
+      "supabase/migrations/20260831025056_index_sop_process_audit_foreign_keys.sql",
+      "supabase/migrations/20260831030345_fix_sop_replace_role_resolution.sql",
+      "supabase/migrations/20260831030827_allow_admin_default_sop_initialization.sql",
+      "supabase/migrations/20260831031150_restrict_admin_sop_write_scope.sql",
+      "design.md",
+      ".hallmark/preflight.json",
+      ".hallmark/log.json",
+      "CHANGELOG.md",
+      "src/lib/version.ts",
+      "package.json",
+      "package-lock.json"
     ],
     "delete": []
   },
@@ -54,8 +54,8 @@
   "security": {
     "secret_files_read": false,
     "secret_values_copied": false,
-    "backend_contract_changes": false,
-    "deployment_changes": false
+    "backend_contract_changes": true,
+    "deployment_changes": true
   },
   "follow_up": {
     "date": "2026-07-28",
