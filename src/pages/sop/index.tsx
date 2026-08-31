@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import { Liquid } from 'liquid-gooey'
 import {
-  ArrowRight,
   AlertCircle,
   BadgeCheck,
   BookOpenCheck,
@@ -15,7 +14,6 @@ import {
   Download,
   FolderCog,
   History,
-  ListChecks,
   LoaderCircle,
   MapPinned,
   MousePointerClick,
@@ -37,20 +35,19 @@ import {
   X,
   type LucideIcon,
 } from 'lucide-react'
-import { Link, useLocation } from 'react-router-dom'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/auth-context'
 import type { UserRole } from '@/lib/constants'
-import { sopService, type PersistedSopProcess } from '@/services/sop.service'
+import { sopService, type PersistedSopItem, type PersistedSopProcess } from '@/services/sop.service'
+import { SystemSopReader } from './system-sop-reader'
+import { getSopScreenshot } from './system-sop-screenshots'
 import './sop-guide.css'
 
 type StageKey = 'materials' | 'workflow' | 'followup'
 type SopKind = 'operations' | 'system'
 type SopRoleGroup = 'user' | 'admin' | 'super_admin'
 
-interface SopItem {
-  id: string
-  label: string
-}
+type SopItem = PersistedSopItem
 
 interface SopProcess {
   id: string
@@ -159,30 +156,6 @@ const stageDefinitions: StageDefinition[] = [
     title: '技术结束，收好尾巴',
     helper: '记录后续确认项，为部署和工单交接留出明确入口。',
     icon: BookOpenCheck,
-  },
-]
-
-const systemStageDefinitions: StageDefinition[] = [
-  {
-    key: 'materials',
-    shortLabel: '入口',
-    title: '先找对入口',
-    helper: '确认账号权限与所需资料，再进入对应功能页面。',
-    icon: MousePointerClick,
-  },
-  {
-    key: 'workflow',
-    shortLabel: '操作',
-    title: '按页面顺序完成',
-    helper: '依次处理必填项、核对信息，并在提交前完成最后检查。',
-    icon: ListChecks,
-  },
-  {
-    key: 'followup',
-    shortLabel: '核对',
-    title: '提交后，确认结果',
-    helper: '返回记录或列表确认状态，必要时保存导出文件或交接信息。',
-    icon: BadgeCheck,
   },
 ]
 
@@ -365,7 +338,7 @@ const systemProcesses: SopProcess[] = [
     entryLabel: '打开借用申请',
     entry: ['从「借用申请」进入，确认账号已通过审核', '准备用途、借用日期、预计归还日期及客户信息（如适用）'],
     workflow: ['选择需要借用的样机并确认库存状态', '选择借用类型，填写用途、日期及客户信息', '核对系统展示的审批链后提交申请'],
-    followup: ['在「我的申请」确认记录已生成及当前审批状态', '申请内容变化时先取消原申请，再按最新信息重新提交'],
+    followup: ['在「我的申请」确认记录已生成及当前审批状态', '尚未开始审批时可点击「编辑申请」；不满足编辑条件时联系管理员，或按规则取消重提'],
   }),
   makeSystemGuide({
     id: 'system-transfer-apply',
@@ -377,7 +350,7 @@ const systemProcesses: SopProcess[] = [
     href: '/borrow/apply',
     entryLabel: '打开借用申请',
     entry: ['从「借用申请」选择转借类型', '确认待转借样机均为借出或逾期状态，且当前借用人一致'],
-    workflow: ['选择全部待转借样机', '填写新使用人、客户信息、用途与日期', '核对转借审批链并提交'],
+    workflow: ['选择同一当前借用人名下的全部待转借样机', '申请账号即新使用人；填写客户名称、用途和预计归还日期', '核对转借审批链并提交，首级由当前借用人确认'],
     followup: ['在「我的申请」跟踪审批进度', '最终审批通过后，核对样机借用人已更新'],
   }),
   makeSystemGuide({
@@ -390,7 +363,7 @@ const systemProcesses: SopProcess[] = [
     href: '/borrow/my-requests',
     entryLabel: '打开我的申请',
     entry: ['进入「我的申请」，找到可续借的借用记录', '准备新的预计归还日期与续借原因'],
-    workflow: ['打开记录操作菜单并选择续借', '设置晚于当前归还日的新日期', '填写续借原因并提交审批'],
+    workflow: ['在记录上点击「申请续借」，核对当前借用信息', '设置晚于当前归还日的新日期', '填写续借原因并提交审批'],
     followup: ['确认续借申请已生成', '审批通过后核对原记录的预计归还日期'],
   }),
   makeSystemGuide({
@@ -429,7 +402,7 @@ const systemProcesses: SopProcess[] = [
     href: '/approval/queue',
     entryLabel: '打开审批队列',
     entry: ['进入「审批队列」查看分配给当前账号的待办', '准备申请背景、库存或当前借用状态等核验信息'],
-    workflow: ['打开申请详情并核对样机、用途、日期与审批链', '填写审批意见，选择通过或驳回', '高风险或信息不全时先与申请人确认'],
+    workflow: ['点击「查看详情」，核对申请卡片和审批流程', '需要拒绝时点击「拒绝」，填写必填的拒绝原因；未核实前不要确认', '信息齐全可点击「通过」；高风险或信息不全时先与申请人确认再处理'],
     followup: ['返回审批队列确认待办已更新', '需要撤销审批时联系超级管理员按权限处理'],
   }),
   makeSystemGuide({
@@ -467,7 +440,7 @@ const systemProcesses: SopProcess[] = [
     roleGroup: 'admin',
     href: '/admin/request-history',
     entryLabel: '打开申请历史',
-    entry: ['进入「申请历史」并明确人员、状态或时间范围', '涉及审计或清理前，先确认团队的留存和备份要求'],
+    entry: ['进入「申请历史」，准备申请编号或用途关键词及状态条件', '涉及审计或清理前，先确认团队的留存和备份要求'],
     workflow: ['组合筛选条件定位目标申请', '打开详情核对申请、审批与借用时间线', '超级管理员可进一步使用 NAS 归档检索核验留存'],
     followup: ['按最小必要原则导出或记录查询结果', '清理前完成备份核验；普通管理员不能以页面查询替代 NAS 归档确认'],
   }),
@@ -507,21 +480,21 @@ const systemProcesses: SopProcess[] = [
     href: '/admin/customers',
     entryLabel: '打开客户地址簿',
     entry: ['进入「客户地址簿」查看各用户维护的客户资料', '删除或修订前核对客户归属与关联申请'],
-    workflow: ['按名称、联系人或归属用户定位记录', '核对联系人、电话与地址等必要字段', '合并规则不明时先保留记录；确认无用后再删除'],
+    workflow: ['按客户名称、联系方式、归属用户或部门定位记录', '核对客户名称、联系方式及来源用户；当前页面不提供地址字段或编辑功能', '当前不支持自动合并；核实归属和关联申请后，仅删除确认无用的资料'],
     followup: ['抽查借用申请中的客户选择是否正常', '定期清理重复、失效资料，并避免采集业务无关信息'],
   }),
   makeSystemGuide({
     id: 'system-global-settings',
     title: '系统设置与通知',
-    description: '维护组织信息、逾期提醒与企微通知',
+    description: '维护本机配置；通知生效需另行核验',
     icon: Settings2,
     requiredRole: 'super_admin',
     roleGroup: 'super_admin',
     href: '/admin/settings',
     entryLabel: '打开系统设置',
-    entry: ['进入「系统设置」并记录修改前配置', '准备组织名称、提醒天数或企业微信 Webhook 等有效信息'],
-    workflow: ['按业务需要修改组织与逾期提醒规则', '配置通知开关及 Webhook', '保存前复核敏感地址与提醒范围'],
-    followup: ['执行一次受控测试，确认通知可达且内容正确', '配置异常时恢复原值并检查 Webhook 权限'],
+    entry: ['进入「系统设置」并记录原值；本页目前只保存到当前浏览器', '准备条码前缀、默认借用天数、逾期提醒天数等配置'],
+    workflow: ['核对条码前缀、默认借用天数和逾期提醒天数', '检查通知开关与企业微信 Webhook；截图和分享时务必遮盖敏感地址', '点击「保存设置」仅写入本机浏览器，不代表全局服务或通知已生效'],
+    followup: ['重新打开页面核对本机保存结果；通知是否可达须由维护人员另行验证', '配置异常时恢复原值；不要以本页保存成功作为通知送达的证明'],
   }),
   makeSystemGuide({
     id: 'system-super-admin-transfer',
@@ -539,14 +512,14 @@ const systemProcesses: SopProcess[] = [
   makeSystemGuide({
     id: 'system-archive-audit',
     title: 'NAS 归档检索与留存核验',
-    description: '按申请历史核验备份与长期留存',
+    description: '检索 NAS 归还照片，不替代完整业务备份',
     icon: DatabaseBackup,
     requiredRole: 'super_admin',
     roleGroup: 'super_admin',
     href: '/admin/request-history',
     entryLabel: '打开申请历史',
-    entry: ['进入「申请历史」并切换到 NAS 归档检索', '准备可缩小范围的申请编号、人员或时间信息'],
-    workflow: ['使用最小必要条件检索归档记录', '对照系统申请详情核验关键字段与附件', '清理业务数据前确认所需记录已进入归档'],
+    entry: ['进入「申请历史」，找到下方「NAS 归还照片快速查询」区域', '可按申请编号或样机型号缩小查询范围，至少填写一项条件'],
+    workflow: ['也可输入序列号后四位，再点击「查询归档」；后四位须恰好四个字符', '对照系统申请详情核验照片关联的申请与设备信息', '清理前确认所需归还照片已归档；NAS 照片不等同于完整申请和审批数据备份'],
     followup: ['记录核验时间、范围与异常项', '归档缺失或不一致时暂停清理，并交由维护人员排查'],
   }),
 ]
@@ -572,6 +545,7 @@ export function SopGuidePage() {
   const [editing, setEditing] = useState(false)
   const [newItemLabel, setNewItemLabel] = useState('')
   const [menuFocusKind, setMenuFocusKind] = useState<SopKind>('operations')
+  const [readerSession, setReaderSession] = useState(0)
   const [isSopLoading, setIsSopLoading] = useState(true)
   const [isSopSaving, setIsSopSaving] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
@@ -600,7 +574,7 @@ export function SopGuidePage() {
     () => visibleProcesses.find((process) => process.id === activeProcessId) ?? visibleProcesses[0],
     [activeProcessId, visibleProcesses],
   )
-  const activeStageDefinitions = activeProcess?.kind === 'system' ? systemStageDefinitions : stageDefinitions
+  const activeStageDefinitions = stageDefinitions
   const stageDefinition = activeStageDefinitions.find((stage) => stage.key === activeStage) ?? activeStageDefinitions[0]
   const editingEnabled = editing && canEdit
   const activeItems = activeProcess?.stages[activeStage] ?? []
@@ -699,6 +673,7 @@ export function SopGuidePage() {
     setActiveStage('materials')
     setCardCollapsed(false)
     setMenuOpen(false)
+    if (selectedKind === 'system') setReaderSession((value) => value + 1)
     const trigger = selectedKind === 'system' ? menuSystemTriggerRef : menuTriggerRef
     trigger.current?.focus()
   }
@@ -854,6 +829,15 @@ export function SopGuidePage() {
       return
     }
 
+    for (const process of visibleProcesses.filter((item) => item.kind === 'system')) {
+      const steps = stageDefinitions.flatMap((stage) => process.stages[stage.key])
+      const missingIndex = steps.findIndex((step) => !step.label.trim() || !getSopScreenshot(step))
+      if (missingIndex !== -1) {
+        setPersistenceError(`“${process.title}”第 ${missingIndex + 1} 步缺少说明或有效截图，请补充后保存。`)
+        return
+      }
+    }
+
     setIsSopSaving(true)
     setPersistenceError(null)
     try {
@@ -878,6 +862,7 @@ export function SopGuidePage() {
     return (
       <button
         key={process.id}
+        data-sop-process={process.id}
         ref={focusFirst === 'system' ? menuFirstSystemItemRef : focusFirst === 'operations' ? menuFirstItemRef : undefined}
         type="button"
         className={`sop-process-option ${process.id === activeProcess.id ? 'is-active' : ''}`}
@@ -890,7 +875,7 @@ export function SopGuidePage() {
           <small>{process.description}</small>
         </span>
         <span className="sop-process-option__meta">
-          {itemCount ? `${itemCount} 项` : '待配置'}
+          {itemCount ? `${itemCount} ${process.kind === 'system' ? '步' : '项'}` : '待配置'}
         </span>
       </button>
     )
@@ -908,13 +893,15 @@ export function SopGuidePage() {
         <div className="sop-intro__copy">
           <h1 id="sop-page-title" className="sop-page__title">把下一步，做成看得见的路径。</h1>
           <p className="sop-page__lede">
-            先选任务，再逐项完成。清单会跟着当前阶段展开，技术结束后仍能看到需要交接的事项。
+            {activeProcess.kind === 'system'
+              ? '一次看懂一个动作。打开图文指引，对照截图阅读，再点击下一步。'
+              : '先选任务，再逐项完成。清单会跟着当前阶段展开，技术结束后仍能看到需要交接的事项。'}
           </p>
         </div>
         <div className="sop-intro__status" aria-label="当前 SOP 进度">
           <span className="sop-intro__status-label">当前流程</span>
           <strong>{activeProcess.title}</strong>
-          <span>{totalReadyItems ? `${totalCompletedItems} / ${totalReadyItems} 已完成` : '内容待配置'}</span>
+          <span>{totalReadyItems ? activeProcess.kind === 'system' ? `${totalReadyItems} 步 · 截图指引` : `${totalCompletedItems} / ${totalReadyItems} 已完成` : '内容待配置'}</span>
         </div>
       </section>
 
@@ -1007,7 +994,7 @@ export function SopGuidePage() {
               <header className="sop-process-column__head">
                 <div>
                   <h3 id="system-sop-title">系统使用 SOP</h3>
-                  <p>按账号权限展开，可直接进入对应功能</p>
+                  <p>按账号权限展开，点击后分步查看操作截图</p>
                   <span>{visibleSystemProcesses.length} 条当前可见</span>
                 </div>
               </header>
@@ -1045,7 +1032,7 @@ export function SopGuidePage() {
                   新增系统指引
                 </button>
               </div>
-              <span>原型中的修改仅保留在当前页面会话。</span>
+              <span>编辑后点击“保存 SOP”，将修改同步到云端。</span>
             </div>
           )}
         </div>
@@ -1162,7 +1149,30 @@ export function SopGuidePage() {
         </div>
       )}
 
-      <main className="sop-workspace">
+      {activeProcess.kind === 'system' ? (
+        <SystemSopReader
+          key={`${activeProcess.id}:${readerSession}`}
+          title={activeProcess.title}
+          description={activeProcess.description}
+          steps={stageDefinitions.flatMap((stage) => activeProcess.stages[stage.key])}
+          entry={activeProcess.entry}
+          editing={editingEnabled}
+          saving={isSopSaving}
+          dirty={hasUnsavedChanges}
+          saveError={persistenceError}
+          undoMessage={undoState?.activeProcessId === activeProcess.id ? undoState.message : undefined}
+          onUndo={undoLastRemoval}
+          onSave={() => void saveProcesses()}
+          onChangeSteps={(steps, removed) => {
+            if (removed) setUndoState({ processes, activeProcessId, message: '已移除一个图文步骤' })
+            updateActiveProcess((process) => ({
+              ...process,
+              status: steps.length ? 'ready' : 'draft',
+              stages: { materials: [], workflow: steps, followup: [] },
+            }))
+          }}
+        />
+      ) : <main className="sop-workspace">
         <Liquid
           blur={10}
           contrast={18}
@@ -1249,20 +1259,6 @@ export function SopGuidePage() {
                   </div>
                 </header>
 
-                {activeProcess.kind === 'system' && activeProcess.entry && (
-                  <aside className="sop-system-entry" aria-label="功能页面入口">
-                    <span className="sop-system-entry__icon"><MousePointerClick aria-hidden="true" /></span>
-                    <div>
-                      <span>功能入口</span>
-                      <strong>{activeProcess.entry.label}</strong>
-                    </div>
-                    <Link className="sop-entry-link" to={activeProcess.entry.href}>
-                      现在前往
-                      <ArrowRight aria-hidden="true" />
-                    </Link>
-                  </aside>
-                )}
-
                 {activeItems.length > 0 ? (
                   <ol className="sop-checklist">
                     {activeItems.map((item, index) => {
@@ -1338,13 +1334,11 @@ export function SopGuidePage() {
             )}
           </Liquid.Item>
         </Liquid>
-      </main>
+      </main>}
 
-      <footer className="sop-page__foot">
+      {activeProcess.kind === 'operations' && <footer className="sop-page__foot">
         <span>
-          {activeProcess.kind === 'system'
-            ? '依次完成：找到入口 → 按页面操作 → 确认处理结果'
-            : '依次完成：物料准备 → 现场工作 → 后续交接'}
+          依次完成：物料准备 → 现场工作 → 后续交接
         </span>
         <button
           type="button"
@@ -1357,7 +1351,7 @@ export function SopGuidePage() {
           <RotateCcw aria-hidden="true" />
           回到第一阶段
         </button>
-      </footer>
+      </footer>}
 
       {undoState && (
         <div className="sop-undo" role="status" aria-live="polite">
