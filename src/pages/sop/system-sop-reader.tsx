@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type ChangeEvent } from 'react'
+import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
 import { Liquid } from 'liquid-gooey'
 import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, BookOpenCheck, ImageOff, LoaderCircle, Plus, RotateCcw, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { Link } from 'react-router-dom'
@@ -20,17 +20,29 @@ interface SystemSopReaderProps {
   onChangeSteps: (steps: PersistedSopItem[], removed?: boolean) => void
 }
 
-function StepScreenshot({ step, zoomed }: { step: PersistedSopItem; zoomed: boolean }) {
+function StepScreenshot({ step, zoomed, onToggleZoom }: { step: PersistedSopItem; zoomed: boolean; onToggleZoom: () => void }) {
   const source = getSopScreenshot(step)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
+  const viewportId = useId()
+  const viewportRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!zoomed) return
+    const frame = window.requestAnimationFrame(() => viewportRef.current?.focus({ preventScroll: true }))
+    return () => window.cancelAnimationFrame(frame)
+  }, [zoomed])
+
   return (
     <figure className={`sop-reader-shot ${zoomed ? 'is-zoomed' : ''}`} aria-busy={Boolean(source) && state === 'loading'}>
-      <div className="sop-reader-shot__viewport" tabIndex={zoomed ? 0 : undefined} aria-label={zoomed ? '放大的操作截图，可滚动查看' : undefined}>
+      <div id={viewportId} ref={viewportRef} className="sop-reader-shot__viewport" tabIndex={zoomed ? 0 : undefined} aria-label={zoomed ? '放大的操作截图，可滚动查看' : undefined}>
         {source && state !== 'error' && (
-          <img key={attempt} src={source} alt={`操作截图：${step.label}`} width={1280} height={860}
-            referrerPolicy="no-referrer" className={state === 'ready' ? 'is-ready' : ''}
-            onLoad={() => setState('ready')} onError={() => setState('error')} />
+          <button type="button" className="sop-reader-shot__image-button" aria-label={zoomed ? '恢复完整截图显示' : `放大操作截图：${step.label}`}
+            aria-pressed={zoomed} aria-controls={viewportId} tabIndex={zoomed ? -1 : 0} disabled={state !== 'ready'} onClick={onToggleZoom}>
+            <img key={attempt} src={source} alt={`操作截图：${step.label}`} width={1280} height={860} draggable={false}
+              referrerPolicy="no-referrer" className={state === 'ready' ? 'is-ready' : ''}
+              onLoad={() => setState('ready')} onError={() => setState('error')} />
+          </button>
         )}
         {source && state === 'loading' && <div className="sop-reader-shot__loading" role="status"><LoaderCircle className="is-spinning" aria-hidden="true" /><span>正在加载操作截图</span></div>}
         {(!source || state === 'error') && (
@@ -167,7 +179,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
       </div>
       <p className="sop-system-guide__note">指引只负责讲解，不会替你提交申请、执行审批或修改系统数据。</p>
 
-      <dialog ref={dialogRef} className="sop-reader-dialog" aria-labelledby="sop-reader-title" aria-describedby="sop-reader-description"
+      <dialog ref={dialogRef} className={`sop-reader-dialog ${editing ? 'is-editing' : ''}`} aria-labelledby="sop-reader-title" aria-describedby="sop-reader-description"
         onClose={() => setOpen(false)}
         onKeyDown={(event) => {
           if (event.key !== 'Tab') return
@@ -189,7 +201,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
           if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setOpen(false)
         }}>
         <header className="sop-reader-head">
-          <div><span>系统使用 SOP · {steps.length} 步</span><h2 id="sop-reader-title">{title}</h2><p id="sop-reader-description">看懂当前截图后，点击右下角继续。</p></div>
+          <div><span>系统使用 SOP · {steps.length} 步</span><h2 id="sop-reader-title">{title}</h2><p id="sop-reader-description">截图会先完整显示；看不清时点击截图放大，再点击右下角继续。</p></div>
           <div className="sop-reader-head__actions">
             {editing && <button type="button" className="sop-save-button" aria-label={saving ? '保存中' : '保存 SOP'} onClick={onSave} disabled={!dirty || saving || uploading}>{saving ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <Save aria-hidden="true" />}<span>{saving ? '保存中' : '保存 SOP'}</span></button>}
             <button type="button" className="sop-icon-button" aria-label="关闭图文指引" onClick={() => setOpen(false)}><X aria-hidden="true" /></button>
@@ -204,7 +216,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
               <h3>{step.label}</h3>
             </div>
             <div className="sop-reader-visual">
-              <StepScreenshot key={getSopScreenshot(step)} step={step} zoomed={zoomed} />
+              <StepScreenshot key={getSopScreenshot(step)} step={step} zoomed={zoomed} onToggleZoom={() => setZoomed((value) => !value)} />
               {getSopScreenshot(step) && <button type="button" className="sop-reader-zoom" aria-pressed={zoomed} onClick={() => setZoomed((value) => !value)}>{zoomed ? <ZoomOut aria-hidden="true" /> : <ZoomIn aria-hidden="true" />}{zoomed ? '适应窗口' : '放大截图'}</button>}
             </div>
             {editing && <div className="sop-reader-editor">
