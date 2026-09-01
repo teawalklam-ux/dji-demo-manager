@@ -24,6 +24,7 @@ const SettingsPage = lazy(() => import('@/pages/admin/settings').then((m) => ({ 
 const CustomersPage = lazy(() => import('@/pages/admin/customers').then((m) => ({ default: m.CustomersPage })))
 const RequestCleanupPage = lazy(() => import('@/pages/admin/request-cleanup').then((m) => ({ default: m.RequestCleanupPage })))
 const RequestHistoryPage = lazy(() => import('@/pages/admin/request-history').then((m) => ({ default: m.RequestHistoryPage })))
+const SystemLogsPage = lazy(() => import('@/pages/admin/system-logs').then((m) => ({ default: m.SystemLogsPage })))
 const ReportsPage = lazy(() => import('@/pages/reports/index').then((m) => ({ default: m.ReportsPage })))
 const SopGuidePage = lazy(() => import('@/pages/sop/index').then((m) => ({ default: m.SopGuidePage })))
 const PendingApproval = lazy(() => import('@/pages/pending-approval').then((m) => ({ default: m.PendingApproval })))
@@ -110,6 +111,11 @@ function App() {
             <Route path="admin/request-history/:id" element={
               <AuthGuard requireRole={['super_admin', 'admin']}>
                 <BorrowRequestDetail mode="admin" />
+              </AuthGuard>
+            } />
+            <Route path="admin/system-logs" element={
+              <AuthGuard requireRole={['super_admin', 'admin']}>
+                <SystemLogsPage />
               </AuthGuard>
             } />
             <Route path="reports" element={<ReportsPage />} />

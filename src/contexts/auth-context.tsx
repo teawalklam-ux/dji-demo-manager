@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useState, type ReactNode } from '
 import { supabase } from '@/lib/supabase'
 import type { Profile, UserRole } from '@/types'
 import type { User } from '@supabase/supabase-js'
+import { resetAppLogSession } from '@/services/app-log.service'
 
 interface AuthContextType {
   user: User | null
@@ -130,6 +131,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signIn(email: string, password: string) {
     try {
+      resetAppLogSession()
       const { error } = await supabase.auth.signInWithPassword({ email, password })
       return { error: error ? new Error(error.message) : null }
     } catch (err) {
@@ -143,6 +145,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
 
     try {
+      resetAppLogSession()
       const {
         DEMO_EMAIL,
         DEMO_PASSWORD,
@@ -163,6 +166,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   async function signUp(email: string, password: string, displayName: string) {
     try {
+      resetAppLogSession()
       const { error } = await supabase.auth.signUp({
         email,
         password,
@@ -186,12 +190,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsDemoMode(false)
       setUser(null)
       setProfile(null)
+      resetAppLogSession()
       return
     }
 
     await supabase.auth.signOut()
     setUser(null)
     setProfile(null)
+    resetAppLogSession()
   }
 
   function hasRole(role: UserRole): boolean {
