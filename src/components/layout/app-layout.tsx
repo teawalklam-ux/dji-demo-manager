@@ -23,6 +23,7 @@ import {
   AlertCircle,
   History,
   BookOpenCheck,
+  ScrollText,
   type LucideIcon,
 } from 'lucide-react'
 import { ROLE_MAP } from '@/lib/constants'
@@ -30,6 +31,7 @@ import { APP_VERSION } from '@/lib/version'
 import { useNotifications } from '@/hooks/use-notifications'
 import { useState, useRef, useEffect } from 'react'
 import type { OverdueNotification, UserRole } from '@/types'
+import { appLogService } from '@/services/app-log.service'
 
 interface MainNavItem {
   title: string
@@ -55,6 +57,7 @@ const adminNavItems = [
   { title: '分类管理', href: '/admin/categories', icon: Tags, superAdminOnly: false },
   { title: '审批链配置', href: '/admin/approval-chains', icon: GitBranch, superAdminOnly: false },
   { title: '记录清理', href: '/admin/request-cleanup', icon: Trash2, superAdminOnly: false },
+  { title: '系统日志', href: '/admin/system-logs', icon: ScrollText, superAdminOnly: false },
   { title: '系统设置', href: '/admin/settings', icon: Settings, superAdminOnly: true },
 ]
 
@@ -244,6 +247,7 @@ function TopHeader() {
     if (location.pathname.startsWith('/sop')) return 'SOP 指引'
     if (location.pathname.startsWith('/reports')) return '报表导出'
     if (location.pathname.startsWith('/admin/request-history')) return '申请历史'
+    if (location.pathname.startsWith('/admin/system-logs')) return '系统日志'
     if (location.pathname.startsWith('/admin')) return '管理后台'
     return '工作区'
   })()
@@ -321,6 +325,14 @@ function TopHeader() {
 }
 
 export function AppLayout() {
+  const location = useLocation()
+  const { profile, isDemoMode } = useAuth()
+
+  useEffect(() => {
+    if (!profile || isDemoMode) return
+    void appLogService.trackPageView(location.pathname, profile.id)
+  }, [isDemoMode, location.pathname, profile])
+
   return (
     <SidebarProvider>
       <AppSidebar />
