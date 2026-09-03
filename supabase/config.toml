@@ -382,6 +382,20 @@ inspector_port = 8083
 # The Deno major version to use.
 deno_version = 2
 
+# Browser-triggered notification functions require a signed-in user JWT.
+[functions.notify-approval]
+verify_jwt = true
+
+[functions.notify-return]
+verify_jwt = true
+
+[functions.wecom-config-status]
+verify_jwt = true
+
+# This worker is invoked only by pg_cron and verifies its own dedicated secret.
+[functions.notify-reservation-events]
+verify_jwt = false
+
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
