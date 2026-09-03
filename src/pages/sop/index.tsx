@@ -38,6 +38,7 @@ import {
 import { useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/auth-context'
 import type { UserRole } from '@/lib/constants'
+import { getErrorMessage } from '@/lib/errors'
 import { sopService, type PersistedSopItem, type PersistedSopProcess } from '@/services/sop.service'
 import { SystemSopReader } from './system-sop-reader'
 import { getSopScreenshot } from './system-sop-screenshots'
@@ -486,15 +487,15 @@ const systemProcesses: SopProcess[] = [
   makeSystemGuide({
     id: 'system-global-settings',
     title: '系统设置与通知',
-    description: '维护本机配置；通知生效需另行核验',
+    description: '维护本机配置并核验服务端通知状态',
     icon: Settings2,
     requiredRole: 'super_admin',
     roleGroup: 'super_admin',
     href: '/admin/settings',
     entryLabel: '打开系统设置',
-    entry: ['进入「系统设置」并记录原值；本页目前只保存到当前浏览器', '准备条码前缀、默认借用天数、逾期提醒天数等配置'],
-    workflow: ['核对条码前缀、默认借用天数和逾期提醒天数', '检查通知开关与企业微信 Webhook；截图和分享时务必遮盖敏感地址', '点击「保存设置」仅写入本机浏览器，不代表全局服务或通知已生效'],
-    followup: ['重新打开页面核对本机保存结果；通知是否可达须由维护人员另行验证', '配置异常时恢复原值；不要以本页保存成功作为通知送达的证明'],
+    entry: ['进入「系统设置」并记录原值；基础设置目前只保存到当前浏览器', '准备条码前缀、默认借用天数、逾期提醒天数等配置'],
+    workflow: ['核对条码前缀、默认借用天数和逾期提醒天数', '检查通知开关，以及企业微信 Webhook、审批抄送人和归还收件人的服务端配置状态', 'Webhook 原始地址只由维护人员在 Supabase Edge Function Secrets 中管理，本页不会读取或保存'],
+    followup: ['重新打开页面核对本机保存结果；通知是否可达仍须通过测试申请验证', '服务端状态异常时联系维护人员，不要在聊天、截图或浏览器中传递 Webhook 原始地址'],
   }),
   makeSystemGuide({
     id: 'system-super-admin-transfer',
@@ -850,7 +851,7 @@ export function SopGuidePage() {
       setLastSavedAt(new Date().toLocaleTimeString('zh-CN', { hour: '2-digit', minute: '2-digit' }))
     } catch (error) {
       console.error('save SOP processes error:', error)
-      setPersistenceError(error instanceof Error ? error.message : 'SOP 保存失败，请稍后重试。')
+      setPersistenceError(getErrorMessage(error, 'SOP 保存失败，请稍后重试。'))
     } finally {
       setIsSopSaving(false)
     }

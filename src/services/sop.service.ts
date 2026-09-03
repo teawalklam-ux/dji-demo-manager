@@ -73,6 +73,10 @@ export const sopService = {
     const { error } = await supabase.rpc('replace_sop_processes', {
       p_processes: processes,
     })
-    if (error) throw error
+    if (error) {
+      const persistenceError = new Error(error.message, { cause: error })
+      persistenceError.name = 'SopPersistenceError'
+      throw persistenceError
+    }
   },
 }
