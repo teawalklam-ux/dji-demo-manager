@@ -5,31 +5,91 @@
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
+import { bearerToken, configuredList, isUuid } from '../_shared/request-security.ts'
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
-// 审批通过抄送人：通过手机号触发真实 @，不在“申请人”字段中展示。
-const APPROVAL_CC_MOBILE = '15112312781'
+function jsonResponse(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json', 'Cache-Control': 'no-store' },
+  })
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders })
   }
 
+  if (req.method !== 'POST') {
+    return jsonResponse({ error: 'Method not allowed' }, 405)
+  }
+
   try {
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
+    if (!supabaseUrl || !supabaseKey) {
+      return jsonResponse({ error: 'Supabase service environment is incomplete' }, 500)
+    }
     const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // 从请求体获取借用申请ID（可选，不传则查所有待通知的审批）
+    const token = bearerToken(req)
+    if (!token) return jsonResponse({ error: 'Unauthorized' }, 401)
+
+    const { data: authData, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !authData.user) {
+      return jsonResponse({ error: 'Unauthorized' }, 401)
+    }
+
     let requestId: string | null = null
     try {
       const body = await req.json()
-      requestId = body.request_id || null
+      requestId = isUuid(body.request_id) ? body.request_id : null
     } catch {
-      // 无请求体，查所有未通知的审批
+      // 由下面的参数校验统一返回错误。
+    }
+
+    if (!requestId) {
+      return jsonResponse({ error: 'A valid request_id is required' }, 400)
+    }
+
+    const [requestResult, profileResult, approvalResult] = await Promise.all([
+      supabase
+        .from('borrow_requests')
+        .select('id, requester_id')
+        .eq('id', requestId)
+        .maybeSingle(),
+      supabase
+        .from('profiles')
+        .select('role, status')
+        .eq('id', authData.user.id)
+        .maybeSingle(),
+      supabase
+        .from('approval_records')
+        .select('id')
+        .eq('request_id', requestId)
+        .eq('approver_id', authData.user.id)
+        .not('acted_at', 'is', null)
+        .limit(1)
+        .maybeSingle(),
+    ])
+
+    if (requestResult.error) throw new Error(`Failed to verify request access: ${requestResult.error.message}`)
+    if (profileResult.error) throw new Error(`Failed to verify caller profile: ${profileResult.error.message}`)
+    if (approvalResult.error) throw new Error(`Failed to verify caller approval: ${approvalResult.error.message}`)
+    if (!requestResult.data) return jsonResponse({ error: 'Borrow request not found' }, 404)
+
+    const callerProfile = profileResult.data
+    const callerIsActive = callerProfile?.status === 'active'
+    const callerIsAdmin = ['super_admin', 'admin'].includes(callerProfile?.role || '')
+    const callerIsRequester = requestResult.data.requester_id === authData.user.id
+    const callerActedOnRequest = Boolean(approvalResult.data)
+
+    if (!callerIsActive || (!callerIsAdmin && !callerIsRequester && !callerActedOnRequest)) {
+      return jsonResponse({ error: 'Forbidden' }, 403)
     }
 
     // 查询待发送企业微信通知的审批通知
@@ -62,9 +122,7 @@ serve(async (req) => {
       .eq('notification_category', 'approval')
       .eq('notification_type', 'push')
 
-    if (requestId) {
-      query = query.eq('borrow_request_id', requestId)
-    }
+    query = query.eq('borrow_request_id', requestId)
 
     const { data: pendingNotifications, error: fetchError } = await query.limit(100)
 
@@ -110,8 +168,17 @@ serve(async (req) => {
     // recipient_id == requester_id → 审批结果通知（申请人收）
     // recipient_id != requester_id → 待审批提醒（审批人收，待审批人只显示自己）
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
+    const approvalCcMobiles = configuredList('APPROVAL_CC_MOBILES')
     let wecomSentCount = 0
     const deliveredNotifications: typeof unsentNotifications = []
+
+    const requiresApprovalCc = unsentNotifications.some((notification) => (
+      notification.recipient_id === notification.borrow_requests?.requester_id
+      && !(notification.message || '').includes('审批拒绝')
+    ))
+    if (requiresApprovalCc && approvalCcMobiles.length === 0) {
+      return jsonResponse({ error: 'APPROVAL_CC_MOBILES is not configured' }, 500)
+    }
 
     if (wecomUrl) {
       for (const n of unsentNotifications) {
@@ -197,7 +264,7 @@ serve(async (req) => {
                     ? (recipientMobile ? [recipientMobile] : [])
                     : [
                         ...new Set(
-                          [requesterMobile, APPROVAL_CC_MOBILE].filter(
+                          [requesterMobile, ...approvalCcMobiles].filter(
                             (mobile): mobile is string => Boolean(mobile)
                           )
                         ),

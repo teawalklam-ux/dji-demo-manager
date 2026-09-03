@@ -1,15 +1,15 @@
 // 样机归还企业微信通知
-// 由前端在 process_return 成功后调用，通知林芷因和田潇。
+// 由前端在 process_return 成功后调用，通知服务端配置的固定收件人。
 
 import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
+
+import { configuredList, isUuid } from '../_shared/request-security.ts'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
-
-const RETURN_MENTION_NAMES = ['林芷因', '田潇']
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -33,6 +33,14 @@ serve(async (req) => {
 
     if (!wecomUrl) {
       return jsonResponse({ error: 'WECOM_WEBHOOK_URL is not configured' }, 500)
+    }
+
+    const returnMentionProfileIds = configuredList('RETURN_MENTION_PROFILE_IDS')
+    if (
+      returnMentionProfileIds.length === 0
+      || returnMentionProfileIds.some((profileId) => !isUuid(profileId))
+    ) {
+      return jsonResponse({ error: 'RETURN_MENTION_PROFILE_IDS is not configured correctly' }, 500)
     }
 
     const authHeader = req.headers.get('authorization')
@@ -119,7 +127,7 @@ serve(async (req) => {
       .from('profiles')
       .select('id, display_name, phone')
       .eq('status', 'active')
-      .in('display_name', RETURN_MENTION_NAMES)
+      .in('id', returnMentionProfileIds)
 
     if (recipientsError) {
       throw new Error(`Failed to fetch WeCom recipients: ${recipientsError.message}`)

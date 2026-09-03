@@ -1,6 +1,8 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
+import { bearerToken, constantTimeEqual } from '../_shared/request-security.ts'
+
 type ReservationEvent = {
   id: string
   event_type: 'overdue_risk' | 'auto_invalidated'
@@ -35,6 +37,14 @@ function nextAttemptDate(attemptCount: number) {
 Deno.serve(async (request) => {
   if (request.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed' }, 405)
+  }
+
+  const cronSecret = Deno.env.get('RESERVATION_EVENTS_CRON_SECRET') || ''
+  if (!cronSecret) {
+    return jsonResponse({ error: 'Reservation notification authentication is not configured' }, 500)
+  }
+  if (!constantTimeEqual(bearerToken(request), cronSecret)) {
+    return jsonResponse({ error: 'Unauthorized' }, 401)
   }
 
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
