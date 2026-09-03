@@ -3,7 +3,7 @@
  * pre-emit critique: P5 H5 E4 S5 R4 V5
  * theme: locked DJI cool system · nav: N11 Mega-menu (5:4 dual catalog, stacked mobile, dim scrim)
  * motion: liquid circle-to-pill · pill-to-card · reverse-collapse
- * variation: system checklist tabs -> sequential screenshot dialog; operations unchanged
+ * variation: system checklist tabs -> sequential screenshot dialog; operations footer reset-only -> sequenced next-step CTA
  * states: default · hover · focus · active · disabled · loading · error · success
  * contrast: pass (40–41) · honest: pass (46) · chrome: pass (47) · tokens: pass (48)
  * mobile: pass (34, 49, 50–57) · icons: pass (30) · slop: pass (42–45)
@@ -366,6 +366,7 @@
 .sop-mega-nav__trigger,
 .sop-admin-toggle,
 .sop-text-button,
+.sop-next-button,
 .sop-save-button,
 .sop-danger-button,
 .sop-add-item button,
@@ -398,6 +399,7 @@
 .sop-mega-nav__trigger svg,
 .sop-admin-toggle svg,
 .sop-text-button svg,
+.sop-next-button svg,
 .sop-save-button svg,
 .sop-danger-button svg,
 .sop-add-item button svg {
@@ -720,6 +722,19 @@
   background: transparent;
   color: var(--color-accent);
   padding-inline: var(--space-2xs);
+}
+
+.sop-next-button {
+  border: var(--rule-hair) solid var(--color-accent);
+  background: var(--color-accent);
+  color: var(--color-accent-ink);
+  padding-inline: var(--space-sm);
+}
+
+.sop-next-button.is-complete {
+  border-color: var(--color-success);
+  background: var(--color-success);
+  color: var(--color-paper);
 }
 
 .sop-mega-scrim {
@@ -1275,6 +1290,13 @@
   font-size: var(--text-sm);
 }
 
+.sop-page__foot-actions {
+  display: flex;
+  max-width: 100%;
+  flex-wrap: wrap;
+  gap: var(--space-2xs);
+}
+
 .sop-undo {
   position: fixed;
   inset: auto var(--space-sm) var(--space-sm);
@@ -1335,6 +1357,7 @@
 .sop-icon-button:focus-visible,
 .sop-process-option:focus-visible,
 .sop-text-button:focus-visible,
+.sop-next-button:focus-visible,
 .sop-save-button:focus-visible,
 .sop-danger-button:focus-visible,
 .sop-add-item button:focus-visible,
@@ -1352,6 +1375,7 @@
 .sop-stage-tab:disabled,
 .sop-collapsed-card:disabled,
 .sop-text-button:disabled,
+.sop-next-button:disabled,
 .sop-save-button:disabled,
 .sop-danger-button:disabled,
 .sop-add-item button:disabled,
@@ -1369,6 +1393,7 @@
 .sop-stage-tab:active,
 .sop-collapsed-card:active,
 .sop-text-button:active,
+.sop-next-button:active,
 .sop-save-button:active,
 .sop-danger-button:active,
 .sop-add-item button:active,
@@ -1410,8 +1435,7 @@
     grid-column: 2;
   }
 
-  .sop-mega-panel__admin,
-  .sop-page__foot {
+  .sop-mega-panel__admin {
     flex-direction: row;
     align-items: center;
     justify-content: space-between;
@@ -1466,6 +1490,12 @@
 }
 
 @media (min-width: 60rem) {
+  .sop-page__foot {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+  }
+
   .sop-intro {
     grid-template-columns: minmax(0, 1.4fr) minmax(14rem, 0.6fr);
     align-items: end;
@@ -1515,6 +1545,7 @@
 @media (hover: hover) and (pointer: fine) {
   .sop-mega-nav__trigger:hover,
   .sop-add-item button:hover,
+  .sop-next-button:not(:disabled):hover,
   .sop-save-button:hover,
   .sop-entry-link:hover {
     transform: translateY(calc(var(--rule-hair) * -1));
@@ -1561,6 +1592,7 @@
   .sop-mega-nav__trigger,
   .sop-admin-toggle,
   .sop-text-button,
+  .sop-next-button,
   .sop-save-button,
   .sop-danger-button,
   .sop-add-item button,
@@ -1585,6 +1617,7 @@
   .sop-stage-tab,
   .sop-collapsed-card,
   .sop-text-button,
+  .sop-next-button,
   .sop-save-button,
   .sop-danger-button,
   .sop-add-item button,

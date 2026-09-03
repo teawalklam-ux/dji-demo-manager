@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEven
 import { Liquid } from 'liquid-gooey'
 import {
   AlertCircle,
+  ArrowRight,
   BadgeCheck,
   BookOpenCheck,
   Check,
@@ -577,6 +578,8 @@ export function SopGuidePage() {
   )
   const activeStageDefinitions = stageDefinitions
   const stageDefinition = activeStageDefinitions.find((stage) => stage.key === activeStage) ?? activeStageDefinitions[0]
+  const activeStageIndex = activeStageDefinitions.findIndex((stage) => stage.key === stageDefinition.key)
+  const nextStageDefinition = activeStageDefinitions[activeStageIndex + 1]
   const editingEnabled = editing && canEdit
   const activeItems = activeProcess?.stages[activeStage] ?? []
   const completedCount = activeItems.filter((item) => completedItems.has(`${activeProcess?.id}:${activeStage}:${item.id}`)).length
@@ -1341,17 +1344,25 @@ export function SopGuidePage() {
         <span>
           依次完成：物料准备 → 现场工作 → 后续交接
         </span>
-        <button
-          type="button"
-          className="sop-text-button"
-          onClick={() => {
-            setActiveStage('materials')
-            setCardCollapsed(false)
-          }}
-        >
-          <RotateCcw aria-hidden="true" />
-          回到第一阶段
-        </button>
+        <div className="sop-page__foot-actions">
+          <button
+            type="button"
+            className="sop-text-button"
+            onClick={() => selectStage('materials', true)}
+          >
+            <RotateCcw aria-hidden="true" />
+            回到第一阶段
+          </button>
+          <button
+            type="button"
+            className={`sop-next-button ${nextStageDefinition ? '' : 'is-complete'}`}
+            onClick={() => nextStageDefinition && selectStage(nextStageDefinition.key, true)}
+            disabled={!nextStageDefinition}
+          >
+            {nextStageDefinition ? `下一步 · ${nextStageDefinition.shortLabel}` : '已完成全部阶段'}
+            {nextStageDefinition ? <ArrowRight aria-hidden="true" /> : <Check aria-hidden="true" />}
+          </button>
+        </div>
       </footer>}
 
       {undoState && (
