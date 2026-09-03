@@ -6,6 +6,7 @@ import { Switch } from '@/components/ui/switch'
 import { Spinner } from '@/components/ui/spinner'
 import { toast } from 'sonner'
 import { Save } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 const STORAGE_KEY = 'dji_demo_system_settings'
 
@@ -13,16 +14,21 @@ interface Settings {
   barcode_prefix: string
   default_borrow_days: number
   overdue_remind_days: number
-  wecom_webhook_url: string
   overdue_email_notify: boolean
   overdue_wecom_notify: boolean
+}
+
+interface WeComConfigStatus {
+  webhookConfigured: boolean
+  approvalRecipientsConfigured: boolean
+  returnRecipientsConfigured: boolean
+  managedBy: 'supabase_edge_function_secrets'
 }
 
 const defaultSettings: Settings = {
   barcode_prefix: 'DJI',
   default_borrow_days: 14,
   overdue_remind_days: 1,
-  wecom_webhook_url: '',
   overdue_email_notify: true,
   overdue_wecom_notify: false,
 }
@@ -31,7 +37,11 @@ function loadSettings(): Settings {
   try {
     const stored = localStorage.getItem(STORAGE_KEY)
     if (stored) {
-      return { ...defaultSettings, ...JSON.parse(stored) }
+      const parsed = JSON.parse(stored) as Partial<Settings> & { wecom_webhook_url?: unknown }
+      delete parsed.wecom_webhook_url
+      const sanitized = { ...defaultSettings, ...parsed }
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized))
+      return sanitized
     }
   } catch {
     // ignore
@@ -43,11 +53,36 @@ export function SettingsPage() {
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [wecomStatus, setWecomStatus] = useState<WeComConfigStatus | null>(null)
+  const [wecomStatusLoading, setWecomStatusLoading] = useState(true)
 
   useEffect(() => {
     const saved = loadSettings()
     setSettings(saved)
     setLoading(false)
+  }, [])
+
+  useEffect(() => {
+    let cancelled = false
+
+    async function loadWeComStatus() {
+      try {
+        const { data, error } = await supabase.functions.invoke<WeComConfigStatus>('wecom-config-status', {
+          body: {},
+        })
+        if (error) throw error
+        if (!cancelled) setWecomStatus(data)
+      } catch (error) {
+        console.error('读取企业微信服务端配置状态失败:', error)
+      } finally {
+        if (!cancelled) setWecomStatusLoading(false)
+      }
+    }
+
+    loadWeComStatus()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   async function handleSave() {
@@ -124,12 +159,28 @@ export function SettingsPage() {
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">企业微信 Webhook URL</label>
-              <Input
-                value={settings.wecom_webhook_url}
-                onChange={e => updateField('wecom_webhook_url', e.target.value)}
-                placeholder="https://qyapi.weixin.qq.com/cgi-bin/webhook/send?key=..."
-              />
-              <p className="text-xs text-muted-foreground">用于发送企业微信通知的 Webhook 地址</p>
+              <div className="flex min-h-10 items-center rounded-md border bg-muted/30 px-3 text-sm">
+                <span
+                  className={`mr-2 size-2 rounded-full ${
+                    wecomStatus?.webhookConfigured ? 'bg-emerald-500' : 'bg-amber-500'
+                  }`}
+                  aria-hidden="true"
+                />
+                {wecomStatusLoading
+                  ? '正在检查服务端配置…'
+                  : wecomStatus?.webhookConfigured
+                    ? '已在服务端安全配置'
+                    : '未配置或状态不可用'}
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Webhook 仅由 Supabase Edge Function Secret 管理，浏览器不会读取或保存原始地址。
+              </p>
+              {!wecomStatusLoading && wecomStatus?.webhookConfigured && (
+                <p className="text-xs text-muted-foreground">
+                  审批抄送人：{wecomStatus.approvalRecipientsConfigured ? '已配置' : '未配置'}；归还收件人：
+                  {wecomStatus.returnRecipientsConfigured ? '已配置' : '未配置'}
+                </p>
+              )}
             </div>
           </div>
         </CardContent>
