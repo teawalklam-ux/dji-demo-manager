@@ -1,6 +1,7 @@
 import type { PersistedSopItem } from '@/services/sop.service'
 
 export const SYSTEM_GUIDE_IDS = [
+  'system-crm-login', 'system-crm-customer', 'system-crm-followup',
   'system-borrow-apply', 'system-transfer-apply', 'system-renew-apply',
   'system-report-export', 'system-return-item', 'system-item-approval',
   'system-approval-chain', 'system-record-cleanup', 'system-request-history',
