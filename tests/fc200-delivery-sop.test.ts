@@ -25,7 +25,7 @@ for (const requiredText of [
 }
 
 const migration = readFileSync(
-  new URL('../supabase/migrations/20260907085558_add_fc200_customer_delivery_sop.sql', import.meta.url),
+  new URL('../supabase/migrations/20260907102534_add_fc200_customer_delivery_sop.sql', import.meta.url),
   'utf8',
 )
 assert.match(migration, /fc200-customer-delivery/)
