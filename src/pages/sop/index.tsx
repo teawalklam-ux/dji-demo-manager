@@ -41,6 +41,8 @@ import { useAuth } from '@/contexts/auth-context'
 import type { UserRole } from '@/lib/constants'
 import { getErrorMessage } from '@/lib/errors'
 import { sopService, type PersistedSopItem, type PersistedSopProcess } from '@/services/sop.service'
+import { crmSystemSopGuides } from './crm-system-sops'
+import { fc200DeliverySop } from './fc200-delivery-sop'
 import { SystemSopReader } from './system-sop-reader'
 import { getSopScreenshot } from './system-sop-screenshots'
 import './sop-guide.css'
@@ -318,6 +320,12 @@ const initialProcesses: SopProcess[] = [
     },
   },
   {
+    ...fc200DeliverySop,
+    status: 'ready',
+    icon: PackageOpen,
+    kind: 'operations',
+  },
+  {
     id: 'dock-maintenance',
     title: '机场维修',
     description: '流程框架已预留，等待管理员录入业务标准',
@@ -329,6 +337,17 @@ const initialProcesses: SopProcess[] = [
 ]
 
 const systemProcesses: SopProcess[] = [
+  ...crmSystemSopGuides.map((guide): SopProcess => ({
+    id: guide.id,
+    title: guide.title,
+    description: guide.description,
+    status: 'ready',
+    icon: sopIconRegistry[guide.iconKey],
+    kind: 'system',
+    requiredRole: guide.requiredRole,
+    roleGroup: guide.roleGroup,
+    stages: guide.stages,
+  })),
   makeSystemGuide({
     id: 'system-borrow-apply',
     title: '提交借用申请',
