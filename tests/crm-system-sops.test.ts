@@ -38,7 +38,7 @@ for (const step of steps) {
 }
 
 const migration = readFileSync(
-  new URL('../supabase/migrations/20260907093405_add_crm_system_sop_guides.sql', import.meta.url),
+  new URL('../supabase/migrations/20260907102719_add_crm_system_sop_guides.sql', import.meta.url),
   'utf8',
 )
 const migrationPayload = migration.match(/\$crm_sop\$\s*([\s\S]*?)\s*\$crm_sop\$/)?.[1]
