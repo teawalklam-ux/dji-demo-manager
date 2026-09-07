@@ -36,7 +36,7 @@ const newPage = async (role = 'super_admin', width = 1440, reducedMotion = 'redu
 }
 
 try {
-  for (const [role, count] of [['user', 5], ['approver', 6], ['admin', 10], ['super_admin', 15]]) {
+  for (const [role, count] of [['user', 8], ['approver', 9], ['admin', 13], ['super_admin', 18]]) {
     const { context, page } = await newPage(role)
     await openMenu(page)
     assert.equal(await page.locator('[data-sop-process^="system-"]').count(), count, `${role} guide count`)
@@ -57,11 +57,12 @@ try {
     assert.equal(await dialog(page).getByRole('checkbox').count(), 0)
     assert.equal(await page.locator('.sop-stage-tabs').count(), 0)
     assert(await dialog(page).getByRole('button', { name: '上一步', exact: true }).isDisabled())
-    for (let index = 0; index < 7; index++) {
+    const stepCount = Number(await dialog(page).getByRole('progressbar').getAttribute('aria-valuemax'))
+    for (let index = 0; index < stepCount; index++) {
       await readyImage(page)
       assert.equal(await dialog(page).getByRole('progressbar').getAttribute('aria-valuenow'), String(index + 1))
       imageCount++
-      await dialog(page).getByRole('button', { name: index === 6 ? '完成指引' : '下一步', exact: true }).click()
+      await dialog(page).getByRole('button', { name: index === stepCount - 1 ? '完成指引' : '下一步', exact: true }).click()
     }
     assert(!(await dialog(page).isVisible()), 'completion closes dialog')
     assert(await page.getByText('阅读完成不代表业务已处理。', { exact: true }).isVisible())
