@@ -167,7 +167,15 @@ serve(async (req) => {
 
     // Send WeCom webhook notification
     const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
-    if (wecomUrl && wecomItems.length > 0) {
+    // Read on each run; errors fail closed for WeCom only.
+    const { data: settings, error: settingsError } = await supabase
+      .from('system_settings')
+      .select('overdue_wecom_notify')
+      .eq('id', true)
+      .single()
+    if (settingsError) console.error('Failed to read system settings:', settingsError.message)
+    let wecomNotifiedCount = 0
+    if (!settingsError && settings?.overdue_wecom_notify === true && wecomUrl && wecomItems.length > 0) {
       const overdueList = wecomItems.join('\n')
 
       try {
@@ -188,7 +196,11 @@ serve(async (req) => {
           }),
         })
         const wecomResult = await wecomResponse.json()
-        console.log('WeCom webhook response:', JSON.stringify(wecomResult))
+        if (wecomResponse.ok && wecomResult.errcode === 0) {
+          wecomNotifiedCount = wecomItems.length
+        } else {
+          console.error('WeCom webhook delivery failed')
+        }
       } catch (wecomError) {
         console.error('WeCom webhook failed:', wecomError)
       }
@@ -202,7 +214,8 @@ serve(async (req) => {
         totalOverdueCount: uniqueRecords.length,
         newlyOverdueCount: newOverdueRecords?.length || 0,
         existingOverdueCount: existingOverdueRecords?.length || 0,
-        wecomNotifiedCount: wecomItems.length,
+        wecomNotifiedCount,
+        settingsReadFailed: Boolean(settingsError),
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     )

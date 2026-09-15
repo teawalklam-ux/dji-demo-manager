@@ -1,5 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
+import { settingsService } from '@/services/settings.service'
+import { defaultReturnDate } from '@/lib/system-settings'
 import { itemsService } from '@/services/items.service'
 import { borrowService } from '@/services/borrow.service'
 import { approvalService } from '@/services/approval.service'
@@ -101,6 +103,8 @@ export function BorrowApply() {
   const [saveCustomer, setSaveCustomer] = useState(true)
   const [customers, setCustomers] = useState<UserCustomer[]>([])
   const [purpose, setPurpose] = useState('')
+  const [defaultBorrowDays, setDefaultBorrowDays] = useState(14)
+  const [returnDateEdited, setReturnDateEdited] = useState(false)
   const [expectedBorrowDate, setExpectedBorrowDate] = useState('')
   const [expectedReturnDate, setExpectedReturnDate] = useState('')
   const [availabilityConflicts, setAvailabilityConflicts] = useState<Array<{ item_id: string; item_name: string; occupied_start_date: string; occupied_end_date: string }>>([])
@@ -129,12 +133,13 @@ export function BorrowApply() {
     setLoading(true)
     setLoadError(null)
     try {
-      const [itemsData, transferableItemsData, chainsData, customersData, requestData] = await Promise.all([
+      const [itemsData, transferableItemsData, chainsData, customersData, requestData, globalSettings] = await Promise.all([
         itemsService.getBorrowableItems(),
         itemsService.getTransferableItems(),
         approvalService.getChains(),
         customerService.getMine(),
         requestId ? borrowService.getRequestById(requestId) : Promise.resolve(null),
+        requestId ? Promise.resolve(null) : settingsService.get(),
       ])
       const mergedItemMap = new Map(itemsData.map((item) => [item.id, item]))
       for (const transferItem of transferableItemsData) {
@@ -179,6 +184,11 @@ export function BorrowApply() {
         setSaveCustomer(false)
       } else {
         setItems(mergedAvailableItems)
+        const today = new Date().toLocaleDateString('en-CA')
+        setDefaultBorrowDays(globalSettings!.default_borrow_days)
+        setExpectedBorrowDate(today)
+        setExpectedReturnDate(defaultReturnDate(today, globalSettings!.default_borrow_days))
+        setReturnDateEdited(false)
         const initialItem = itemId ? mergedAvailableItems.find((item) => item.id === itemId) : null
         if (itemId && !initialItem) {
           setSelectedItemIds([])
@@ -255,6 +265,12 @@ export function BorrowApply() {
       return Boolean(item && ['in_stock', 'borrowed'].includes(item.status))
     }))
   }, [borrowType, editingRequest, items, loading])
+
+  useEffect(() => {
+    if (!loading && !requestId && !returnDateEdited) {
+      setExpectedReturnDate(defaultReturnDate(expectedBorrowDate, defaultBorrowDays))
+    }
+  }, [loading, requestId, returnDateEdited, expectedBorrowDate, defaultBorrowDays])
 
   const activeChains = chains.filter((chain) => chain.is_active)
   const borrowTypeOptions = getBorrowTypeOptions(activeChains.map(chain => chain.borrow_type))
@@ -655,7 +671,7 @@ export function BorrowApply() {
                 type="date"
                 min={expectedBorrowDate || new Date().toLocaleDateString('en-CA')}
                 value={expectedReturnDate}
-                onChange={(e) => setExpectedReturnDate(e.target.value)}
+                onChange={(e) => { setReturnDateEdited(true); setExpectedReturnDate(e.target.value) }}
               />
             </div>
           </div>

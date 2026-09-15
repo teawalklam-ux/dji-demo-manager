@@ -1,5 +1,5 @@
 import { Html5QrcodeSupportedFormats } from 'html5-qrcode'
-import { BARCODE_PREFIX } from '../../lib/constants'
+import { BARCODE_PREFIX } from '../../lib/constants.ts'
 
 export type BarcodeScanMode = 'barcode' | 'qrcode' | 'mixed'
 
