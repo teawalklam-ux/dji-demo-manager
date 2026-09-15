@@ -6,7 +6,7 @@ import {
   getSelectableScanModes,
   isAcceptedScanResult,
   isSystemBarcode,
-} from '../src/components/barcode/barcode-scan-profile'
+} from '../src/components/barcode/barcode-scan-profile.ts'
 
 const code128 = Html5QrcodeSupportedFormats.CODE_128
 const qrCode = Html5QrcodeSupportedFormats.QR_CODE

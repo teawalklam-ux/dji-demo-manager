@@ -113,6 +113,8 @@
   :where(a, button, input, select, textarea, [tabindex]):focus-visible {
     outline: 2px solid var(--color-focus);
     outline-offset: 2px;
+    animation-duration: 0ms !important;
+    transition-duration: 0ms !important;
   }
   ::selection {
     background: var(--color-accent-surface);
@@ -241,20 +243,23 @@
     align-items: center;
     gap: var(--space-3xs);
   }
-  .hm-sidebar-link {
+  .hm-sidebar-menu {
     position: relative;
   }
-  .hm-sidebar-link::before {
+  .hm-sidebar-active-indicator {
+    pointer-events: none;
     position: absolute;
-    inset-block: 0.65rem;
+    inset-block-start: 0.625rem;
     inset-inline-start: -0.75rem;
+    z-index: 1;
+    height: 1.25rem;
     width: var(--rule-fine);
     border-radius: var(--radius-pill);
-    background: transparent;
-    content: "";
-  }
-  .hm-sidebar-link[data-active="true"]::before {
     background: var(--color-sidebar-accent);
+    transform: translateY(var(--hm-sidebar-indicator-offset, 0));
+    transition:
+      transform var(--dur-short) var(--ease-out),
+      opacity var(--dur-micro) var(--ease-out);
   }
   .hm-tool-rail {
     border-block: var(--rule-hair) solid var(--color-rule);
@@ -314,6 +319,8 @@
     scroll-behavior: auto !important;
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
+    transition-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
   }
   .hm-metric-link {
     transition-duration: 0.01ms;

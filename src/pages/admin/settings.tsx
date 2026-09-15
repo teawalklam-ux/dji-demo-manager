@@ -8,15 +8,10 @@ import { toast } from 'sonner'
 import { Save } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
-const STORAGE_KEY = 'dji_demo_system_settings'
-
-interface Settings {
-  barcode_prefix: string
-  default_borrow_days: number
-  overdue_remind_days: number
-  overdue_email_notify: boolean
-  overdue_wecom_notify: boolean
-}
+import { settingsService } from '@/services/settings.service'
+import { defaultSettings, type SystemSettings as Settings } from '@/lib/system-settings'
+import { useAuth } from '@/contexts/auth-context'
+import { getErrorMessage } from '@/lib/errors'
 
 interface WeComConfigStatus {
   webhookConfigured: boolean
@@ -25,31 +20,10 @@ interface WeComConfigStatus {
   managedBy: 'supabase_edge_function_secrets'
 }
 
-const defaultSettings: Settings = {
-  barcode_prefix: 'DJI',
-  default_borrow_days: 14,
-  overdue_remind_days: 1,
-  overdue_email_notify: true,
-  overdue_wecom_notify: false,
-}
-
-function loadSettings(): Settings {
-  try {
-    const stored = localStorage.getItem(STORAGE_KEY)
-    if (stored) {
-      const parsed = JSON.parse(stored) as Partial<Settings> & { wecom_webhook_url?: unknown }
-      delete parsed.wecom_webhook_url
-      const sanitized = { ...defaultSettings, ...parsed }
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(sanitized))
-      return sanitized
-    }
-  } catch {
-    // ignore
-  }
-  return { ...defaultSettings }
-}
-
 export function SettingsPage() {
+  const { profile } = useAuth()
+  const canEdit = profile?.role === 'super_admin' && profile.status === 'active'
+  const [loadError, setLoadError] = useState(false)
   const [settings, setSettings] = useState<Settings>(defaultSettings)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -57,9 +31,18 @@ export function SettingsPage() {
   const [wecomStatusLoading, setWecomStatusLoading] = useState(true)
 
   useEffect(() => {
-    const saved = loadSettings()
-    setSettings(saved)
-    setLoading(false)
+    let cancelled = false
+    settingsService.get().then(saved => {
+      if (!cancelled) setSettings(saved)
+    }).catch(() => {
+      if (!cancelled) {
+        setLoadError(true)
+        toast.error('读取系统设置失败，请刷新重试')
+      }
+    }).finally(() => {
+      if (!cancelled) setLoading(false)
+    })
+    return () => { cancelled = true }
   }, [])
 
   useEffect(() => {
@@ -88,12 +71,12 @@ export function SettingsPage() {
   async function handleSave() {
     try {
       setSaving(true)
-      localStorage.setItem(STORAGE_KEY, JSON.stringify(settings))
-      // 短暂延迟模拟保存
-      await new Promise(resolve => setTimeout(resolve, 300))
+      if (!canEdit || loadError) return
+      const saved = await settingsService.update(settings)
+      setSettings(saved)
       toast.success('设置已保存')
     } catch (err) {
-      toast.error('保存设置失败')
+      toast.error(getErrorMessage(err, '保存设置失败'))
       console.error(err)
     } finally {
       setSaving(false)
@@ -116,12 +99,14 @@ export function SettingsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-bold">系统设置</h1>
-        <Button onClick={handleSave} disabled={saving}>
+        <Button onClick={handleSave} disabled={saving || !canEdit || loadError}>
           {saving ? <Spinner className="size-4 mr-2" /> : <Save className="size-4 mr-2" />}
           保存设置
         </Button>
       </div>
 
+      {loadError && <p role="alert" className="text-sm text-destructive">读取系统设置失败，请刷新重试。</p>}
+      <fieldset disabled={saving || !canEdit || loadError} className="space-y-6">
       <Card>
         <CardHeader>
           <CardTitle>基础设置</CardTitle>
@@ -142,7 +127,7 @@ export function SettingsPage() {
               <Input
                 type="number"
                 value={settings.default_borrow_days}
-                onChange={e => updateField('default_borrow_days', parseInt(e.target.value) || 14)}
+                onChange={e => updateField('default_borrow_days', Number(e.target.value))}
                 min={1}
               />
               <p className="text-xs text-muted-foreground">创建借用申请时的默认天数</p>
@@ -152,7 +137,7 @@ export function SettingsPage() {
               <Input
                 type="number"
                 value={settings.overdue_remind_days}
-                onChange={e => updateField('overdue_remind_days', parseInt(e.target.value) || 1)}
+                onChange={e => updateField('overdue_remind_days', Number(e.target.value))}
                 min={0}
               />
               <p className="text-xs text-muted-foreground">到期前多少天开始提醒</p>
@@ -213,6 +198,7 @@ export function SettingsPage() {
           </div>
         </CardContent>
       </Card>
+      </fieldset>
     </div>
   )
 }
