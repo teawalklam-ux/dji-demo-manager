@@ -29,7 +29,7 @@ import {
 import { ROLE_MAP } from '@/lib/constants'
 import { APP_VERSION } from '@/lib/version'
 import { useNotifications } from '@/hooks/use-notifications'
-import { useState, useRef, useEffect } from 'react'
+import { useState, useRef, useEffect, type CSSProperties } from 'react'
 import type { OverdueNotification, UserRole } from '@/types'
 import { appLogService } from '@/services/app-log.service'
 
@@ -61,6 +61,21 @@ const adminNavItems = [
   { title: '系统设置', href: '/admin/settings', icon: Settings, superAdminOnly: true },
 ]
 
+function isMainNavItemActive(pathname: string, item: MainNavItem) {
+  return pathname === item.href
+    || (item.href !== '/' && pathname.startsWith(item.href))
+    || (
+      item.href === '/borrow/my-requests'
+      && pathname.startsWith('/borrow/requests/')
+    )
+}
+
+function sidebarIndicatorStyle(activeIndex: number): CSSProperties {
+  return {
+    '--hm-sidebar-indicator-offset': `${activeIndex * 2.75}rem`,
+  } as CSSProperties
+}
+
 function AppSidebar() {
   const { profile, signOut, isSuperAdmin, isAdmin, hasRole, isDemoMode } = useAuth()
   const location = useLocation()
@@ -69,6 +84,9 @@ function AppSidebar() {
     item => (!item.roles || item.roles.some(r => hasRole(r)))
       && (!isDemoMode || item.href === '/' || item.href === '/items' || item.href === '/sop')
   )
+  const filteredAdminNav = adminNavItems.filter(item => !item.superAdminOnly || isSuperAdmin)
+  const activeMainNavIndex = filteredMainNav.findIndex(item => isMainNavItemActive(location.pathname, item))
+  const activeAdminNavIndex = filteredAdminNav.findIndex(item => location.pathname.startsWith(item.href))
 
   return (
     <Sidebar className="border-r-0">
@@ -91,20 +109,19 @@ function AppSidebar() {
       <SidebarContent className="gap-4 px-3 py-5">
         <div>
           <p className="mb-2 px-3 text-[11px] font-semibold tracking-[var(--tracking-label)] text-[var(--color-sidebar-muted)]">工作区</p>
-          <SidebarMenu>
+          <SidebarMenu
+            className="hm-sidebar-menu"
+            style={activeMainNavIndex >= 0 ? sidebarIndicatorStyle(activeMainNavIndex) : undefined}
+          >
+            {activeMainNavIndex >= 0 && (
+              <li className="hm-sidebar-active-indicator" role="presentation" aria-hidden="true" />
+            )}
             {filteredMainNav.map((item) => (
               <SidebarMenuItem key={item.href}>
                 <SidebarMenuButton
                   asChild
-                  isActive={
-                    location.pathname === item.href
-                    || (item.href !== '/' && location.pathname.startsWith(item.href))
-                    || (
-                      item.href === '/borrow/my-requests'
-                      && location.pathname.startsWith('/borrow/requests/')
-                    )
-                  }
-                  className="hm-sidebar-link h-10 rounded-[var(--radius-input)] px-3 text-sidebar-foreground/70 hover:text-sidebar-foreground data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
+                  isActive={isMainNavItemActive(location.pathname, item)}
+                  className="h-10 rounded-[var(--radius-input)] px-3 text-sidebar-foreground/70 hover:text-sidebar-foreground data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
                 >
                   <Link to={item.href}>
                     <item.icon className="h-4 w-4" />
@@ -119,15 +136,19 @@ function AppSidebar() {
         {isAdmin && (
           <div>
             <p className="mb-2 px-3 text-[11px] font-semibold tracking-[var(--tracking-label)] text-[var(--color-sidebar-muted)]">管理</p>
-            <SidebarMenu>
-              {adminNavItems
-                .filter(item => !item.superAdminOnly || isSuperAdmin)
-                .map((item) => (
+            <SidebarMenu
+              className="hm-sidebar-menu"
+              style={activeAdminNavIndex >= 0 ? sidebarIndicatorStyle(activeAdminNavIndex) : undefined}
+            >
+              {activeAdminNavIndex >= 0 && (
+                <li className="hm-sidebar-active-indicator" role="presentation" aria-hidden="true" />
+              )}
+              {filteredAdminNav.map((item) => (
                 <SidebarMenuItem key={item.href}>
                   <SidebarMenuButton
                     asChild
                     isActive={location.pathname.startsWith(item.href)}
-                    className="hm-sidebar-link h-10 rounded-[var(--radius-input)] px-3 text-sidebar-foreground/70 hover:text-sidebar-foreground data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
+                    className="h-10 rounded-[var(--radius-input)] px-3 text-sidebar-foreground/70 hover:text-sidebar-foreground data-[active=true]:font-semibold data-[active=true]:text-sidebar-foreground"
                   >
                     <Link to={item.href}>
                       <item.icon className="h-4 w-4" />
@@ -156,7 +177,7 @@ function AppSidebar() {
           </div>
           <button
             onClick={signOut}
-            className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-input)] text-[var(--color-sidebar-muted)] transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-sidebar-accent hover:text-sidebar-foreground active:translate-y-px"
+            className="flex size-11 shrink-0 items-center justify-center rounded-[var(--radius-input)] text-[var(--color-sidebar-muted)] transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-sidebar-accent hover:text-sidebar-foreground active:translate-y-px motion-reduce:transition-none motion-reduce:active:translate-y-0"
             title="退出登录"
             aria-label="退出登录"
           >
@@ -261,7 +282,7 @@ function TopHeader() {
       </div>
       <div className="relative" ref={notifRef}>
         <button
-          className="relative flex size-11 items-center justify-center rounded-[var(--radius-input)] text-muted-foreground transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-muted hover:text-foreground active:translate-y-px"
+          className="relative flex size-11 items-center justify-center rounded-[var(--radius-input)] text-muted-foreground transition-[color,background-color,transform] duration-short ease-hm-out hover:bg-muted hover:text-foreground active:translate-y-px motion-reduce:transition-none motion-reduce:active:translate-y-0"
           onClick={() => setShowNotifications(!showNotifications)}
           aria-label="通知"
           aria-expanded={showNotifications}
