@@ -279,7 +279,7 @@ export function ItemsList() {
                 className="pl-9 w-full"
               />
             </div>
-            <div className="grid shrink-0 grid-cols-1 gap-2 sm:flex">
+            <div className="grid shrink-0 grid-cols-[minmax(0,9rem)_minmax(0,8rem)] gap-2 sm:flex">
               <Select value={categoryFilter} onValueChange={(value) => {
                 setPage(1)
                 setCategoryFilter(value === 'all' ? '' : value)
