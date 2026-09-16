@@ -1,5 +1,18 @@
 [
   {
+    "date": "2026-09-16",
+    "scope": "app-motion-refinement",
+    "macrostructure": "Workbench shell / equal-card Stat-Led dashboard / fixed sliding SOP tabs",
+    "theme": "locked DJI cool system",
+    "theme_axes": "light workspace / dark side rail / cool accent",
+    "vibe": "precise, calm, operational, trustworthy",
+    "enrichment": "functional rotating loader and rolling KPI numerals",
+    "brief": "Replace liquid motion with enterprise sliding tabs; refine focus, select and action microinteractions without changing theme colors",
+    "variation_delta": "Dashboard metrics change from a connected asymmetric strip to responsive 4/2/1 cards; SOP stages share one transform-only active surface",
+    "critique": "P5 H5 E5 S5 R5 V4",
+    "verification": "17 tests, production build, scoped ESLint, 320/375/414/768/1440 responsive QA, zero select-open layout delta"
+  },
+  {
     "date": "2026-08-31",
     "scope": "app-feature-redesign",
     "macrostructure": "Workbench Guided Sequence / Narrative Workflow",

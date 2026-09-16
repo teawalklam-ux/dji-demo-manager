@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type ReactNode } from 'react'
+import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { approvalService } from '@/services/approval.service'
@@ -8,6 +8,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
+import { CircleSwapLink } from '@/components/ui/circle-swap-link'
+import { SlideActionLink } from '@/components/ui/slide-action-link'
+import { UnderlineActionLink } from '@/components/ui/underline-action-link'
 import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog,
@@ -18,7 +21,7 @@ import {
 import { Label } from '@/components/ui/label'
 import {
   Package, ArrowRightLeft, AlertTriangle, FileText,
-  CheckSquare, ClipboardList, ArrowRight, ChevronRight,
+  CheckSquare, ClipboardList, ChevronRight,
   CircleCheckBig, History, ChartPie, BookOpenCheck, type LucideIcon,
 } from 'lucide-react'
 import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
@@ -59,6 +62,49 @@ function DashboardEmptyState({
         {action && <div className="mt-4">{action}</div>}
       </div>
     </div>
+  )
+}
+
+function DashboardLoader() {
+  return (
+    <span className="hm-dashboard-loader" role="status" aria-live="polite">
+      <span className="hm-dashboard-loader__ring" aria-hidden="true" />
+      正在同步数据
+    </span>
+  )
+}
+
+function RollingMetricValue({ value, loading, label }: { value: number; loading: boolean; label: string }) {
+  if (loading) {
+    return (
+      <span className="hm-metric-placeholder" role="status" aria-live="polite">
+        <span aria-hidden="true">—</span>
+        <span className="sr-only">{label}加载中</span>
+      </span>
+    )
+  }
+
+  const formattedValue = new Intl.NumberFormat('zh-CN').format(value)
+
+  return (
+    <span
+      className="hm-metric-roll"
+      role="status"
+      aria-live="polite"
+      aria-label={`${label} ${formattedValue}`}
+    >
+      {Array.from(formattedValue).map((character, index) => (
+        <span
+          key={`${formattedValue}-${index}`}
+          className="hm-metric-roll__slot"
+          style={{ '--hm-roll-index': index } as CSSProperties}
+          aria-hidden="true"
+        >
+          <span className="hm-metric-roll__old">0</span>
+          <span className="hm-metric-roll__new">{character}</span>
+        </span>
+      ))}
+    </span>
   )
 }
 
@@ -210,59 +256,51 @@ export function Dashboard() {
 
   return (
     <div className="hm-page hm-dashboard space-y-8 sm:space-y-10">
-      <section className="hm-dashboard-heading flex-wrap">
+      <section className="hm-dashboard-heading hm-dashboard-enter flex-wrap">
         <div className="min-w-0">
-          <h1 className="hm-page-title">仪表盘</h1>
+          <div className="flex flex-wrap items-center gap-3">
+            <h1 className="hm-page-title">仪表盘</h1>
+            {statsLoading && <DashboardLoader />}
+          </div>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-muted-foreground sm:text-base">
             集中查看样机库存、借用申请与待办审批。
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <Button asChild size="lg">
-            <Link to="/borrow/apply">
-              <FileText className="size-4" />
-              申请借用
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link to="/sop">
-              <BookOpenCheck className="size-4" aria-hidden="true" />
-              SOP 指引
-            </Link>
-          </Button>
-          <Button asChild variant="outline" size="lg">
-            <Link to="/borrow/my-requests">
-              <ClipboardList className="size-4" />
-              我的申请
-            </Link>
-          </Button>
+          <UnderlineActionLink to="/borrow/apply" icon={FileText}>申请借用</UnderlineActionLink>
+          <SlideActionLink to="/sop" variant="outline" size="default" className="h-11">
+            <BookOpenCheck className="size-4" aria-hidden="true" />
+            SOP 指引
+          </SlideActionLink>
+          <SlideActionLink to="/borrow/my-requests" variant="outline" size="default" className="h-11">
+            <ClipboardList className="size-4" aria-hidden="true" />
+            我的申请
+          </SlideActionLink>
           {isApprover && (
-            <Button asChild variant="outline" size="lg">
-              <Link to="/approval/queue">
-                <CheckSquare className="size-4" />
+            <SlideActionLink to="/approval/queue" variant="outline" size="default" className="h-11">
+                <CheckSquare className="size-4" aria-hidden="true" />
                 审批队列
                 {pendingApprovals.length > 0 && (
                   <Badge variant="destructive" className="ml-1 px-1.5 py-0 text-xs">
                     {pendingApprovals.length}
                   </Badge>
                 )}
-              </Link>
-            </Button>
+            </SlideActionLink>
           )}
         </div>
       </section>
 
       {/* 统计带：保留原有查询和跳转，仅重新建立数值层级。 */}
-      <section aria-label="样机运营指标" className="hm-metric-grid">
-        <Link to="/items?status=in_stock" className="hm-metric-link bg-card xl:col-span-4">
-          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+      <section aria-label="样机运营指标" className="hm-metric-grid hm-dashboard-enter hm-dashboard-enter--1">
+        <Link to="/items?status=in_stock" className="hm-metric-link">
+          <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">可用在库</CardTitle>
               <Package className="size-4 text-primary" />
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : stats.inStock}</div>
+                <div className="hm-metric-value"><RollingMetricValue value={stats.inStock} loading={statsLoading} label="可用在库" /></div>
                 <p className="mt-2 text-xs text-muted-foreground">{statsLoading ? '加载中…' : `全部样机 ${stats.total} 台`}</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -270,15 +308,15 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/items?status=borrowed" className="hm-metric-link bg-card xl:col-span-3">
-          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+        <Link to="/items?status=borrowed" className="hm-metric-link">
+          <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">借出中</CardTitle>
               <ArrowRightLeft className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : stats.borrowed}</div>
+                <div className="hm-metric-value"><RollingMetricValue value={stats.borrowed} loading={statsLoading} label="借出中" /></div>
                 <p className="mt-2 text-xs text-muted-foreground">当前借出数量</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -286,15 +324,15 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/items?status=overdue" className="hm-metric-link bg-card xl:col-span-2">
-          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+        <Link to="/items?status=overdue" className="hm-metric-link">
+          <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">逾期未还</CardTitle>
               <AlertTriangle className="size-4 text-destructive" />
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value text-destructive" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : stats.overdue}</div>
+                <div className="hm-metric-value text-destructive"><RollingMetricValue value={stats.overdue} loading={statsLoading} label="逾期未还" /></div>
                 <p className="mt-2 text-xs text-muted-foreground">需要及时跟进</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -302,15 +340,15 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/borrow/my-requests" className="hm-metric-link bg-card xl:col-span-3">
-          <Card className="hm-metric-card h-full rounded-none border-0 shadow-none">
+        <Link to="/borrow/my-requests" className="hm-metric-link">
+          <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">本月申请</CardTitle>
               <FileText className="size-4 text-muted-foreground" />
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value" aria-live="polite">{statsLoading ? <Spinner className="size-5" /> : monthlyRequests}</div>
+                <div className="hm-metric-value"><RollingMetricValue value={monthlyRequests} loading={statsLoading} label="本月申请" /></div>
                 <p className="mt-2 text-xs text-muted-foreground">本月借用申请数</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -319,7 +357,7 @@ export function Dashboard() {
         </Link>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+      <section className="hm-dashboard-enter hm-dashboard-enter--2 grid grid-cols-1 gap-6 xl:grid-cols-12">
         <Card className="hm-dashboard-panel xl:col-span-7">
           <CardHeader className="border-b pb-4">
             <div className="flex items-start gap-3">
@@ -370,7 +408,7 @@ export function Dashboard() {
                 icon={Package}
                 title="暂无样机数据"
                 description="样机入库后，这里会展示实时库存状态分布。"
-                action={<Button asChild variant="outline" size="sm"><Link to="/items">查看样机列表</Link></Button>}
+                action={<SlideActionLink to="/items" variant="outline">查看样机列表</SlideActionLink>}
               />
             )}
           </CardContent>
@@ -399,9 +437,7 @@ export function Dashboard() {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       <Badge className={ITEM_STATUS_MAP.overdue.color}>{ITEM_STATUS_MAP.overdue.label}</Badge>
-                      <Button asChild variant="outline" size="sm">
-                        <Link to={`/items/${item.id}`}>查看</Link>
-                      </Button>
+                      <SlideActionLink to={`/items/${item.id}`} variant="outline">查看</SlideActionLink>
                     </div>
                   </div>
                 ))}
@@ -411,14 +447,14 @@ export function Dashboard() {
                 icon={CircleCheckBig}
                 title="目前没有逾期样机"
                 description="所有借出样机都在计划归还时间内。"
-                action={<Button asChild variant="outline" size="sm"><Link to="/items">查看全部样机</Link></Button>}
+                action={<CircleSwapLink to="/items">查看全部样机</CircleSwapLink>}
               />
             )}
           </CardContent>
         </Card>
       </section>
 
-      <section className="grid grid-cols-1 gap-6 xl:grid-cols-12">
+      <section className="hm-dashboard-enter hm-dashboard-enter--3 grid grid-cols-1 gap-6 xl:grid-cols-12">
         {/* 待审批快速审批（审批人/管理员/超级管理员） */}
         {isApprover && (
           <Card className="hm-dashboard-panel xl:col-span-5">
@@ -442,7 +478,7 @@ export function Dashboard() {
                   icon={CircleCheckBig}
                   title="没有待审批申请"
                   description="新的审批任务到达后会显示在这里。"
-                  action={<Button asChild variant="outline" size="sm"><Link to="/approval/queue">查看审批队列</Link></Button>}
+                  action={<CircleSwapLink to="/approval/queue">查看审批队列</CircleSwapLink>}
                 />
               ) : (
                 <div>
@@ -485,9 +521,9 @@ export function Dashboard() {
                     )
                   })}
                   {pendingApprovals.length > 5 && (
-                    <Link to="/approval/queue" className="mt-2 inline-flex whitespace-nowrap text-sm font-medium text-primary underline-offset-4 hover:underline">
+                    <CircleSwapLink to="/approval/queue" className="mt-2">
                       查看全部 {pendingApprovals.length} 条待审批
-                    </Link>
+                    </CircleSwapLink>
                   )}
                 </div>
               )}
@@ -533,7 +569,7 @@ export function Dashboard() {
                 icon={History}
                 title="暂无库存变动"
                 description="入库、借出、归还等记录会按时间显示在这里。"
-                action={<Button asChild variant="outline" size="sm"><Link to="/items">查看样机列表</Link></Button>}
+                action={<SlideActionLink to="/items" variant="outline">查看样机列表</SlideActionLink>}
               />
             )}
           </CardContent>
@@ -541,7 +577,7 @@ export function Dashboard() {
       </section>
 
       {/* 我的最近申请 */}
-      <Card className="hm-dashboard-panel">
+      <Card className="hm-dashboard-panel hm-dashboard-enter hm-dashboard-enter--4">
           <CardHeader className="flex flex-row items-start justify-between gap-4 border-b pb-4">
             <div className="flex items-start gap-3">
               <span className="hm-panel-icon"><ClipboardList className="size-4" /></span>
@@ -550,11 +586,7 @@ export function Dashboard() {
                 <CardDescription className="mt-1">跟进最近提交的借用流程</CardDescription>
               </div>
             </div>
-            <Button asChild variant="ghost" size="sm">
-              <Link to="/borrow/my-requests">
-                查看全部 <ArrowRight className="size-4" />
-              </Link>
-            </Button>
+            <CircleSwapLink to="/borrow/my-requests">查看全部</CircleSwapLink>
           </CardHeader>
           <CardContent className="pt-2">
             {requestsLoading ? (
@@ -580,7 +612,7 @@ export function Dashboard() {
                 icon={ClipboardList}
                 title="还没有借用申请"
                 description="提交申请后，可在这里查看最近流程与当前状态。"
-                action={<Button asChild size="sm"><Link to="/borrow/apply">申请借用</Link></Button>}
+                action={<UnderlineActionLink to="/borrow/apply" icon={FileText}>申请借用</UnderlineActionLink>}
               />
             )}
           </CardContent>

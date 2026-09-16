@@ -1,7 +1,7 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
-import { Liquid } from 'liquid-gooey'
 import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, BookOpenCheck, ImageOff, LoaderCircle, Plus, RotateCcw, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react'
 import { Link } from 'react-router-dom'
+import { HoverToolbar } from '@/components/ui/hover-toolbar'
 import type { PersistedSopItem } from '@/services/sop.service'
 import { getSopScreenshot } from './system-sop-screenshots'
 
@@ -66,7 +66,6 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
   const [zoomed, setZoomed] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
-  const [reduceMotion, setReduceMotion] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
   const bodyRef = useRef<HTMLDivElement>(null)
   const fileRef = useRef<HTMLInputElement>(null)
@@ -74,14 +73,6 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
   const currentIndex = Math.max(0, Math.min(index, steps.length - 1))
   const step = steps[currentIndex]
   const progressStart = Math.max(0, Math.min(currentIndex - 3, steps.length - 7))
-
-  useEffect(() => {
-    const media = window.matchMedia('(prefers-reduced-motion: reduce)')
-    const update = () => setReduceMotion(media.matches)
-    update()
-    media.addEventListener('change', update)
-    return () => media.removeEventListener('change', update)
-  }, [])
 
   useEffect(() => {
     const dialog = dialogRef.current
@@ -215,10 +206,16 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
               <span className="sop-reader-step-number">第 {currentIndex + 1} 步 / 共 {steps.length} 步</span>
               <h3>{step.label}</h3>
             </div>
-            <div className="sop-reader-visual">
+            <HoverToolbar
+              className="sop-reader-visual"
+              toolbarClassName="sop-reader-visual__toolbar"
+              label="截图查看工具"
+              toolbar={getSopScreenshot(step) ? (
+                <button type="button" className="sop-reader-zoom" aria-pressed={zoomed} onClick={() => setZoomed((value) => !value)}>{zoomed ? <ZoomOut aria-hidden="true" /> : <ZoomIn aria-hidden="true" />}{zoomed ? '适应窗口' : '放大截图'}</button>
+              ) : undefined}
+            >
               <StepScreenshot key={getSopScreenshot(step)} step={step} zoomed={zoomed} onToggleZoom={() => setZoomed((value) => !value)} />
-              {getSopScreenshot(step) && <button type="button" className="sop-reader-zoom" aria-pressed={zoomed} onClick={() => setZoomed((value) => !value)}>{zoomed ? <ZoomOut aria-hidden="true" /> : <ZoomIn aria-hidden="true" />}{zoomed ? '适应窗口' : '放大截图'}</button>}
-            </div>
+            </HoverToolbar>
             {editing && <div className="sop-reader-editor">
               <label><span>本步操作说明</span><textarea value={step.label} maxLength={500} disabled={uploading || saving} onChange={(event) => patchStep({ label: event.target.value })} /></label>
               <label><span>截图地址</span><input value={step.screenshot?.startsWith('data:') ? '' : step.screenshot ?? getSopScreenshot(step)}
@@ -241,15 +238,15 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
         <footer className="sop-reader-footer">
           <button type="button" className="sop-reader-back" disabled={currentIndex === 0 || uploading} onClick={() => goTo(currentIndex - 1)}><ArrowLeft aria-hidden="true" /><span>上一步</span></button>
           <div className="sop-reader-progress" role="progressbar" aria-label="指引阅读位置" aria-valuemin={0} aria-valuemax={steps.length || 1} aria-valuenow={step ? currentIndex + 1 : 0}>
-            <Liquid blur={2} contrast={18} fill="var(--color-paper-3)" className="sop-reader-progress__liquid">
-              {steps.slice(progressStart, progressStart + 7).map((item, offset) => <Liquid.Item key={item.id} morph={{ shape: !reduceMotion, bounce: 0, contentBlur: 0 }}><span className={`sop-reader-progress__item ${progressStart + offset === currentIndex ? 'is-current' : ''}`}>{progressStart + offset === currentIndex ? `${currentIndex + 1} / ${steps.length}` : ''}</span></Liquid.Item>)}
-            </Liquid>
+            <div className="sop-reader-progress__track">
+              {steps.slice(progressStart, progressStart + 7).map((item, offset) => (
+                <span key={item.id} className={`sop-reader-progress__item ${progressStart + offset === currentIndex ? 'is-current' : ''}`} aria-hidden="true">
+                  {progressStart + offset === currentIndex ? `${currentIndex + 1} / ${steps.length}` : <span className="sop-reader-progress__dot" />}
+                </span>
+              ))}
+            </div>
           </div>
-          <Liquid blur={6} contrast={18} fill="var(--color-accent)" className="sop-reader-next-liquid">
-            <Liquid.Item morph={{ shape: !reduceMotion, speed: 1.15, bounce: 0, contentBlur: 0 }} className="sop-reader-next-shape">
-              <button type="button" className="sop-reader-next" disabled={!step || uploading} onClick={next}><span>{currentIndex === steps.length - 1 ? '完成指引' : '下一步'}</span><ArrowRight aria-hidden="true" /></button>
-            </Liquid.Item>
-          </Liquid>
+          <button type="button" className="sop-reader-next" disabled={!step || uploading} onClick={next}><span>{currentIndex === steps.length - 1 ? '完成指引' : '下一步'}</span><ArrowRight aria-hidden="true" /></button>
         </footer>
       </dialog>
       {finished && <div className="sop-system-guide__finish"><span>阅读完成不代表业务已处理。</span><button type="button" className="sop-text-button" onClick={() => { goTo(0); setFinished(false); setOpen(true) }}><RotateCcw aria-hidden="true" />重新阅读</button>{entry && <Link className="sop-entry-link" to={entry.href}>{entry.label}<ArrowRight aria-hidden="true" /></Link>}</div>}

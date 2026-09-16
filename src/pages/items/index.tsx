@@ -8,6 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { SlideActionLink } from '@/components/ui/slide-action-link'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Checkbox } from '@/components/ui/checkbox'
@@ -396,9 +397,7 @@ export function ItemsList() {
                         </TableCell>
                         <TableCell>{item.location || '-'}</TableCell>
                         <TableCell>
-                          <Link to={`/items/${item.id}`}>
-                            <Button variant="ghost" size="sm">查看</Button>
-                          </Link>
+                          <SlideActionLink to={`/items/${item.id}`}>查看</SlideActionLink>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -437,9 +436,7 @@ export function ItemsList() {
                         </div>
                       </div>
                       <div className="shrink-0">
-                        <Link to={`/items/${item.id}`} onClick={(e) => e.stopPropagation()}>
-                          <Button variant="ghost" size="sm" className="h-7 px-2 text-xs">查看</Button>
-                        </Link>
+                        <SlideActionLink to={`/items/${item.id}`} onClick={(e) => e.stopPropagation()} className="h-9 px-2 text-xs">查看</SlideActionLink>
                       </div>
                     </div>
                   </div>

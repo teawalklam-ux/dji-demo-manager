@@ -1,4 +1,4 @@
-/* Hallmark · macrostructure: Workbench shell / Stat-Led dashboard · genre: modern-minimal · theme: custom · axes: light workspace / dark side rail / cool accent · vibe: precise, calm, operational, trustworthy · enrichment: none · motion: button press + surface lift + sidebar indicator + functional overlays, reduced-motion safe · pre-emit critique: P5 H5 E5 S5 R5 V4 · contrast: pass (40–41) · nav: N3 dark side rail · footer: Ft2 inline version · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · mobile: pass (34, 49, 50–57) · icons: pass (30) */
+/* Hallmark · macrostructure: Workbench shell / Stat-Led dashboard · genre: modern-minimal corporate-clean · theme: locked DJI cool system · axes: light workspace / dark side rail / cool accent · vibe: precise, calm, operational, trustworthy · enrichment: none · motion: layered dashboard reveal + rolling metrics + fixed-geometry SOP sliding tabs + focus-safe controls, reduced-motion safe · pre-emit critique: P5 H5 E5 S5 R5 V4 · contrast: pass (40–41) · nav: N3 dark side rail · footer: Ft2 inline version · honest: pass (46) · chrome: pass (47) · tokens: pass (48) · mobile: pass (34, 49, 50–57) · icons: pass (30) */
 :root {
   /* Core surfaces and ink */
   --color-paper: oklch(98.8% 0.004 250);
@@ -36,7 +36,7 @@
   --color-info-surface: var(--color-accent-surface);
   --color-reserved: oklch(50% 0.15 300);
 
-  /* SOP liquid surfaces: soft enough to merge, quiet enough for operational content */
+  /* SOP compatibility surfaces: retained as aliases while motion moves to fixed sliding tabs */
   --color-liquid-surface: oklch(97.6% 0.012 252);
   --color-liquid-shadow: oklch(20.6% 0.039 265.5 / 0.12);
   --color-liquid-scrim: oklch(20.6% 0.039 265.5 / 0.24);
