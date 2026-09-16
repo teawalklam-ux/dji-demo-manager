@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
-import { Liquid } from 'liquid-gooey'
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type KeyboardEvent as ReactKeyboardEvent } from 'react'
 import {
   AlertCircle,
   ArrowRight,
@@ -1196,14 +1195,14 @@ export function SopGuidePage() {
           }}
         />
       ) : <main className="sop-workspace">
-        <Liquid
-          blur={10}
-          contrast={18}
-          fill="var(--color-liquid-surface)"
-          shadow="0 14px 40px var(--color-liquid-shadow)"
-          className="sop-liquid-group"
-        >
-          <div className="sop-stage-tabs" role="tablist" aria-label="SOP 阶段">
+        <section className="sop-stage-switcher" aria-label="业务作业阶段">
+          <div
+            className="sop-stage-tabs"
+            role="tablist"
+            aria-label="SOP 阶段"
+            style={{ '--sop-active-stage': activeStageIndex } as CSSProperties}
+          >
+            <span className="sop-stage-tabs__indicator" aria-hidden="true" />
             {activeStageDefinitions.map((stage, index) => {
               const Icon = stage.icon
               const isActive = activeStage === stage.key
@@ -1212,11 +1211,7 @@ export function SopGuidePage() {
                 (item) => completedItems.has(`${activeProcess.id}:${stage.key}:${item.id}`),
               )
               return (
-                <Liquid.Item
-                  key={stage.key}
-                  morph={{ shape: true, speed: 1.15, bounce: 0.18, contentBlur: 2 }}
-                  className="sop-stage-tab-item"
-                >
+                <div key={stage.key} className="sop-stage-tab-item">
                   <button
                     type="button"
                     role="tab"
@@ -1229,22 +1224,17 @@ export function SopGuidePage() {
                     aria-label={`${index + 1}，${stage.shortLabel}`}
                   >
                     <span className="sop-stage-tab__number">{stageComplete ? <Check aria-hidden="true" /> : index + 1}</span>
-                    {isActive && (
-                      <span className="sop-stage-tab__label">
-                        <Icon aria-hidden="true" />
-                        {stage.shortLabel}
-                      </span>
-                    )}
+                    <span className="sop-stage-tab__label">
+                      <Icon aria-hidden="true" />
+                      {stage.shortLabel}
+                    </span>
                   </button>
-                </Liquid.Item>
+                </div>
               )
             })}
           </div>
 
-          <Liquid.Item
-            morph={{ shape: true, speed: 1.05, bounce: 0.12, contentBlur: 3 }}
-            className="sop-stage-panel-item"
-          >
+          <div key={`${activeStage}:${cardCollapsed ? 'collapsed' : 'expanded'}`} className="sop-stage-panel-item">
             {cardCollapsed ? (
               <button
                 type="button"
@@ -1355,8 +1345,8 @@ export function SopGuidePage() {
                 )}
               </section>
             )}
-          </Liquid.Item>
-        </Liquid>
+          </div>
+        </section>
       </main>}
 
       {activeProcess.kind === 'operations' && <footer className="sop-page__foot">
