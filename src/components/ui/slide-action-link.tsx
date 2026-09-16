@@ -33,7 +33,7 @@ function SlideActionLink({
             className="size-3.5 -translate-x-2 opacity-0 transition-[opacity,transform] duration-short ease-hm-out group-hover/slide-action:translate-x-0 group-hover/slide-action:opacity-100 group-focus-visible/slide-action:translate-x-0 group-focus-visible/slide-action:opacity-100 motion-reduce:hidden"
             aria-hidden="true"
           />
-          <span className="-translate-x-[1.125rem] whitespace-nowrap transition-transform duration-short ease-hm-out group-hover/slide-action:translate-x-0 group-focus-visible/slide-action:translate-x-0 motion-reduce:translate-x-0">
+          <span className="inline-flex -translate-x-[1.125rem] items-center gap-2 whitespace-nowrap transition-transform duration-short ease-hm-out group-hover/slide-action:translate-x-0 group-focus-visible/slide-action:translate-x-0 motion-reduce:translate-x-0">
             {children}
           </span>
         </span>

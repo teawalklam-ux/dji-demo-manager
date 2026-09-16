@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
+import { lazy, Suspense, useState, useEffect, useCallback, type CSSProperties, type ReactNode } from 'react'
 import { Link } from 'react-router-dom'
 import { itemsService } from '@/services/items.service'
 import { approvalService } from '@/services/approval.service'
@@ -24,21 +24,52 @@ import {
   CheckSquare, ClipboardList, ChevronRight,
   CircleCheckBig, History, ChartPie, BookOpenCheck, type LucideIcon,
 } from 'lucide-react'
-import { PieChart, Pie, Cell, ResponsiveContainer, Legend, Tooltip } from 'recharts'
 import { supabase } from '@/lib/supabase'
 import { ITEM_STATUS_MAP, BORROW_TYPE_MAP, REQUEST_STATUS_MAP } from '@/lib/constants'
 import { getErrorMessage } from '@/lib/errors'
 import type { Item, StockMovement, ApprovalRecord, BorrowRequest } from '@/types'
 import { toast } from 'sonner'
+import type { StatusDistributionDatum } from '@/components/dashboard/status-distribution-chart'
 
-const STATUS_CHART_COLORS = {
-  in_stock: 'var(--color-chart-in-stock)',
-  reserved: 'var(--color-chart-reserved)',
-  borrowed: 'var(--color-chart-borrowed)',
-  overdue: 'var(--color-chart-overdue)',
-  maintenance: 'var(--color-chart-maintenance)',
-  retired: 'var(--color-chart-retired)',
-} as const
+const StatusDistributionChart = lazy(() => import('@/components/dashboard/status-distribution-chart')
+  .then((module) => ({ default: module.StatusDistributionChart })))
+
+type DeferredWindow = Window & typeof globalThis & {
+  requestIdleCallback?: (callback: IdleRequestCallback, options?: IdleRequestOptions) => number
+  cancelIdleCallback?: (handle: number) => void
+}
+
+function scheduleDeferredTask(task: () => void, timeout = 800) {
+  const deferredWindow = window as DeferredWindow
+  let idleHandle: number | undefined
+  let fallbackHandle: number | undefined
+  let completed = false
+
+  const runTask = () => {
+    if (completed) return
+    completed = true
+    if (idleHandle !== undefined) deferredWindow.cancelIdleCallback?.(idleHandle)
+    if (fallbackHandle !== undefined) window.clearTimeout(fallbackHandle)
+    task()
+  }
+
+  const kickoffHandle = window.setTimeout(() => {
+    if (deferredWindow.requestIdleCallback) {
+      idleHandle = deferredWindow.requestIdleCallback(runTask, { timeout })
+      fallbackHandle = window.setTimeout(runTask, timeout)
+      return
+    }
+
+    fallbackHandle = window.setTimeout(runTask, 120)
+  }, 0)
+
+  return () => {
+    completed = true
+    window.clearTimeout(kickoffHandle)
+    if (idleHandle !== undefined) deferredWindow.cancelIdleCallback?.(idleHandle)
+    if (fallbackHandle !== undefined) window.clearTimeout(fallbackHandle)
+  }
+}
 
 function DashboardEmptyState({
   icon: Icon,
@@ -74,7 +105,17 @@ function DashboardLoader() {
   )
 }
 
-function RollingMetricValue({ value, loading, label }: { value: number; loading: boolean; label: string }) {
+function RollingMetricValue({
+  value,
+  loading,
+  label,
+  animationKey,
+}: {
+  value: number
+  loading: boolean
+  label: string
+  animationKey: number
+}) {
   if (loading) {
     return (
       <span className="hm-metric-placeholder" role="status" aria-live="polite">
@@ -95,7 +136,7 @@ function RollingMetricValue({ value, loading, label }: { value: number; loading:
     >
       {Array.from(formattedValue).map((character, index) => (
         <span
-          key={`${formattedValue}-${index}`}
+          key={`${formattedValue}-${animationKey}-${index}`}
           className="hm-metric-roll__slot"
           style={{ '--hm-roll-index': index } as CSSProperties}
           aria-hidden="true"
@@ -122,26 +163,30 @@ export function Dashboard() {
   const [pendingApprovals, setPendingApprovals] = useState<ApprovalRecord[]>([])
   const [monthlyRequests, setMonthlyRequests] = useState(0)
   const [myRecentRequests, setMyRecentRequests] = useState<BorrowRequest[]>([])
+  const [metricAnimationRuns, setMetricAnimationRuns] = useState({ inStock: 0, borrowed: 0, overdue: 0, monthly: 0 })
+  const [chartReady, setChartReady] = useState(false)
 
   // 快速审批状态
   const [processingId, setProcessingId] = useState<string | null>(null)
   const [rejectDialogOpen, setRejectDialogOpen] = useState<string | null>(null)
   const [rejectReason, setRejectReason] = useState('')
 
-  const loadDashboardData = useCallback(async () => {
+  const loadCriticalData = useCallback(async () => {
     setStatsLoading(true)
-    setOverdueLoading(true)
-    setMovementsLoading(true)
-    setApprovalsLoading(isApprover)
-    setRequestsLoading(!!userId)
-
-    const statsTask = itemsService.getStats()
+    await itemsService.getStats()
       .then((summary) => {
         setStats(summary)
         setMonthlyRequests(summary.monthlyRequests)
       })
       .catch((error) => console.error('加载仪表盘统计失败:', error))
       .finally(() => setStatsLoading(false))
+  }, [])
+
+  const loadSupportingData = useCallback(async () => {
+    setOverdueLoading(true)
+    setMovementsLoading(true)
+    setApprovalsLoading(isApprover)
+    setRequestsLoading(!!userId)
 
     const overdueTask = itemsService.getPage({ display_status: 'overdue', page_size: 5 })
       .then((result) => setOverdueItems(result.data))
@@ -192,16 +237,33 @@ export function Dashboard() {
           setRequestsLoading(false)
         })
 
-    await Promise.allSettled([statsTask, overdueTask, movementsTask, approvalsTask, requestsTask])
+    await Promise.allSettled([overdueTask, movementsTask, approvalsTask, requestsTask])
   }, [isApprover, isDemoMode, profile?.role, userId])
 
-  useEffect(() => {
-    const timer = window.setTimeout(() => {
-      void loadDashboardData()
-    }, 0)
+  const refreshDashboardData = useCallback(async () => {
+    await Promise.allSettled([loadCriticalData(), loadSupportingData()])
+  }, [loadCriticalData, loadSupportingData])
 
-    return () => window.clearTimeout(timer)
-  }, [loadDashboardData])
+  useEffect(() => {
+    let cancelled = false
+    let cancelSupportingLoad: (() => void) | undefined
+
+    void loadCriticalData().then(() => {
+      if (!cancelled) {
+        cancelSupportingLoad = scheduleDeferredTask(() => void loadSupportingData())
+      }
+    })
+
+    return () => {
+      cancelled = true
+      cancelSupportingLoad?.()
+    }
+  }, [loadCriticalData, loadSupportingData])
+
+  useEffect(() => {
+    if (statsLoading || chartReady) return
+    return scheduleDeferredTask(() => setChartReady(true), 1000)
+  }, [chartReady, statsLoading])
 
   // 快速审批 - 通过
   async function handleApprove(requestId: string) {
@@ -209,7 +271,7 @@ export function Dashboard() {
     try {
       await approvalService.processApproval(requestId, 'approved')
       toast.success('审批通过')
-      loadDashboardData()
+      void refreshDashboardData()
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
@@ -229,7 +291,7 @@ export function Dashboard() {
       toast.success('已拒绝申请')
       setRejectDialogOpen(null)
       setRejectReason('')
-      loadDashboardData()
+      void refreshDashboardData()
     } catch (error: unknown) {
       toast.error(getErrorMessage(error, '审批操作失败'))
     } finally {
@@ -237,14 +299,14 @@ export function Dashboard() {
     }
   }
 
-  const pieData = [
+  const pieData = ([
     { status: 'in_stock', name: '可用在库', value: stats.inStock },
     { status: 'reserved', name: '预定', value: stats.reserved },
     { status: 'borrowed', name: '借出', value: stats.borrowed },
     { status: 'overdue', name: '逾期', value: stats.overdue },
     { status: 'maintenance', name: '维修中', value: stats.maintenance },
     { status: 'retired', name: '已退役', value: stats.retired },
-  ].filter(d => d.value > 0)
+  ] satisfies StatusDistributionDatum[]).filter(d => d.value > 0)
 
   const movementTypeLabels: Record<string, string> = {
     borrow_out: '借出',
@@ -252,6 +314,11 @@ export function Dashboard() {
     new_entry: '入库',
     maintenance: '维修',
     retire: '退役',
+  }
+
+  function replayMetricAnimation(metric: keyof typeof metricAnimationRuns) {
+    if (statsLoading) return
+    setMetricAnimationRuns((current) => ({ ...current, [metric]: current[metric] + 1 }))
   }
 
   return (
@@ -266,18 +333,19 @@ export function Dashboard() {
             集中查看样机库存、借用申请与待办审批。
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="hm-dashboard-actions">
           <UnderlineActionLink to="/borrow/apply" icon={FileText}>申请借用</UnderlineActionLink>
-          <SlideActionLink to="/sop" variant="outline" size="default" className="h-11">
-            <BookOpenCheck className="size-4" aria-hidden="true" />
-            SOP 指引
-          </SlideActionLink>
-          <SlideActionLink to="/borrow/my-requests" variant="outline" size="default" className="h-11">
-            <ClipboardList className="size-4" aria-hidden="true" />
-            我的申请
-          </SlideActionLink>
-          {isApprover && (
-            <SlideActionLink to="/approval/queue" variant="outline" size="default" className="h-11">
+          <div className={`hm-dashboard-actions__secondary ${isApprover ? 'hm-dashboard-actions__secondary--three' : 'hm-dashboard-actions__secondary--two'}`}>
+            <SlideActionLink to="/sop" variant="outline" size="default" className="hm-dashboard-secondary-action">
+              <BookOpenCheck className="size-4" aria-hidden="true" />
+              SOP 指引
+            </SlideActionLink>
+            <SlideActionLink to="/borrow/my-requests" variant="outline" size="default" className="hm-dashboard-secondary-action">
+              <ClipboardList className="size-4" aria-hidden="true" />
+              我的申请
+            </SlideActionLink>
+            {isApprover && (
+              <SlideActionLink to="/approval/queue" variant="outline" size="default" className="hm-dashboard-secondary-action">
                 <CheckSquare className="size-4" aria-hidden="true" />
                 审批队列
                 {pendingApprovals.length > 0 && (
@@ -285,14 +353,20 @@ export function Dashboard() {
                     {pendingApprovals.length}
                   </Badge>
                 )}
-            </SlideActionLink>
-          )}
+              </SlideActionLink>
+            )}
+          </div>
         </div>
       </section>
 
       {/* 统计带：保留原有查询和跳转，仅重新建立数值层级。 */}
       <section aria-label="样机运营指标" className="hm-metric-grid hm-dashboard-enter hm-dashboard-enter--1">
-        <Link to="/items?status=in_stock" className="hm-metric-link">
+        <Link
+          to="/items?status=in_stock"
+          className="hm-metric-link"
+          onMouseEnter={() => replayMetricAnimation('inStock')}
+          onFocus={() => replayMetricAnimation('inStock')}
+        >
           <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">可用在库</CardTitle>
@@ -300,7 +374,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value"><RollingMetricValue value={stats.inStock} loading={statsLoading} label="可用在库" /></div>
+                <div className="hm-metric-value"><RollingMetricValue value={stats.inStock} loading={statsLoading} label="可用在库" animationKey={metricAnimationRuns.inStock} /></div>
                 <p className="mt-2 text-xs text-muted-foreground">{statsLoading ? '加载中…' : `全部样机 ${stats.total} 台`}</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -308,7 +382,12 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/items?status=borrowed" className="hm-metric-link">
+        <Link
+          to="/items?status=borrowed"
+          className="hm-metric-link"
+          onMouseEnter={() => replayMetricAnimation('borrowed')}
+          onFocus={() => replayMetricAnimation('borrowed')}
+        >
           <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">借出中</CardTitle>
@@ -316,7 +395,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value"><RollingMetricValue value={stats.borrowed} loading={statsLoading} label="借出中" /></div>
+                <div className="hm-metric-value"><RollingMetricValue value={stats.borrowed} loading={statsLoading} label="借出中" animationKey={metricAnimationRuns.borrowed} /></div>
                 <p className="mt-2 text-xs text-muted-foreground">当前借出数量</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -324,7 +403,12 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/items?status=overdue" className="hm-metric-link">
+        <Link
+          to="/items?status=overdue"
+          className="hm-metric-link"
+          onMouseEnter={() => replayMetricAnimation('overdue')}
+          onFocus={() => replayMetricAnimation('overdue')}
+        >
           <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">逾期未还</CardTitle>
@@ -332,7 +416,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value text-destructive"><RollingMetricValue value={stats.overdue} loading={statsLoading} label="逾期未还" /></div>
+                <div className="hm-metric-value text-destructive"><RollingMetricValue value={stats.overdue} loading={statsLoading} label="逾期未还" animationKey={metricAnimationRuns.overdue} /></div>
                 <p className="mt-2 text-xs text-muted-foreground">需要及时跟进</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -340,7 +424,12 @@ export function Dashboard() {
           </Card>
         </Link>
 
-        <Link to="/borrow/my-requests" className="hm-metric-link">
+        <Link
+          to="/borrow/my-requests"
+          className="hm-metric-link"
+          onMouseEnter={() => replayMetricAnimation('monthly')}
+          onFocus={() => replayMetricAnimation('monthly')}
+        >
           <Card className="hm-metric-card h-full">
             <CardHeader className="flex flex-row items-center justify-between px-5 pb-0 pt-5 sm:px-6 sm:pt-6">
               <CardTitle className="text-sm font-medium text-muted-foreground">本月申请</CardTitle>
@@ -348,7 +437,7 @@ export function Dashboard() {
             </CardHeader>
             <CardContent className="flex items-end justify-between px-5 pb-5 pt-7 sm:px-6 sm:pb-6">
               <div>
-                <div className="hm-metric-value"><RollingMetricValue value={monthlyRequests} loading={statsLoading} label="本月申请" /></div>
+                <div className="hm-metric-value"><RollingMetricValue value={monthlyRequests} loading={statsLoading} label="本月申请" animationKey={metricAnimationRuns.monthly} /></div>
                 <p className="mt-2 text-xs text-muted-foreground">本月借用申请数</p>
               </div>
               <ChevronRight className="size-5 text-muted-foreground" />
@@ -372,37 +461,13 @@ export function Dashboard() {
             {statsLoading ? (
               <div className="flex h-[17.5rem] items-center justify-center"><Spinner className="size-6" /></div>
             ) : pieData.length > 0 ? (
-              <div
-                className="relative h-[17.5rem] min-w-0"
-                role="img"
-                aria-label={`样机状态分布：全部 ${stats.total} 台`}
-              >
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={pieData}
-                      cx="50%"
-                      cy="45%"
-                      innerRadius={68}
-                      outerRadius={96}
-                      paddingAngle={3}
-                      dataKey="value"
-                      stroke="var(--color-paper)"
-                      strokeWidth={2}
-                    >
-                      {pieData.map((entry) => (
-                        <Cell key={entry.status} fill={STATUS_CHART_COLORS[entry.status as keyof typeof STATUS_CHART_COLORS]} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                    <Legend verticalAlign="bottom" iconType="circle" iconSize={8} />
-                  </PieChart>
-                </ResponsiveContainer>
-                <div className="hm-chart-center" aria-hidden="true">
-                  <span className="font-display text-3xl font-semibold tabular-nums">{stats.total}</span>
-                  <span className="text-xs text-muted-foreground">全部样机</span>
-                </div>
-              </div>
+              chartReady ? (
+                <Suspense fallback={<div className="flex h-[17.5rem] items-center justify-center"><Spinner className="size-6" /></div>}>
+                  <StatusDistributionChart data={pieData} total={stats.total} />
+                </Suspense>
+              ) : (
+                <div className="flex h-[17.5rem] items-center justify-center"><Spinner className="size-6" /></div>
+              )
             ) : (
               <DashboardEmptyState
                 icon={Package}
