@@ -149,6 +149,25 @@
     padding-block: var(--space-xs) var(--space-lg);
     border-bottom: var(--rule-hair) solid var(--color-rule);
   }
+  .hm-dashboard-actions {
+    display: flex;
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--space-xs);
+  }
+  .hm-dashboard-actions__secondary {
+    display: grid;
+    width: 100%;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: var(--space-2xs);
+  }
+  .hm-dashboard-secondary-action {
+    width: 100%;
+    min-width: 0;
+    min-height: 3.5rem;
+    border-radius: var(--radius-card);
+  }
   .hm-metric-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr);
@@ -404,6 +423,11 @@
     align-items: center;
     gap: var(--space-3xs);
   }
+  .hm-chart-motion .recharts-pie {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: hm-chart-pie-enter var(--dur-long) var(--ease-out) both;
+  }
   .hm-sidebar-menu {
     position: relative;
   }
@@ -486,7 +510,26 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes hm-chart-pie-enter {
+  from { opacity: 0.35; transform: rotate(-120deg); }
+  to { opacity: 1; transform: rotate(0); }
+}
+
 @media (min-width: 40rem) {
+  .hm-dashboard-actions {
+    width: auto;
+    flex-direction: row;
+    align-items: center;
+  }
+  .hm-dashboard-actions__secondary {
+    width: auto;
+  }
+  .hm-dashboard-actions__secondary--two {
+    grid-template-columns: repeat(2, minmax(8.5rem, 1fr));
+  }
+  .hm-dashboard-actions__secondary--three {
+    grid-template-columns: repeat(3, minmax(8.5rem, 1fr));
+  }
   .hm-metric-grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
   }
@@ -549,7 +592,8 @@
   .hm-dashboard-enter,
   .hm-dashboard-loader,
   .hm-metric-roll__old,
-  .hm-metric-roll__new {
+  .hm-metric-roll__new,
+  .hm-chart-motion .recharts-pie {
     animation-duration: 0.01ms;
     animation-delay: 0ms;
     transform: none;
@@ -567,6 +611,9 @@
   .hm-metric-roll__new {
     opacity: 1;
     transform: none;
+  }
+  .hm-chart-motion .recharts-pie {
+    opacity: 1;
   }
   .hm-underline-action__icon,
   .hm-underline-action__line,
