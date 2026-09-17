@@ -423,10 +423,66 @@
     align-items: center;
     gap: var(--space-3xs);
   }
-  .hm-chart-motion .recharts-pie {
+  .hm-chart-center__content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--space-3xs);
+    animation: hm-chart-center-swap var(--dur-short) var(--ease-out) both;
+  }
+  .hm-donut-segment {
     transform-box: fill-box;
     transform-origin: center;
-    animation: hm-chart-pie-enter var(--dur-long) var(--ease-out) both;
+    cursor: pointer;
+    transition: transform var(--dur-short) var(--ease-out), opacity var(--dur-short) var(--ease-out);
+  }
+  .hm-donut-segment.is-active {
+    transform: scale(1.05);
+  }
+  .hm-chart-motion:has(.hm-donut-segment.is-active) .hm-donut-segment:not(.is-active) {
+    opacity: 0.58;
+  }
+  .hm-donut-segment:focus-visible {
+    outline: var(--rule-fine) solid var(--color-focus);
+    outline-offset: var(--space-3xs);
+  }
+  .hm-donut-legend {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: var(--space-3xs) var(--space-xs);
+    padding-inline: var(--space-2xs);
+  }
+  .hm-donut-legend__button {
+    display: inline-flex;
+    min-width: 0;
+    align-items: center;
+    gap: var(--space-3xs);
+    border: 0;
+    border-radius: var(--radius-input);
+    background: transparent;
+    color: var(--color-neutral);
+    font-size: var(--text-xs);
+    line-height: 1rem;
+    cursor: pointer;
+    transition: color var(--dur-short) var(--ease-out), opacity var(--dur-short) var(--ease-out);
+  }
+  .hm-donut-legend__button[aria-pressed="true"] {
+    color: var(--color-ink);
+    font-weight: 600;
+  }
+  .hm-donut-legend__button:active {
+    opacity: 0.72;
+  }
+  .hm-donut-legend__button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .hm-donut-legend__swatch {
+    width: 0.5rem;
+    height: 0.5rem;
+    flex: 0 0 auto;
+    border-radius: var(--radius-pill);
   }
   .hm-sidebar-menu {
     position: relative;
@@ -510,9 +566,9 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes hm-chart-pie-enter {
-  from { opacity: 0.35; transform: rotate(-120deg); }
-  to { opacity: 1; transform: rotate(0); }
+@keyframes hm-chart-center-swap {
+  from { opacity: 0; transform: translateY(var(--space-3xs)); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
 @media (min-width: 40rem) {
@@ -558,6 +614,9 @@
   .hm-metric-link:hover {
     transform: translateY(-1px);
   }
+  .hm-donut-legend__button:hover {
+    color: var(--color-ink);
+  }
 }
 
 @media (pointer: coarse) {
@@ -593,7 +652,7 @@
   .hm-dashboard-loader,
   .hm-metric-roll__old,
   .hm-metric-roll__new,
-  .hm-chart-motion .recharts-pie {
+  .hm-chart-center__content {
     animation-duration: 0.01ms;
     animation-delay: 0ms;
     transform: none;
@@ -612,8 +671,10 @@
     opacity: 1;
     transform: none;
   }
-  .hm-chart-motion .recharts-pie {
-    opacity: 1;
+  .hm-donut-segment,
+  .hm-donut-segment.is-active {
+    transform: none;
+    transition: none;
   }
   .hm-underline-action__icon,
   .hm-underline-action__line,
