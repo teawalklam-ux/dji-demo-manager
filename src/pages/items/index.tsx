@@ -15,6 +15,7 @@ import { Checkbox } from '@/components/ui/checkbox'
 import { ITEM_STATUS_MAP } from '@/lib/constants'
 import { Plus, Download, ScanLine, Search, Printer, Upload, ArrowUpDown } from 'lucide-react'
 import type { Item, Category, ItemStatus, ItemDisplayStatus } from '@/types'
+import './items-list.css'
 
 type SortField = 'barcode' | 'name' | 'model' | 'category' | 'status' | 'location'
 type SortOrder = 'asc' | 'desc'
@@ -197,6 +198,16 @@ export function ItemsList() {
     return sorted
   }, [items, sortField, sortOrder])
 
+  const listMotionKey = useMemo(() => [
+    page,
+    debouncedSearch,
+    categoryFilter,
+    statusFilter,
+    sortField ?? 'source',
+    sortOrder,
+    sortedItems.map(item => item.id).join(','),
+  ].join(':'), [categoryFilter, debouncedSearch, page, sortField, sortOrder, sortedItems, statusFilter])
+
   function openBatchPrint() {
     if (selectedIds.size === 0) return
     setBatchPrintOpen(true)
@@ -205,18 +216,38 @@ export function ItemsList() {
   // 可排序表头渲染
   function sortIndicator(field: SortField) {
     if (sortField !== field) {
-      return <ArrowUpDown className="ml-1 size-3 text-muted-foreground/40 inline-block" />
+      return <ArrowUpDown className="items-sort-trigger__icon" aria-hidden="true" />
     }
     return (
-      <span className={`ml-1 inline-block text-xs font-bold ${sortOrder === 'asc' ? 'text-primary' : 'text-warning'}`}>
+      <span className={`items-sort-trigger__direction ${sortOrder === 'asc' ? 'is-ascending' : 'is-descending'}`} aria-hidden="true">
         {sortOrder === 'asc' ? '↑' : '↓'}
       </span>
     )
   }
 
+  function sortableHeader(field: SortField, label: string) {
+    const ariaSort = sortField === field
+      ? sortOrder === 'asc' ? 'ascending' : 'descending'
+      : 'none'
+
+    return (
+      <TableHead aria-sort={ariaSort}>
+        <button
+          type="button"
+          className="items-sort-trigger"
+          onClick={() => handleSort(field)}
+          aria-label={`${label}，${sortField === field ? sortOrder === 'asc' ? '当前升序，点击切换为降序' : '当前降序，点击取消排序' : '点击按升序排列'}`}
+        >
+          <span>{label}</span>
+          {sortIndicator(field)}
+        </button>
+      </TableHead>
+    )
+  }
+
   return (
-    <div className="hm-page space-y-8">
-      <div className="flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
+    <div className="hm-page items-page space-y-8">
+      <div className="items-page__heading flex flex-col justify-between gap-4 border-b pb-5 sm:flex-row sm:items-center">
         <h1 className="hm-page-title">样机管理</h1>
         <div className="flex flex-wrap items-center gap-2">
           {isAdmin && (
@@ -267,7 +298,7 @@ export function ItemsList() {
       </div>
 
       {/* 搜索与筛选 */}
-      <Card className="overflow-visible border-0 bg-transparent shadow-none">
+      <Card className="items-tool-card overflow-visible border-0 bg-transparent shadow-none">
         <CardContent className="hm-tool-rail px-0 py-4 sm:px-0 sm:pb-4">
           <div className="flex flex-col gap-3 sm:flex-row">
             <div className="relative flex-1 min-w-0">
@@ -314,9 +345,12 @@ export function ItemsList() {
       </Card>
 
       {/* 数据表格 */}
-      <Card className="hm-data-surface">
+      <Card className="hm-data-surface items-data-surface" aria-busy={loading}>
         <CardHeader className="border-b">
-          <CardTitle className="text-base tabular-nums">样机列表 (共 {totalCount} 条)</CardTitle>
+          <CardTitle className="items-result-title text-base tabular-nums" aria-live="polite">
+            <span>样机列表</span>
+            <span className="items-result-title__count">{totalCount} 条</span>
+          </CardTitle>
         </CardHeader>
         <CardContent className="p-0 sm:p-0">
           {loading ? (
@@ -338,48 +372,22 @@ export function ItemsList() {
                           onCheckedChange={toggleSelectAll}
                         />
                       </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
-                        onClick={() => handleSort('barcode')}
-                      >
-                        条码{sortIndicator('barcode')}
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
-                        onClick={() => handleSort('name')}
-                      >
-                        名称{sortIndicator('name')}
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
-                        onClick={() => handleSort('model')}
-                      >
-                        型号{sortIndicator('model')}
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
-                        onClick={() => handleSort('category')}
-                      >
-                        分类{sortIndicator('category')}
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
-                        onClick={() => handleSort('status')}
-                      >
-                        状态{sortIndicator('status')}
-                      </TableHead>
-                      <TableHead
-                        className="cursor-pointer select-none whitespace-nowrap transition-[color,background-color] duration-micro ease-hm-out hover:text-foreground"
-                        onClick={() => handleSort('location')}
-                      >
-                        存放位置{sortIndicator('location')}
-                      </TableHead>
+                      {sortableHeader('barcode', '条码')}
+                      {sortableHeader('name', '名称')}
+                      {sortableHeader('model', '型号')}
+                      {sortableHeader('category', '分类')}
+                      {sortableHeader('status', '状态')}
+                      {sortableHeader('location', '存放位置')}
                       <TableHead>操作</TableHead>
                     </TableRow>
                   </TableHeader>
-                  <TableBody>
+                  <TableBody key={`desktop:${listMotionKey}`}>
                     {sortedItems.map(item => (
-                      <TableRow key={item.id} className={selectedIds.has(item.id) ? 'bg-accent/50' : ''}>
+                      <TableRow
+                        key={item.id}
+                        className={`items-record ${selectedIds.has(item.id) ? 'is-selected' : ''}`}
+                        data-state={selectedIds.has(item.id) ? 'selected' : undefined}
+                      >
                         <TableCell>
                           <Checkbox
                             checked={selectedIds.has(item.id)}
@@ -406,11 +414,11 @@ export function ItemsList() {
               </div>
 
               {/* 移动端卡片 */}
-              <div className="space-y-3 p-3 sm:hidden">
+              <div key={`mobile:${listMotionKey}`} className="items-mobile-list space-y-3 p-3 sm:hidden">
                 {sortedItems.map(item => (
                   <div
                     key={item.id}
-                    className={`rounded-[var(--radius-input)] border p-3 transition-[color,background-color,border-color] duration-micro ease-hm-out ${selectedIds.has(item.id) ? 'border-primary bg-accent/60' : 'bg-card'}`}
+                    className={`items-mobile-record rounded-[var(--radius-input)] border p-3 ${selectedIds.has(item.id) ? 'is-selected border-primary bg-accent/60' : 'bg-card'}`}
                     onClick={() => toggleSelect(item.id)}
                   >
                     <div className="flex items-start gap-3">

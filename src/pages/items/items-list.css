@@ -1,0 +1,194 @@
+/* Hallmark · component: inventory workbench motion · genre: modern-minimal · theme: locked DJI cool system
+ * states: default · hover · focus · active · disabled · loading · selected
+ * motion: composed surface entrance · replayable row resolve · sort direction confirmation
+ * contrast: pass (40–41) · pre-emit critique: P5 H5 E5 S5 R5 V4
+ */
+
+.items-page__heading,
+.items-tool-card,
+.items-data-surface {
+  animation: items-surface-enter var(--dur-long) var(--ease-out) both;
+}
+
+.items-tool-card {
+  animation-delay: 60ms;
+}
+
+.items-data-surface {
+  animation-delay: var(--dur-micro);
+}
+
+.items-result-title {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-xs);
+}
+
+.items-result-title__count {
+  display: inline-flex;
+  min-height: 1.75rem;
+  align-items: center;
+  padding-inline: var(--space-2xs);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  color: var(--color-neutral);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.items-sort-trigger {
+  display: inline-flex;
+  width: 100%;
+  min-height: 2.5rem;
+  align-items: center;
+  gap: var(--space-3xs);
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: start;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+
+.items-sort-trigger__icon {
+  width: 0.75rem;
+  height: 0.75rem;
+  color: var(--color-rule-2);
+  opacity: 0.72;
+}
+
+.items-sort-trigger__direction {
+  display: inline-grid;
+  width: 0.875rem;
+  height: 0.875rem;
+  place-items: center;
+  color: var(--color-accent);
+  font-family: var(--font-outlier);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  animation: items-sort-confirm var(--dur-short) var(--ease-out) both;
+}
+
+.items-sort-trigger:focus-visible {
+  border-radius: var(--radius-input);
+  outline: var(--rule-fine) solid var(--color-focus);
+  outline-offset: var(--space-3xs);
+}
+
+.items-sort-trigger:active {
+  transform: translateY(1px);
+}
+
+.items-sort-trigger:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.items-record,
+.items-mobile-record {
+  opacity: 0;
+  animation: items-record-resolve var(--dur-short) var(--ease-out) both;
+}
+
+.items-record:nth-child(2),
+.items-mobile-record:nth-child(2) { animation-delay: 40ms; }
+.items-record:nth-child(3),
+.items-mobile-record:nth-child(3) { animation-delay: 80ms; }
+.items-record:nth-child(4),
+.items-mobile-record:nth-child(4) { animation-delay: var(--dur-micro); }
+.items-record:nth-child(5),
+.items-mobile-record:nth-child(5) { animation-delay: 160ms; }
+.items-record:nth-child(n + 6),
+.items-mobile-record:nth-child(n + 6) { animation-delay: var(--dur-short); }
+
+.items-record.is-selected {
+  color: var(--color-ink);
+}
+
+.items-mobile-record {
+  color: var(--color-ink-2);
+  transition: transform var(--dur-micro) var(--ease-out);
+}
+
+.items-mobile-record.is-selected {
+  color: var(--color-ink);
+}
+
+.items-mobile-record:focus-within {
+  outline: var(--rule-fine) solid var(--color-focus);
+  outline-offset: var(--space-3xs);
+}
+
+.items-mobile-record:active {
+  transform: scale(0.995);
+}
+
+.items-data-surface[aria-busy='true'] .items-result-title__count {
+  opacity: 0.55;
+}
+
+@media (hover: hover) and (pointer: fine) {
+  .items-sort-trigger:hover:not(:disabled) {
+    color: var(--color-ink);
+  }
+}
+
+@keyframes items-surface-enter {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2xs));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes items-record-resolve {
+  from {
+    opacity: 0;
+    transform: translateY(var(--space-2xs));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes items-sort-confirm {
+  from {
+    opacity: 0;
+    transform: translateY(-25%);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .items-page__heading,
+  .items-tool-card,
+  .items-data-surface,
+  .items-record,
+  .items-mobile-record,
+  .items-sort-trigger__direction {
+    animation-delay: 0ms;
+    animation-duration: 0.01ms;
+    transform: none;
+  }
+
+  .items-mobile-record:active,
+  .items-sort-trigger:active {
+    transform: none;
+  }
+}

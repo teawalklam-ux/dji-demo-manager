@@ -71,9 +71,6 @@
 .sop-reader-shot__image-button { display: flex; width: 100%; min-width: 0; align-items: center; justify-content: center; padding: 0; border: 0; background: var(--color-paper-2); color: var(--color-ink); cursor: zoom-in; transition: background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out); }
 .sop-reader-shot img { display: block; width: 100%; height: auto; opacity: 0; }
 .sop-reader-shot img.is-ready { opacity: 1; }
-.sop-reader-shot.is-zoomed .sop-reader-shot__viewport { max-height: 32rem; overflow: auto; }
-.sop-reader-shot.is-zoomed .sop-reader-shot__image-button { width: 80rem; min-width: 80rem; cursor: zoom-out; }
-.sop-reader-shot.is-zoomed img { width: 100%; min-width: 0; max-width: none; }
 .sop-reader-shot figcaption { padding-block: var(--space-2xs); color: var(--color-muted); font-size: var(--text-xs); line-height: 1.5; }
 .sop-reader-shot__loading { position: absolute; inset: 0; display: flex; align-items: center; justify-content: center; gap: var(--space-xs); background: var(--color-paper-2); color: var(--color-muted); font-size: var(--text-sm); }
 .sop-reader-shot__loading svg { width: 1.25rem; height: 1.25rem; }
@@ -83,6 +80,101 @@
 .sop-reader-visual__toolbar { inset-inline-end: var(--space-xs); bottom: calc(var(--space-xs) + 1.75rem); }
 .sop-reader-zoom { display: inline-flex; min-height: 2.5rem; align-items: center; gap: var(--space-3xs); padding: var(--space-2xs) var(--space-xs); border: 0; border-radius: var(--radius-input); background: transparent; color: var(--color-ink-2); font-size: var(--text-xs); white-space: nowrap; transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out); }
 .sop-reader-zoom svg { width: 1rem; height: 1rem; }
+.sop-image-viewer {
+  position: fixed;
+  inset: 0;
+  width: 100dvw;
+  max-width: none;
+  height: 100dvh;
+  max-height: none;
+  margin: 0;
+  padding: 0;
+  overflow: clip;
+  border: 0;
+  background: var(--color-image-viewer-scrim);
+  color: var(--color-ink);
+  font-family: var(--font-body);
+}
+.sop-image-viewer[open] { display: block; }
+.sop-image-viewer::backdrop { background: var(--color-image-viewer-scrim); animation: sop-image-viewer-backdrop-in var(--dur-short) var(--ease-out) both; }
+.sop-image-viewer__viewport { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; scrollbar-color: var(--color-rule-2) transparent; }
+.sop-image-viewer__stage {
+  --sop-viewer-edge-space: var(--space-lg);
+  display: grid;
+  width: max(100%, calc(var(--sop-viewer-image-width) + var(--sop-viewer-edge-space)));
+  min-width: 100%;
+  height: max(100%, calc(var(--sop-viewer-image-height) + var(--sop-viewer-edge-space)));
+  min-height: 100%;
+  place-items: center;
+}
+.sop-image-viewer__stage img {
+  display: block;
+  width: var(--sop-viewer-image-width);
+  max-width: none;
+  height: var(--sop-viewer-image-height);
+  max-height: none;
+  border-radius: var(--radius-card);
+  background: var(--color-paper-2);
+  box-shadow: var(--shadow-popover);
+  opacity: 0;
+  user-select: none;
+}
+.sop-image-viewer__stage img.is-ready { animation: sop-image-viewer-image-in var(--dur-short) var(--ease-out) both; }
+.sop-image-viewer__controls {
+  position: fixed;
+  inset-inline-start: 50%;
+  bottom: max(var(--space-md), env(safe-area-inset-bottom));
+  display: flex;
+  align-items: center;
+  gap: var(--space-xs);
+  transform: translateX(-50%);
+}
+.sop-image-viewer__zoom {
+  display: grid;
+  grid-template-columns: 3rem minmax(4.5rem, 5.25rem) 3rem;
+  min-height: 3rem;
+  overflow: clip;
+  border: var(--rule-hair) solid var(--color-rule);
+  border-radius: var(--radius-pill);
+  background: var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: var(--shadow-popover);
+  transition: transform var(--dur-micro) var(--ease-out), background-color var(--dur-short) var(--ease-out);
+}
+.sop-image-viewer__zoom[data-sweeping] { transform: scale(0.985); background: var(--color-accent-surface); cursor: ew-resize; }
+.sop-image-viewer__zoom button, .sop-image-viewer__close {
+  display: inline-flex;
+  width: 3rem;
+  min-width: 3rem;
+  height: 3rem;
+  min-height: 3rem;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: 0;
+  background: var(--color-paper);
+  color: var(--color-ink-2);
+  touch-action: none;
+  user-select: none;
+  transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out);
+}
+.sop-image-viewer__zoom button svg, .sop-image-viewer__close svg { width: 1.125rem; height: 1.125rem; pointer-events: none; }
+.sop-image-viewer__zoom output {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  justify-content: center;
+  border-inline: var(--rule-hair) solid var(--color-rule);
+  color: var(--color-ink);
+  font-family: var(--font-outlier);
+  font-size: var(--text-sm);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.sop-image-viewer__close { border: var(--rule-hair) solid var(--color-rule); border-radius: var(--radius-pill); box-shadow: var(--shadow-popover); }
+.sop-image-viewer__zoom button:disabled { opacity: 0.45; cursor: not-allowed; }
+.sop-image-viewer__zoom button:focus-visible, .sop-image-viewer__close:focus-visible { outline: 2px solid var(--color-focus); outline-offset: 3px; }
+.sop-image-viewer__zoom button:active:not(:disabled), .sop-image-viewer__close:active { transform: scale(0.96); }
 .sop-reader-footer { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: var(--space-xs); padding: var(--space-sm); padding-bottom: max(var(--space-sm), env(safe-area-inset-bottom)); border-top: var(--rule-hair) solid var(--color-rule); background: var(--color-liquid-surface); color: var(--color-ink); }
 .sop-reader-back, .sop-reader-next, .sop-reader-start { display: inline-flex; align-items: center; justify-content: center; gap: var(--space-2xs); min-height: 48px; border: var(--rule-hair) solid transparent; border-radius: var(--radius-input); padding: var(--space-xs) var(--space-md); font-size: var(--text-sm); font-weight: 600; white-space: nowrap; transition: color var(--dur-short) var(--ease-out), background-color var(--dur-short) var(--ease-out), transform var(--dur-micro) var(--ease-out); }
 .sop-reader-back { padding-inline: var(--space-xs); background: transparent; color: var(--color-muted); }
@@ -114,6 +206,7 @@
   .sop-reader-shot__image-button:hover:not(:disabled) { background: var(--color-paper-3); }
   .sop-reader-next:hover:not(:disabled), .sop-reader-start:hover { transform: translateY(-1px); }
   .sop-reader-editor input:hover:not(:disabled), .sop-reader-editor textarea:hover:not(:disabled) { background: var(--color-paper-2); }
+  .sop-image-viewer__zoom button:hover:not(:disabled), .sop-image-viewer__close:hover { background: var(--color-paper-3); color: var(--color-ink); }
 }
 
 @media (min-width: 40rem) {
@@ -129,10 +222,8 @@
   .sop-reader-dialog:not(.is-editing) .sop-reader-shot { display: grid; height: 100%; min-height: 0; grid-template-rows: minmax(0, 1fr) auto; }
   .sop-reader-dialog:not(.is-editing) .sop-reader-shot__viewport { height: 100%; min-height: 0; }
   .sop-reader-dialog:not(.is-editing) .sop-reader-shot__image-button { height: 100%; }
-  .sop-reader-dialog:not(.is-editing) .sop-reader-shot:not(.is-zoomed) img { width: 100%; height: 100%; object-fit: contain; }
-  .sop-reader-dialog:not(.is-editing) .sop-reader-shot.is-zoomed .sop-reader-shot__viewport { max-height: none; }
-  .sop-reader-dialog:not(.is-editing) .sop-reader-shot.is-zoomed .sop-reader-shot__image-button { height: auto; }
-  .sop-reader-dialog:not(.is-editing) .sop-reader-shot.is-zoomed img { height: auto; }
+  .sop-reader-dialog:not(.is-editing) .sop-reader-shot img { width: 100%; height: 100%; object-fit: contain; }
+  .sop-image-viewer__stage { --sop-viewer-edge-space: var(--space-2xl); }
   .sop-reader-progress { flex: 1 1 auto; order: 0; max-width: 18rem; }
   .sop-system-guide { padding: var(--space-lg); }
 }
@@ -141,10 +232,21 @@
   from { opacity: 0; transform: translateY(var(--space-2xs)); }
   to { opacity: 1; transform: translateY(0); }
 }
+@keyframes sop-image-viewer-backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes sop-image-viewer-image-in {
+  from { opacity: 0; transform: scale(0.985); }
+  to { opacity: 1; transform: scale(1); }
+}
 @media (prefers-reduced-motion: reduce) {
   .sop-reader-page { animation-duration: 150ms; }
   .sop-reader-dialog button, .sop-reader-start { transition: none; }
   .sop-reader-dialog button:hover:not(:disabled), .sop-reader-dialog button:active:not(:disabled), .sop-reader-start:hover, .sop-reader-start:active { transform: none; }
+  .sop-image-viewer::backdrop, .sop-image-viewer__stage img.is-ready { animation-duration: 150ms; }
+  .sop-image-viewer__stage img.is-ready { transform: none; }
+  .sop-image-viewer__zoom, .sop-image-viewer__zoom button, .sop-image-viewer__close { transition: none; }
 }
 
 .sop-page {
@@ -1044,11 +1146,21 @@
 }
 
 .sop-stage-card__head h2 {
+  display: flex;
   max-width: 22ch;
+  align-items: center;
+  gap: var(--space-2xs);
   font-family: var(--font-display);
   font-size: clamp(1.5rem, 1.2rem + 1vw, 2.25rem);
   font-style: normal;
   line-height: 1.15;
+}
+
+.sop-stage-card__head h2 > svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  flex: 0 0 auto;
+  color: var(--color-accent);
 }
 
 .sop-stage-card__head > div:first-child > span {
@@ -1078,6 +1190,27 @@
   color: var(--color-muted);
   font-size: var(--text-xs);
   white-space: nowrap;
+}
+
+.sop-stage-card__progress {
+  grid-column: 1 / -1;
+  height: var(--space-3xs);
+  overflow: clip;
+  border-radius: var(--radius-pill);
+  background: var(--color-paper-3);
+  color: var(--color-ink-2);
+}
+
+.sop-stage-card__progress > span {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--color-success);
+  color: var(--color-success-ink);
+  transform: scaleX(var(--sop-checklist-progress));
+  transform-origin: left center;
+  transition: transform var(--dur-short) var(--ease-out);
 }
 
 @keyframes sop-stage-card-enter {
@@ -1158,8 +1291,9 @@
 
 .sop-checklist {
   display: grid;
+  gap: var(--space-2xs);
   margin: 0;
-  padding: 0;
+  padding: var(--space-xs) 0 0;
   list-style: none;
 }
 
@@ -1169,11 +1303,17 @@
   align-items: center;
   gap: var(--space-xs);
   min-height: 4.25rem;
-  border-bottom: var(--rule-hair) solid var(--color-rule);
+  padding-inline: var(--space-xs);
+  border-radius: var(--radius-card);
+  background: var(--color-paper-2);
+  color: var(--color-ink-2);
+  transition: transform var(--dur-micro) var(--ease-out), opacity var(--dur-short) var(--ease-out);
 }
 
-.sop-checklist__item:last-child {
-  border-bottom: 0;
+.sop-checklist__item.is-complete {
+  background: var(--color-success-surface);
+  color: var(--color-ink-2);
+  animation: sop-todo-complete var(--dur-short) var(--ease-out) both;
 }
 
 .sop-checklist__check {
@@ -1201,18 +1341,19 @@
   align-items: center;
   justify-content: center;
   border: var(--rule-hair) solid var(--color-rule-2);
-  border-radius: var(--radius-liquid-pill);
+  border-radius: var(--radius-input);
   background: var(--color-paper);
   color: transparent;
   transition:
-    color var(--dur-micro) var(--ease-out),
-    background-color var(--dur-micro) var(--ease-out),
     transform var(--dur-micro) var(--ease-out);
 }
 
 .sop-checklist__box svg {
   width: 0.875rem;
   height: 0.875rem;
+  opacity: 0;
+  transform: scale(0.65);
+  transition: opacity var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out);
 }
 
 .sop-checklist__check > input:focus-visible + .sop-checklist__box {
@@ -1224,6 +1365,15 @@
   border-color: var(--color-success);
   background: var(--color-success);
   color: var(--color-success-ink);
+}
+
+.sop-checklist__check > input:checked + .sop-checklist__box svg {
+  opacity: 1;
+  transform: scale(1);
+}
+
+.sop-checklist__check > input:active + .sop-checklist__box {
+  transform: scale(0.92);
 }
 
 .sop-checklist__check > input:disabled + .sop-checklist__box {
@@ -1254,6 +1404,11 @@
   text-decoration: line-through;
   text-decoration-thickness: var(--rule-hair);
   text-underline-offset: var(--space-3xs);
+}
+
+@keyframes sop-todo-complete {
+  from { opacity: 0.72; transform: scale(0.995); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 .sop-checklist__edit {
@@ -1615,7 +1770,15 @@
     background: transparent;
   }
 
-  .sop-checklist__check:hover .sop-checklist__box {
+  .sop-checklist__item:hover {
+    transform: translateX(var(--space-3xs));
+  }
+
+  .sop-checklist__item:focus-within {
+    transform: translateX(var(--space-3xs));
+  }
+
+  .sop-checklist__check:hover input:not(:checked) + .sop-checklist__box {
     background: var(--color-paper-3);
   }
 
@@ -1666,9 +1829,19 @@
   .sop-danger-button,
   .sop-add-item button,
   .sop-entry-link,
-  .sop-checklist__box {
+  .sop-checklist__box,
+  .sop-checklist__box svg,
+  .sop-checklist__item {
     transform: none !important;
     transition-duration: var(--dur-micro);
+  }
+
+  .sop-checklist__item.is-complete {
+    animation: none;
+  }
+
+  .sop-stage-card__progress > span {
+    transition: none;
   }
 
   .sop-page .is-spinning {

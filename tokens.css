@@ -40,6 +40,7 @@
   --color-liquid-surface: oklch(97.6% 0.012 252);
   --color-liquid-shadow: oklch(20.6% 0.039 265.5 / 0.12);
   --color-liquid-scrim: oklch(20.6% 0.039 265.5 / 0.24);
+  --color-image-viewer-scrim: oklch(24% 0.012 258 / 0.72);
 
   /* Data visualisation */
   --color-chart-1: var(--color-accent);

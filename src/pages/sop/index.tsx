@@ -15,6 +15,7 @@ import {
   FolderCog,
   History,
   LoaderCircle,
+  ListChecks,
   MapPinned,
   MousePointerClick,
   PackageCheck,
@@ -1255,7 +1256,7 @@ export function SopGuidePage() {
               >
                 <header className="sop-stage-card__head">
                   <div>
-                    <h2>{stageDefinition.title}</h2>
+                    <h2><ListChecks aria-hidden="true" /><span>{stageDefinition.title}</span></h2>
                     <span>{stageDefinition.helper}</span>
                   </div>
                   <div className="sop-stage-card__meta">
@@ -1269,11 +1270,21 @@ export function SopGuidePage() {
                     >
                       <ChevronUp aria-hidden="true" />
                     </button>
+                    <div
+                      className="sop-stage-card__progress"
+                      role="progressbar"
+                      aria-label={`${stageDefinition.shortLabel}完成进度`}
+                      aria-valuemin={0}
+                      aria-valuemax={activeItems.length}
+                      aria-valuenow={completedCount}
+                    >
+                      <span style={{ '--sop-checklist-progress': activeItems.length ? completedCount / activeItems.length : 0 } as CSSProperties} />
+                    </div>
                   </div>
                 </header>
 
                 {activeItems.length > 0 ? (
-                  <ol className="sop-checklist">
+                  <ol className="sop-checklist" aria-label={`${stageDefinition.shortLabel}待办清单`}>
                     {activeItems.map((item, index) => {
                       const itemKey = `${activeProcess.id}:${activeStage}:${item.id}`
                       const checked = completedItems.has(itemKey)
