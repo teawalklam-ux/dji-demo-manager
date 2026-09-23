@@ -1,5 +1,5 @@
-import { useEffect, useId, useRef, useState, type ChangeEvent } from 'react'
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, BookOpenCheck, ImageOff, LoaderCircle, Plus, RotateCcw, Save, Trash2, Upload, X, ZoomIn, ZoomOut } from 'lucide-react'
+import { useEffect, useId, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, BookOpenCheck, ImageOff, LoaderCircle, Minus, Plus, RotateCcw, Save, Trash2, Upload, X, ZoomIn } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { HoverToolbar } from '@/components/ui/hover-toolbar'
 import type { PersistedSopItem } from '@/services/sop.service'
@@ -20,25 +20,173 @@ interface SystemSopReaderProps {
   onChangeSteps: (steps: PersistedSopItem[], removed?: boolean) => void
 }
 
-function StepScreenshot({ step, zoomed, onToggleZoom }: { step: PersistedSopItem; zoomed: boolean; onToggleZoom: () => void }) {
+const MIN_IMAGE_ZOOM = 10
+const MAX_IMAGE_ZOOM = 300
+const IMAGE_ZOOM_STEP = 5
+const IMAGE_SWEEP_DELAY = 260
+
+type ImageSize = { width: number; height: number }
+type ZoomDirection = -1 | 1
+type ZoomPress = { pointerId: number; originX: number; originZoom: number; direction: ZoomDirection; sweeping: boolean }
+
+const clampImageZoom = (value: number) => Math.min(MAX_IMAGE_ZOOM, Math.max(MIN_IMAGE_ZOOM, value))
+
+const getFitImageZoom = ({ width, height }: ImageSize) => {
+  const edgeSpace = window.innerWidth < 640 ? 32 : 72
+  const availableWidth = Math.max(1, window.innerWidth - edgeSpace)
+  const availableHeight = Math.max(1, window.innerHeight - edgeSpace)
+  return clampImageZoom(Math.floor(Math.min(availableWidth / width, availableHeight / height) * 1000) / 10)
+}
+
+function ScreenshotViewer({ open, source, label, onRequestClose }: { open: boolean; source: string; label: string; onRequestClose: () => void }) {
+  const [imageSize, setImageSize] = useState<ImageSize | null>(null)
+  const [zoomPercent, setZoomPercent] = useState(100)
+  const [sweeping, setSweeping] = useState(false)
+  const dialogRef = useRef<HTMLDialogElement>(null)
+  const zoomRailRef = useRef<HTMLDivElement>(null)
+  const firstControlRef = useRef<HTMLButtonElement>(null)
+  const zoomRef = useRef(zoomPercent)
+  const pressRef = useRef<ZoomPress | null>(null)
+  const sweepTimerRef = useRef<number | null>(null)
+  const manuallyAdjustedRef = useRef(false)
+  const hintId = useId()
+
+  useEffect(() => { zoomRef.current = zoomPercent }, [zoomPercent])
+
+  useEffect(() => {
+    const dialog = dialogRef.current
+    if (!dialog) return
+    if (open && !dialog.open) {
+      dialog.showModal()
+      const frame = window.requestAnimationFrame(() => firstControlRef.current?.focus({ preventScroll: true }))
+      return () => window.cancelAnimationFrame(frame)
+    }
+    if (!open && dialog.open) dialog.close()
+  }, [open])
+
+  useEffect(() => {
+    if (!open || !imageSize) return
+    const fitToViewport = () => {
+      if (!manuallyAdjustedRef.current) setZoomPercent(getFitImageZoom(imageSize))
+    }
+    fitToViewport()
+    window.addEventListener('resize', fitToViewport)
+    return () => window.removeEventListener('resize', fitToViewport)
+  }, [imageSize, open])
+
+  useEffect(() => {
+    if (!open) return
+    const root = document.documentElement
+    const previousOverflowY = root.style.overflowY
+    root.style.overflowY = 'hidden'
+    return () => { root.style.overflowY = previousOverflowY }
+  }, [open])
+
+  useEffect(() => () => {
+    if (sweepTimerRef.current !== null) window.clearTimeout(sweepTimerRef.current)
+  }, [])
+
+  const setUserZoom = (value: number) => {
+    manuallyAdjustedRef.current = true
+    setZoomPercent(clampImageZoom(Math.round(value * 10) / 10))
+  }
+
+  const stepZoom = (direction: ZoomDirection) => setUserZoom(zoomRef.current + direction * IMAGE_ZOOM_STEP)
+
+  const startPress = (direction: ZoomDirection, event: ReactPointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0) return
+    if (sweepTimerRef.current !== null) window.clearTimeout(sweepTimerRef.current)
+    event.currentTarget.setPointerCapture(event.pointerId)
+    pressRef.current = { pointerId: event.pointerId, originX: event.clientX, originZoom: zoomRef.current, direction, sweeping: false }
+    sweepTimerRef.current = window.setTimeout(() => {
+      if (!pressRef.current) return
+      pressRef.current.sweeping = true
+      setSweeping(true)
+    }, IMAGE_SWEEP_DELAY)
+  }
+
+  const movePress = (event: ReactPointerEvent<HTMLButtonElement>) => {
+    const press = pressRef.current
+    if (!press || press.pointerId !== event.pointerId || !press.sweeping) return
+    const railWidth = zoomRailRef.current?.getBoundingClientRect().width || 1
+    setUserZoom(press.originZoom + ((event.clientX - press.originX) / railWidth) * 100)
+  }
+
+  const finishPress = (event: ReactPointerEvent<HTMLButtonElement>, commitTap: boolean) => {
+    const press = pressRef.current
+    if (!press || press.pointerId !== event.pointerId) return
+    if (sweepTimerRef.current !== null) window.clearTimeout(sweepTimerRef.current)
+    sweepTimerRef.current = null
+    if (commitTap && !press.sweeping) stepZoom(press.direction)
+    pressRef.current = null
+    setSweeping(false)
+    if (event.currentTarget.hasPointerCapture(event.pointerId)) event.currentTarget.releasePointerCapture(event.pointerId)
+  }
+
+  const displayWidth = imageSize ? imageSize.width * zoomPercent / 100 : 0
+  const displayHeight = imageSize ? imageSize.height * zoomPercent / 100 : 0
+  const displayedZoom = Number.isInteger(zoomPercent) ? String(zoomPercent) : zoomPercent.toFixed(1)
+  const stageStyle = {
+    '--sop-viewer-image-width': `${displayWidth}px`,
+    '--sop-viewer-image-height': `${displayHeight}px`,
+  } as CSSProperties
+
+  const zoomButtonEvents = (direction: ZoomDirection) => ({
+    onPointerDown: (event: ReactPointerEvent<HTMLButtonElement>) => startPress(direction, event),
+    onPointerMove: movePress,
+    onPointerUp: (event: ReactPointerEvent<HTMLButtonElement>) => finishPress(event, true),
+    onPointerCancel: (event: ReactPointerEvent<HTMLButtonElement>) => finishPress(event, false),
+    onClick: (event: React.MouseEvent<HTMLButtonElement>) => { if (event.detail === 0) stepZoom(direction) },
+  })
+
+  const closeViewer = () => {
+    if (dialogRef.current?.open) dialogRef.current.close()
+    else onRequestClose()
+  }
+
+  return (
+    <dialog ref={dialogRef} className="sop-image-viewer" aria-label={`查看操作截图：${label}`} aria-describedby={hintId}
+      onCancel={(event) => { event.preventDefault(); closeViewer() }}
+      onClose={() => { if (open) onRequestClose() }}>
+      <p id={hintId} className="sr-only">图片已按窗口完整显示。单击减号或加号精确缩放；长按任一按钮后左右拖动可快速缩放。</p>
+      <div className="sop-image-viewer__viewport">
+        <div className="sop-image-viewer__stage" style={stageStyle} onClick={(event) => { if (event.target === event.currentTarget) closeViewer() }}>
+          <img src={source} alt={`操作截图：${label}`} draggable={false} referrerPolicy="no-referrer"
+            className={imageSize ? 'is-ready' : ''}
+            onLoad={(event) => {
+              const nextSize = { width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }
+              setImageSize(nextSize)
+              setZoomPercent(getFitImageZoom(nextSize))
+            }} />
+        </div>
+      </div>
+      <div className="sop-image-viewer__controls">
+        <div ref={zoomRailRef} className="sop-image-viewer__zoom" data-sweeping={sweeping || undefined} role="group" aria-label="图片缩放控制">
+          <button ref={firstControlRef} type="button" aria-label="缩小图片；单击减少 5%，长按后左右拖动快速调整" disabled={zoomPercent <= MIN_IMAGE_ZOOM} {...zoomButtonEvents(-1)}>
+            <Minus aria-hidden="true" />
+          </button>
+          <output aria-live="polite" aria-label={`当前缩放比例 ${displayedZoom}%`}>{displayedZoom}%</output>
+          <button type="button" aria-label="放大图片；单击增加 5%，长按后左右拖动快速调整" disabled={zoomPercent >= MAX_IMAGE_ZOOM} {...zoomButtonEvents(1)}>
+            <Plus aria-hidden="true" />
+          </button>
+        </div>
+        <button type="button" className="sop-image-viewer__close" aria-label="退出图片查看" onClick={closeViewer}><X aria-hidden="true" /></button>
+      </div>
+    </dialog>
+  )
+}
+
+function StepScreenshot({ step, onOpenViewer }: { step: PersistedSopItem; onOpenViewer: () => void }) {
   const source = getSopScreenshot(step)
   const [state, setState] = useState<'loading' | 'ready' | 'error'>('loading')
   const [attempt, setAttempt] = useState(0)
-  const viewportId = useId()
-  const viewportRef = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    if (!zoomed) return
-    const frame = window.requestAnimationFrame(() => viewportRef.current?.focus({ preventScroll: true }))
-    return () => window.cancelAnimationFrame(frame)
-  }, [zoomed])
 
   return (
-    <figure className={`sop-reader-shot ${zoomed ? 'is-zoomed' : ''}`} aria-busy={Boolean(source) && state === 'loading'}>
-      <div id={viewportId} ref={viewportRef} className="sop-reader-shot__viewport" tabIndex={zoomed ? 0 : undefined} aria-label={zoomed ? '放大的操作截图，可滚动查看' : undefined}>
+    <figure className="sop-reader-shot" aria-busy={Boolean(source) && state === 'loading'}>
+      <div className="sop-reader-shot__viewport">
         {source && state !== 'error' && (
-          <button type="button" className="sop-reader-shot__image-button" aria-label={zoomed ? '恢复完整截图显示' : `放大操作截图：${step.label}`}
-            aria-pressed={zoomed} aria-controls={viewportId} tabIndex={zoomed ? -1 : 0} disabled={state !== 'ready'} onClick={onToggleZoom}>
+          <button type="button" className="sop-reader-shot__image-button" aria-label={`全屏查看操作截图：${step.label}`}
+            disabled={state !== 'ready'} onClick={onOpenViewer}>
             <img key={attempt} src={source} alt={`操作截图：${step.label}`} width={1280} height={860} draggable={false}
               referrerPolicy="no-referrer" className={state === 'ready' ? 'is-ready' : ''}
               onLoad={() => setState('ready')} onError={() => setState('error')} />
@@ -63,7 +211,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
   const [open, setOpen] = useState(true)
   const [index, setIndex] = useState(0)
   const [finished, setFinished] = useState(false)
-  const [zoomed, setZoomed] = useState(false)
+  const [viewerOpen, setViewerOpen] = useState(false)
   const [uploadError, setUploadError] = useState<string | null>(null)
   const [uploading, setUploading] = useState(false)
   const dialogRef = useRef<HTMLDialogElement>(null)
@@ -94,7 +242,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
 
   const goTo = (nextIndex: number) => {
     setIndex(Math.max(0, Math.min(nextIndex, steps.length - 1)))
-    setZoomed(false)
+    setViewerOpen(false)
     setUploadError(null)
     bodyRef.current?.scrollTo({ top: 0, behavior: 'instant' })
   }
@@ -192,7 +340,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
           if (event.clientX < rect.left || event.clientX > rect.right || event.clientY < rect.top || event.clientY > rect.bottom) setOpen(false)
         }}>
         <header className="sop-reader-head">
-          <div><span>系统使用 SOP · {steps.length} 步</span><h2 id="sop-reader-title">{title}</h2><p id="sop-reader-description">截图会先完整显示；看不清时点击截图放大，再点击右下角继续。</p></div>
+          <div><span>系统使用 SOP · {steps.length} 步</span><h2 id="sop-reader-title">{title}</h2><p id="sop-reader-description">截图会先完整显示；点击可全屏查看，底部可精确或快速调整比例。</p></div>
           <div className="sop-reader-head__actions">
             {editing && <button type="button" className="sop-save-button" aria-label={saving ? '保存中' : '保存 SOP'} onClick={onSave} disabled={!dirty || saving || uploading}>{saving ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <Save aria-hidden="true" />}<span>{saving ? '保存中' : '保存 SOP'}</span></button>}
             <button type="button" className="sop-icon-button" aria-label="关闭图文指引" onClick={() => setOpen(false)}><X aria-hidden="true" /></button>
@@ -211,10 +359,10 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
               toolbarClassName="sop-reader-visual__toolbar"
               label="截图查看工具"
               toolbar={getSopScreenshot(step) ? (
-                <button type="button" className="sop-reader-zoom" aria-pressed={zoomed} onClick={() => setZoomed((value) => !value)}>{zoomed ? <ZoomOut aria-hidden="true" /> : <ZoomIn aria-hidden="true" />}{zoomed ? '适应窗口' : '放大截图'}</button>
+                <button type="button" className="sop-reader-zoom" onClick={() => setViewerOpen(true)}><ZoomIn aria-hidden="true" />放大截图</button>
               ) : undefined}
             >
-              <StepScreenshot key={getSopScreenshot(step)} step={step} zoomed={zoomed} onToggleZoom={() => setZoomed((value) => !value)} />
+              <StepScreenshot key={getSopScreenshot(step)} step={step} onOpenViewer={() => setViewerOpen(true)} />
             </HoverToolbar>
             {editing && <div className="sop-reader-editor">
               <label><span>本步操作说明</span><textarea value={step.label} maxLength={500} disabled={uploading || saving} onChange={(event) => patchStep({ label: event.target.value })} /></label>
@@ -249,6 +397,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
           <button type="button" className="sop-reader-next" disabled={!step || uploading} onClick={next}><span>{currentIndex === steps.length - 1 ? '完成指引' : '下一步'}</span><ArrowRight aria-hidden="true" /></button>
         </footer>
       </dialog>
+      {viewerOpen && step && getSopScreenshot(step) && <ScreenshotViewer open source={getSopScreenshot(step)} label={step.label} onRequestClose={() => setViewerOpen(false)} />}
       {finished && <div className="sop-system-guide__finish"><span>阅读完成不代表业务已处理。</span><button type="button" className="sop-text-button" onClick={() => { goTo(0); setFinished(false); setOpen(true) }}><RotateCcw aria-hidden="true" />重新阅读</button>{entry && <Link className="sop-entry-link" to={entry.href}>{entry.label}<ArrowRight aria-hidden="true" /></Link>}</div>}
     </section>
   )

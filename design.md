@@ -34,7 +34,7 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
 
 系统指引按现有角色权限向下兼容：使用人看到基础操作；审批人额外看到样机审批；管理员看到审批和管理指引；超级管理员看到全部内容。系统弹窗一次只显示当前说明和对应截图，底部固定上一页、阅读位置与右下主操作；阅读完成不代表业务执行。阶段导航使用固定三栏与仅基于 `transform` 的活动底板，内容区以短淡入和 8 px 内位移完成交接，不再使用液态融合、弹跳或正文模糊。机场选址与安装部署内容不变；维修保留待配置空状态。
 
-系统阅读器在小屏采用全屏弹窗，在桌面采用圆角浮层；正文独立滚动，截图可放大、容器内滚动。原生 dialog 配合 Tab 循环、Escape 关闭和背景滚动锁定。减少动态效果偏好下关闭形变及空间位移，只保留短淡入。
+系统阅读器在小屏采用全屏弹窗，在桌面采用圆角浮层；正文独立滚动。截图点击后进入独立的全屏居中查看层，使用冷灰半透明遮罩；初始比例按完整容纳窗口计算，底部胶囊支持单击 5% 精调，以及长按后横向拖动快调。原生 dialog 配合 Tab 循环、Escape、遮罩空白和显式关闭按钮退出，并保持背景滚动锁定。减少动态效果偏好下关闭形变及空间位移，只保留短淡入。
 
 管理员编辑采用显式保存：页面内修改先进入未保存状态，点击“保存 SOP”后由 Supabase 事务接口整体写入；读取和写入均服从数据库 RLS。接口不可用时显示内置示例与明确错误，不伪装为已保存。
 
@@ -121,6 +121,7 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --color-liquid-surface: oklch(97.6% 0.012 252);
   --color-liquid-shadow: oklch(20.6% 0.039 265.5 / 0.12);
   --color-liquid-scrim: oklch(20.6% 0.039 265.5 / 0.24);
+  --color-image-viewer-scrim: oklch(24% 0.012 258 / 0.72);
   --color-chart-in-stock: var(--color-success);
   --color-chart-reserved: var(--color-reserved);
   --color-chart-borrowed: var(--color-accent);
@@ -184,6 +185,7 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
     "liquid-surface": { "$value": "oklch(97.6% 0.012 252)", "$type": "color" },
     "liquid-shadow": { "$value": "oklch(20.6% 0.039 265.5 / 0.12)", "$type": "color" },
     "liquid-scrim": { "$value": "oklch(20.6% 0.039 265.5 / 0.24)", "$type": "color" },
+    "image-viewer-scrim": { "$value": "oklch(24% 0.012 258 / 0.72)", "$type": "color" },
     "chart-in-stock": { "$value": "{color.success}", "$type": "color" },
     "chart-reserved": { "$value": "{color.reserved}", "$type": "color" },
     "chart-borrowed": { "$value": "{color.accent}", "$type": "color" },
@@ -261,6 +263,7 @@ Hallmark v1.1 设计记录。此基线仅约束视觉层，不改变路由、权
   --sop-liquid-surface: 97.6% 0.012 252;
   --sop-liquid-shadow: 20.6% 0.039 265.5 / 0.12;
   --sop-liquid-scrim: 20.6% 0.039 265.5 / 0.24;
+  --sop-image-viewer-scrim: 24% 0.012 258 / 0.72;
   --sop-liquid-radius: 1.75rem;
 }
 ```
