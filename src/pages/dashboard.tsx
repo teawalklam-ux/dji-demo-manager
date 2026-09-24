@@ -99,7 +99,7 @@ function DashboardEmptyState({
 function DashboardLoader() {
   return (
     <span className="hm-dashboard-loader" role="status" aria-live="polite">
-      <span className="hm-dashboard-loader__ring" aria-hidden="true" />
+      <Spinner className="size-4 text-primary" aria-hidden="true" />
       正在同步数据
     </span>
   )

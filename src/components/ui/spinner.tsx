@@ -1,16 +1,10 @@
-import { Loader2Icon } from "lucide-react"
+import { HaloLoader } from '@/components/ui/generative-loader'
 
-import { cn } from "@/lib/utils"
+function Spinner({ className, ...props }: React.ComponentProps<'span'>) {
+  const hidden = props['aria-hidden'] === true || props['aria-hidden'] === 'true'
+  const label = hidden ? undefined : String(props['aria-label'] || '加载中')
 
-function Spinner({ className, ...props }: React.ComponentProps<"svg">) {
-  return (
-    <Loader2Icon
-      role="status"
-      aria-label="Loading"
-      className={cn("size-4 animate-spin", className)}
-      {...props}
-    />
-  )
+  return <HaloLoader className={className} label={label} {...props} />
 }
 
 export { Spinner }

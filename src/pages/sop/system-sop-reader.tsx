@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState, type ChangeEvent, type CSSProperties, type PointerEvent as ReactPointerEvent } from 'react'
-import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, BookOpenCheck, ImageOff, LoaderCircle, Minus, Plus, RotateCcw, Save, Trash2, Upload, X, ZoomIn } from 'lucide-react'
+import { ArrowLeft, ArrowRight, ArrowUp, ArrowDown, BookOpenCheck, ImageOff, Minus, Plus, RotateCcw, Save, Trash2, Upload, X, ZoomIn } from 'lucide-react'
 import { Link } from 'react-router-dom'
 import { HoverToolbar } from '@/components/ui/hover-toolbar'
+import { ScanLoader } from '@/components/ui/generative-loader'
+import { Spinner } from '@/components/ui/spinner'
 import type { PersistedSopItem } from '@/services/sop.service'
 import { getSopScreenshot } from './system-sop-screenshots'
 
@@ -151,6 +153,7 @@ function ScreenshotViewer({ open, source, label, onRequestClose }: { open: boole
       <p id={hintId} className="sr-only">图片已按窗口完整显示。单击减号或加号精确缩放；长按任一按钮后左右拖动可快速缩放。</p>
       <div className="sop-image-viewer__viewport">
         <div className="sop-image-viewer__stage" style={stageStyle} onClick={(event) => { if (event.target === event.currentTarget) closeViewer() }}>
+          {!imageSize && <div className="sop-image-viewer__loading"><ScanLoader className="size-28" label="正在加载操作截图" /></div>}
           <img src={source} alt={`操作截图：${label}`} draggable={false} referrerPolicy="no-referrer"
             className={imageSize ? 'is-ready' : ''}
             onLoad={(event) => {
@@ -192,7 +195,7 @@ function StepScreenshot({ step, onOpenViewer }: { step: PersistedSopItem; onOpen
               onLoad={() => setState('ready')} onError={() => setState('error')} />
           </button>
         )}
-        {source && state === 'loading' && <div className="sop-reader-shot__loading" role="status"><LoaderCircle className="is-spinning" aria-hidden="true" /><span>正在加载操作截图</span></div>}
+        {source && state === 'loading' && <div className="sop-reader-shot__loading"><ScanLoader className="size-24" label="正在加载操作截图" /><span>正在加载操作截图</span></div>}
         {(!source || state === 'error') && (
           <div className="sop-reader-shot__empty" role="status">
             <ImageOff aria-hidden="true" />
@@ -342,7 +345,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
         <header className="sop-reader-head">
           <div><span>系统使用 SOP · {steps.length} 步</span><h2 id="sop-reader-title">{title}</h2><p id="sop-reader-description">截图会先完整显示；点击可全屏查看，底部可精确或快速调整比例。</p></div>
           <div className="sop-reader-head__actions">
-            {editing && <button type="button" className="sop-save-button" aria-label={saving ? '保存中' : '保存 SOP'} onClick={onSave} disabled={!dirty || saving || uploading}>{saving ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <Save aria-hidden="true" />}<span>{saving ? '保存中' : '保存 SOP'}</span></button>}
+            {editing && <button type="button" className="sop-save-button" aria-label={saving ? '保存中' : '保存 SOP'} onClick={onSave} disabled={!dirty || saving || uploading}>{saving ? <Spinner className="size-4" aria-hidden="true" /> : <Save aria-hidden="true" />}<span>{saving ? '保存中' : '保存 SOP'}</span></button>}
             <button type="button" className="sop-icon-button" aria-label="关闭图文指引" onClick={() => setOpen(false)}><X aria-hidden="true" /></button>
           </div>
         </header>
@@ -371,7 +374,7 @@ export function SystemSopReader({ title, description, steps, entry, editing, sav
                 onChange={(event) => patchStep({ screenshot: event.target.value.trim() })} /></label>
               <div className="sop-reader-editor__tools">
                 <input ref={fileRef} type="file" accept="image/png,image/jpeg,image/webp" hidden onChange={(event) => void uploadScreenshot(event)} />
-                <button type="button" className="sop-text-button" disabled={uploading || saving} onClick={() => fileRef.current?.click()}>{uploading ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <Upload aria-hidden="true" />}{uploading ? '读取中' : '上传截图'}</button>
+                <button type="button" className="sop-text-button" disabled={uploading || saving} onClick={() => fileRef.current?.click()}>{uploading ? <Spinner className="size-4" aria-hidden="true" /> : <Upload aria-hidden="true" />}{uploading ? '读取中' : '上传截图'}</button>
                 <button type="button" className="sop-icon-button" disabled={currentIndex === 0 || uploading || saving} onClick={() => moveStep(-1)} aria-label="上移本步"><ArrowUp aria-hidden="true" /></button>
                 <button type="button" className="sop-icon-button" disabled={currentIndex === steps.length - 1 || uploading || saving} onClick={() => moveStep(1)} aria-label="下移本步"><ArrowDown aria-hidden="true" /></button>
                 <button type="button" className="sop-text-button" disabled={uploading || saving} onClick={addStep}><Plus aria-hidden="true" />插入下一步</button>

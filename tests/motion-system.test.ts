@@ -57,6 +57,26 @@ assert.match(tailwindConfig, /"accordion-down"[\s\S]*?opacity[\s\S]*?translateY/
 
 const appSource = readFileSync(join(sourceRoot, 'App.tsx'), 'utf8')
 assert.doesNotMatch(appSource, /AnimatePresence|motion\./)
+assert.match(appSource, /<PageLoader \/>/)
+
+const generativeLoaderSource = readFileSync(join(sourceRoot, 'components/ui/generative-loader.tsx'), 'utf8')
+const generativeLoaderCss = readFileSync(join(sourceRoot, 'components/ui/generative-loader.css'), 'utf8')
+const spinnerSource = readFileSync(join(sourceRoot, 'components/ui/spinner.tsx'), 'utf8')
+const dashboardLoaderSource = readFileSync(join(sourceRoot, 'pages/dashboard.tsx'), 'utf8')
+const systemLogsSource = readFileSync(join(sourceRoot, 'pages/admin/system-logs.tsx'), 'utf8')
+const exportButtonSource = readFileSync(join(sourceRoot, 'components/export/export-button.tsx'), 'utf8')
+assert.match(spinnerSource, /<HaloLoader/)
+assert.match(dashboardLoaderSource, /hm-dashboard-loader[\s\S]*?<Spinner/)
+assert.match(systemLogsSource, /loading \? <Spinner/)
+assert.doesNotMatch(systemLogsSource, /animate-spin/)
+assert.match(exportButtonSource, /loading \? <Spinner/)
+assert.match(generativeLoaderSource, /data-generative-loader="halo"/)
+assert.match(generativeLoaderSource, /data-generative-loader="scan"/)
+assert.match(generativeLoaderSource, /function ScanImage/)
+assert.match(generativeLoaderCss, /@keyframes gl-halo-dot[\s\S]*?rotate\(var\(--gl-halo-angle\)\)/)
+assert.match(generativeLoaderCss, /@keyframes gl-scan-beam[\s\S]*?translateY\(100%\)/)
+assert.match(generativeLoaderCss, /prefers-reduced-motion:\s*reduce[\s\S]*?\.gl-scan-loader__beam[\s\S]*?animation:\s*none/)
+assert.doesNotMatch(generativeLoaderCss, /transition:\s*all|@keyframes gl-[^{]+\{[^}]*\b(?:top|left|width|height)\s*:/)
 
 const inputSource = readFileSync(join(sourceRoot, 'components/ui/input.tsx'), 'utf8')
 assert.match(inputSource, /transition-\[color,background-color\]/)
@@ -84,6 +104,7 @@ assert.match(sopReaderSource, /IMAGE_SWEEP_DELAY = 260/)
 assert.match(sopReaderSource, /getFitImageZoom/)
 assert.match(sopReaderSource, /setPointerCapture/)
 assert.match(sopReaderSource, /aria-label="退出图片查看"/)
+assert.match(sopReaderSource, /<ScanLoader[^>]+label="正在加载操作截图"/)
 assert.match(sopCss, /\.sop-stage-tabs__indicator[\s\S]*?transform:\s*translateX/)
 assert.match(sopCss, /@keyframes sop-stage-card-enter[\s\S]*?transform:\s*translateY/)
 assert.match(sopCss, /\.sop-image-viewer::backdrop[\s\S]*?var\(--color-image-viewer-scrim\)/)
@@ -120,7 +141,7 @@ assert.match(dashboardSource, /CircleSwapLink/)
 assert.match(dashboardSource, /UnderlineActionLink/)
 assert.match(globalCss, /@keyframes hm-dashboard-enter[\s\S]*?transform:\s*translateY/)
 assert.match(globalCss, /@keyframes hm-metric-roll-in[\s\S]*?translateY\(105%\)/)
-assert.match(globalCss, /@keyframes hm-dashboard-loader-spin[\s\S]*?rotate\(360deg\)/)
+assert.doesNotMatch(globalCss, /@keyframes hm-dashboard-loader-spin|hm-dashboard-loader__ring/)
 assert.match(globalCss, /\.hm-donut-segment\.is-active[\s\S]*?scale\(1\.05\)/)
 assert.match(globalCss, /@keyframes hm-chart-center-swap[\s\S]*?translateY/)
 assert.doesNotMatch(globalCss, /@keyframes hm-chart-pie-enter/)
@@ -139,3 +160,13 @@ assert.match(itemsCss, /prefers-reduced-motion:\s*reduce/)
 
 const packageSource = readFileSync(join(projectRoot, 'package.json'), 'utf8')
 assert.doesNotMatch(packageSource, /liquid-gooey/)
+assert.doesNotMatch(packageSource, /generative-loaders|framer-motion/)
+
+for (const fileName of [
+  'components/borrow/nas-archive-search.tsx',
+  'components/borrow/return-photo-capture.tsx',
+  'components/borrow/return-photo-gallery.tsx',
+]) {
+  const source = readFileSync(join(sourceRoot, fileName), 'utf8')
+  assert.match(source, /ScanImage|ScanLoader/, `${fileName} must use the scan image loading state`)
+}

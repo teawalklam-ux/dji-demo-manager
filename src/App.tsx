@@ -4,6 +4,7 @@ import { AuthProvider } from '@/contexts/auth-context'
 import { AuthGuard } from '@/components/auth/auth-guard'
 import { AppLayout } from '@/components/layout/app-layout'
 import { LoginForm } from '@/components/auth/login-form'
+import { PageLoader } from '@/components/ui/generative-loader'
 
 const Dashboard = lazy(() => import('@/pages/dashboard').then((m) => ({ default: m.Dashboard })))
 const ItemsList = lazy(() => import('@/pages/items/index').then((m) => ({ default: m.ItemsList })))
@@ -35,7 +36,7 @@ function App() {
   return (
     <BrowserRouter basename="/dji-demo-manager">
       <AuthProvider>
-        <Suspense fallback={<div className="flex min-h-screen items-center justify-center text-sm text-muted-foreground">加载中...</div>}>
+        <Suspense fallback={<PageLoader />}>
           <Routes>
           <Route path="/login" element={<LoginForm />} />
           <Route path="/reset-password" element={<ResetPassword />} />

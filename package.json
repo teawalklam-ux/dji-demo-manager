@@ -1,7 +1,7 @@
 {
   "name": "my-app",
   "private": true,
-  "version": "1.80.0",
+  "version": "1.81.0",
   "type": "module",
   "scripts": {
     "test": "node --test tests/*.test.ts",

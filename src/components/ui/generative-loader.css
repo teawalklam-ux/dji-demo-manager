@@ -1,0 +1,220 @@
+/* Hallmark · genre: modern-minimal · tone: precise, calm, enterprise · palette anchor: DJI blue
+ * macrostructure: existing Workbench + Stat-Led surfaces · component system: Halo + Scan loading states
+ * states: loading · paused · image-ready · image-error · reduced-motion · slop: pass (1–58)
+ * pre-emit critique: P5 H4 E5 S5 R5 V4 · contrast: pass (40–41)
+ */
+
+.gl-halo-loader,
+.gl-halo-loader *,
+.gl-scan-loader,
+.gl-scan-loader *,
+.gl-scan-image,
+.gl-scan-image * {
+  box-sizing: border-box;
+}
+
+.gl-halo-loader {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: currentColor;
+  line-height: 1;
+  animation: gl-loader-appear var(--dur-micro) var(--ease-out) var(--dur-micro) both;
+}
+
+.gl-halo-loader__visual {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  animation: gl-halo-drift var(--dur-loader-halo) var(--ease-in-out) infinite;
+}
+
+.gl-halo-loader__visual i {
+  position: absolute;
+  inset-inline-start: 42%;
+  inset-block-start: 2%;
+  width: 16%;
+  aspect-ratio: 1;
+  border-radius: var(--radius-pill);
+  background: currentColor;
+  transform-origin: 50% 300%;
+  animation: gl-halo-dot var(--dur-loader-halo) var(--ease-in-out) infinite;
+  animation-delay: calc(var(--dur-loader-halo) * (var(--gl-halo-index) * -0.105));
+}
+
+.gl-scan-loader {
+  display: inline-grid;
+  flex: 0 0 auto;
+  place-items: center;
+  color: var(--color-accent);
+  line-height: 1;
+  animation: gl-loader-appear var(--dur-micro) var(--ease-out) var(--dur-micro) both;
+}
+
+.gl-scan-loader__visual {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  border: var(--rule-hair) solid color-mix(in oklch, currentColor 28%, transparent);
+  border-radius: var(--radius-card);
+  background: color-mix(in oklch, currentColor 4%, var(--color-paper-2));
+  isolation: isolate;
+}
+
+.gl-scan-loader__fill,
+.gl-scan-loader__beam,
+.gl-scan-loader__frame {
+  position: absolute;
+  display: block;
+  margin: 0;
+}
+
+.gl-scan-loader__fill {
+  inset: 7%;
+  border-radius: calc(var(--radius-card) - var(--space-3xs));
+  background: linear-gradient(
+    135deg,
+    color-mix(in oklch, currentColor 8%, transparent),
+    color-mix(in oklch, currentColor 42%, transparent)
+  );
+  opacity: 0.08;
+  transform: scaleY(0);
+  transform-origin: bottom;
+  animation: gl-scan-fill var(--dur-loader-scan) var(--ease-in-out) infinite;
+}
+
+.gl-scan-loader__beam {
+  inset: 7%;
+  background: linear-gradient(
+    to bottom,
+    transparent 45%,
+    color-mix(in oklch, currentColor 12%, transparent) 49%,
+    color-mix(in oklch, currentColor 76%, transparent) 50%,
+    transparent 52%
+  );
+  opacity: 0;
+  transform: translateY(-100%);
+  animation: gl-scan-beam var(--dur-loader-scan) var(--ease-in-out) infinite;
+}
+
+.gl-scan-loader__frame {
+  inset: 14%;
+  border: var(--rule-hair) solid color-mix(in oklch, currentColor 26%, transparent);
+  border-radius: calc(var(--radius-card) - var(--space-3xs));
+  opacity: 0.12;
+  transform: scale(0.96);
+  animation: gl-scan-frame var(--dur-loader-scan) var(--ease-in-out) infinite;
+}
+
+.gl-scan-image {
+  position: relative;
+  display: grid;
+  min-width: 0;
+  overflow: hidden;
+  place-items: center;
+  background: var(--color-paper-2);
+  color: var(--color-ink);
+}
+
+.gl-scan-image__media {
+  min-width: 0;
+  opacity: 0;
+  transition: opacity var(--dur-short) var(--ease-out);
+}
+
+.gl-scan-image[data-image-state='ready'] .gl-scan-image__media,
+.gl-scan-image[data-image-state='error'] .gl-scan-image__media {
+  opacity: 1;
+}
+
+.gl-scan-image__loading {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  pointer-events: none;
+}
+
+.gl-scan-image__loader {
+  width: min(38%, 8rem);
+  height: auto;
+  aspect-ratio: 1;
+}
+
+.gl-page-loader {
+  display: grid;
+  min-height: 100dvh;
+  place-content: center;
+  justify-items: center;
+  gap: var(--space-sm);
+  background: var(--color-paper-2);
+  color: var(--color-muted);
+  font-family: var(--font-body);
+  font-size: var(--text-sm);
+}
+
+.gl-page-loader .gl-halo-loader { color: var(--color-accent); }
+
+[data-slot='button']:has(.gl-halo-loader) {
+  cursor: progress;
+}
+
+.gl-halo-loader[data-paused] *,
+.gl-scan-loader[data-paused] * {
+  animation-play-state: paused;
+}
+
+@keyframes gl-loader-appear {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes gl-halo-dot {
+  0%, 100% { opacity: 0.22; transform: rotate(var(--gl-halo-angle)) scale(0.58); }
+  42% { opacity: 1; transform: rotate(var(--gl-halo-angle)) scale(1); }
+  70% { opacity: 0.48; transform: rotate(var(--gl-halo-angle)) scale(0.76); }
+}
+
+@keyframes gl-halo-drift {
+  0%, 100% { transform: rotate(-7deg) scale(0.94); }
+  50% { transform: rotate(7deg) scale(1); }
+}
+
+@keyframes gl-scan-fill {
+  0%, 14%, 100% { opacity: 0.08; transform: scaleY(0); }
+  54%, 78% { opacity: 0.72; transform: scaleY(1); }
+}
+
+@keyframes gl-scan-beam {
+  0%, 14% { opacity: 0; transform: translateY(-100%); }
+  22% { opacity: 0.72; }
+  54% { opacity: 0.72; transform: translateY(100%); }
+  72%, 100% { opacity: 0; transform: translateY(100%); }
+}
+
+@keyframes gl-scan-frame {
+  0%, 100% { opacity: 0.1; transform: scale(0.96); }
+  54%, 78% { opacity: 0.32; transform: scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gl-halo-loader,
+  .gl-halo-loader__visual,
+  .gl-halo-loader__visual i,
+  .gl-scan-loader,
+  .gl-scan-loader__fill,
+  .gl-scan-loader__beam,
+  .gl-scan-loader__frame {
+    animation: none;
+  }
+
+  .gl-halo-loader__visual { transform: none; }
+  .gl-halo-loader__visual i { opacity: 0.6; transform: rotate(var(--gl-halo-angle)) scale(0.74); }
+  .gl-scan-loader__fill { opacity: 0.22; transform: scaleY(1); }
+  .gl-scan-loader__beam { opacity: 0; transform: none; }
+  .gl-scan-loader__frame { opacity: 0.32; transform: none; }
+  .gl-scan-image__media { transition-duration: 0.01ms; }
+}

@@ -120,6 +120,7 @@
   user-select: none;
 }
 .sop-image-viewer__stage img.is-ready { animation: sop-image-viewer-image-in var(--dur-short) var(--ease-out) both; }
+.sop-image-viewer__loading { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; }
 .sop-image-viewer__controls {
   position: fixed;
   inset-inline-start: 50%;

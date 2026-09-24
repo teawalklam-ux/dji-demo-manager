@@ -24,6 +24,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { Spinner } from '@/components/ui/spinner'
 import {
   Select,
   SelectContent,
@@ -246,11 +247,11 @@ export function SystemLogsPage() {
         <div className="flex flex-wrap items-center gap-2">
           <div className="mr-1 font-mono text-sm text-muted-foreground tabular-nums">共 {count} 条</div>
           <Button variant="outline" onClick={() => void loadLogs()} disabled={loading}>
-            <RefreshCw className={`mr-2 size-4 ${loading ? 'animate-spin' : ''}`} />
+            {loading ? <Spinner className="mr-2 size-4" aria-hidden="true" /> : <RefreshCw className="mr-2 size-4" />}
             刷新
           </Button>
           <Button variant="outline" onClick={handleExport} disabled={exporting || loading}>
-            <Download className="mr-2 size-4" />
+            {exporting ? <Spinner className="mr-2 size-4" aria-hidden="true" /> : <Download className="mr-2 size-4" />}
             {exporting ? '导出中' : '导出 CSV'}
           </Button>
         </div>

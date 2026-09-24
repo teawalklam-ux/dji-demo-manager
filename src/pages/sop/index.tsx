@@ -14,7 +14,6 @@ import {
   Download,
   FolderCog,
   History,
-  LoaderCircle,
   ListChecks,
   MapPinned,
   MousePointerClick,
@@ -45,6 +44,7 @@ import { crmSystemSopGuides } from './crm-system-sops'
 import { fc200DeliverySop } from './fc200-delivery-sop'
 import { SystemSopReader } from './system-sop-reader'
 import { getSopScreenshot } from './system-sop-screenshots'
+import { Spinner } from '@/components/ui/spinner'
 import './sop-guide.css'
 
 type StageKey = 'materials' | 'workflow' | 'followup'
@@ -1126,7 +1126,7 @@ export function SopGuidePage() {
               onClick={() => void saveProcesses()}
               disabled={!hasUnsavedChanges || isSopSaving || isSopLoading}
             >
-              {isSopSaving ? <LoaderCircle className="is-spinning" aria-hidden="true" /> : <Save aria-hidden="true" />}
+              {isSopSaving ? <Spinner className="size-4" aria-hidden="true" /> : <Save aria-hidden="true" />}
               {isSopSaving ? '保存中' : '保存 SOP'}
             </button>
             <button
@@ -1151,7 +1151,7 @@ export function SopGuidePage() {
           {persistenceError
             ? <AlertCircle aria-hidden="true" />
             : isSopLoading || isSopSaving
-              ? <LoaderCircle className="is-spinning" aria-hidden="true" />
+              ? <Spinner className="size-4" aria-hidden="true" />
               : <Save aria-hidden="true" />}
           <span>
             {persistenceError
