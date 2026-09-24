@@ -1,7 +1,7 @@
 /* Hallmark · pre-emit critique: P4 H4 E4 S5 R5 V5 */
 import { useEffect, useState } from 'react'
 import type { ReturnPhotoView } from '@/types'
-import { Camera, CheckCircle2, Clock3, HardDrive, ImageOff, LoaderCircle, MapPin } from 'lucide-react'
+import { Camera, CheckCircle2, Clock3, HardDrive, ImageOff, MapPin } from 'lucide-react'
 
 import { supabase } from '@/lib/supabase'
 
@@ -12,6 +12,7 @@ import {
   DialogTitle,
   DialogTrigger,
 } from '@/components/ui/dialog'
+import { ScanImage, ScanLoader } from '@/components/ui/generative-loader'
 
 interface ReturnPhotoGalleryProps {
   photos: ReturnPhotoView[]
@@ -111,13 +112,15 @@ function ReturnPhotoCard({ photo }: { photo: ReturnPhotoView }) {
               className="block w-full overflow-hidden bg-muted text-left active:opacity-90"
               aria-label={`查看 ${itemName} 的归还水印照片`}
             >
-              <img
+              <ScanImage
                 src={displayUrl}
                 alt={`${itemName} 归还水印照片`}
                 width={1600}
                 height={1200}
                 loading="lazy"
-                className="aspect-[4/3] w-full object-cover"
+                containerClassName="aspect-[4/3] w-full"
+                className="h-full w-full object-cover"
+                loadingLabel={`正在加载 ${itemName} 的归还水印照片`}
               />
             </button>
           </DialogTrigger>
@@ -126,12 +129,14 @@ function ReturnPhotoCard({ photo }: { photo: ReturnPhotoView }) {
               <DialogTitle>{itemName} · 归还水印照片</DialogTitle>
             </DialogHeader>
             <div className="bg-muted p-3 sm:p-5">
-              <img
+              <ScanImage
                 src={displayUrl}
                 alt={`${itemName} 归还水印照片大图`}
                 width={2000}
                 height={1500}
-                className="mx-auto max-h-[65dvh] w-auto max-w-full object-contain"
+                containerClassName="mx-auto min-h-72 w-full"
+                className="max-h-[65dvh] w-auto max-w-full object-contain"
+                loadingLabel={`正在加载 ${itemName} 的归还水印照片大图`}
               />
             </div>
             <div className="px-5 pb-5">
@@ -143,7 +148,7 @@ function ReturnPhotoCard({ photo }: { photo: ReturnPhotoView }) {
         <div className="flex aspect-[4/3] items-center justify-center bg-muted p-5 text-center">
           <div className="max-w-64 text-sm text-muted-foreground">
             {archived.loading ? (
-              <LoaderCircle className="mx-auto mb-3 size-7 animate-spin" aria-hidden="true" />
+              <ScanLoader className="mx-auto mb-3 size-20" label="正在从内网 NAS 读取照片" />
             ) : (
               <ImageOff className="mx-auto mb-3 size-7" aria-hidden="true" />
             )}

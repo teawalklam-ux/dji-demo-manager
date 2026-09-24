@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import type { FormEvent } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { Eye, FileSearch, HardDrive, ImageOff, LoaderCircle, Search, ShieldCheck } from 'lucide-react'
+import { Eye, FileSearch, HardDrive, ImageOff, Search, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 
 import { borrowService } from '@/services/borrow.service'
@@ -17,6 +17,8 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Input } from '@/components/ui/input'
+import { ScanImage, ScanLoader } from '@/components/ui/generative-loader'
+import { Spinner } from '@/components/ui/spinner'
 
 function formatDateTime(value: string | null) {
   if (!value) return '-'
@@ -85,10 +87,12 @@ function ArchivePhotoDialog({
         </DialogHeader>
         <div className="flex min-h-72 items-center justify-center bg-muted p-4 sm:p-6">
           {url ? (
-            <img
+            <ScanImage
               src={url}
               alt={`${result?.item_name || '样机'}归还水印照片`}
+              containerClassName="min-h-72 w-full"
               className="max-h-[68dvh] w-auto max-w-full object-contain"
+              loadingLabel={`正在加载 ${result?.item_name || '样机'}归还水印照片`}
             />
           ) : error ? (
             <div className="max-w-sm text-center text-sm text-muted-foreground">
@@ -98,7 +102,7 @@ function ArchivePhotoDialog({
             </div>
           ) : (
             <div className="text-center text-sm text-muted-foreground">
-              <LoaderCircle className="mx-auto mb-3 size-7 animate-spin" aria-hidden="true" />
+              <ScanLoader className="mx-auto mb-3 size-24" label="正在校验并读取内网归档照片" />
               正在校验并读取内网归档
             </div>
           )}
@@ -229,7 +233,7 @@ export function NasArchiveSearch() {
           />
         </div>
         <Button type="submit" disabled={configured !== true || loading}>
-          {loading ? <LoaderCircle className="mr-2 size-4 animate-spin" /> : <Search className="mr-2 size-4" />}
+          {loading ? <Spinner className="mr-2 size-4" aria-hidden="true" /> : <Search className="mr-2 size-4" />}
           查询归档
         </Button>
       </form>

@@ -220,15 +220,6 @@
     opacity: 0;
     animation: hm-dashboard-loader-show var(--dur-micro) var(--ease-out) 150ms both;
   }
-  .hm-dashboard-loader__ring {
-    width: 1rem;
-    height: 1rem;
-    flex: 0 0 auto;
-    border: 2px solid color-mix(in oklch, var(--color-accent) 24%, transparent);
-    border-top-color: var(--color-accent);
-    border-radius: var(--radius-pill);
-    animation: hm-dashboard-loader-spin 800ms linear infinite;
-  }
   .hm-metric-placeholder {
     display: inline-block;
     color: var(--color-muted);
@@ -552,10 +543,6 @@
   to { opacity: 1; }
 }
 
-@keyframes hm-dashboard-loader-spin {
-  to { transform: rotate(360deg); }
-}
-
 @keyframes hm-metric-roll-out {
   from { opacity: 1; transform: translateY(0); }
   to { opacity: 0; transform: translateY(-105%); }
@@ -659,10 +646,6 @@
   }
   .hm-dashboard-loader {
     opacity: 1;
-  }
-  .hm-dashboard-loader__ring {
-    animation-duration: 1.6s !important;
-    animation-iteration-count: infinite !important;
   }
   .hm-metric-roll__old {
     display: none;
