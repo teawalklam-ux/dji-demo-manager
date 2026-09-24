@@ -104,6 +104,8 @@
   --dur-micro: 120ms;
   --dur-short: 180ms;
   --dur-long: 420ms;
+  --dur-loader-halo: 1200ms;
+  --dur-loader-scan: 2350ms;
 
   /* Stacking */
   --z-base: 0;

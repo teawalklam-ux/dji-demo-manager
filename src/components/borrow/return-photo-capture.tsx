@@ -2,6 +2,7 @@ import { useState, useRef, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
+import { ScanImage } from '@/components/ui/generative-loader'
 import { drawWatermark } from '@/lib/photo-watermark'
 import { getCurrentLocation, formatCoordinates } from '@/lib/geolocation'
 import { getErrorMessage } from '@/lib/errors'
@@ -174,10 +175,12 @@ export function ReturnPhotoCapture({ onPhotoCaptured, onPhotoCleared }: ReturnPh
         {previewUrl && photoData && (
           <div className="space-y-3">
             <div className="relative overflow-hidden rounded-lg border">
-              <img
+              <ScanImage
                 src={previewUrl}
                 alt="归还照片预览"
+                containerClassName="w-full"
                 className="w-full object-contain"
+                loadingLabel="正在生成归还照片预览"
               />
             </div>
             {/* 元数据信息 */}
