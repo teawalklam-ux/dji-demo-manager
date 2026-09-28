@@ -453,20 +453,20 @@ export function Dashboard() {
               <span className="hm-panel-icon"><ChartPie className="size-4" /></span>
               <div>
                 <CardTitle>样机状态分布</CardTitle>
-                <CardDescription className="mt-1">全部样机当前所处状态</CardDescription>
+                <CardDescription className="mt-1">切换圆环或条形视图比较当前状态</CardDescription>
               </div>
             </div>
           </CardHeader>
           <CardContent className="pt-4 sm:pt-6">
             {statsLoading ? (
-              <div className="flex h-[17.5rem] items-center justify-center"><Spinner className="size-6" /></div>
+              <div className="flex h-80 items-center justify-center"><Spinner className="size-6" /></div>
             ) : pieData.length > 0 ? (
               chartReady ? (
-                <Suspense fallback={<div className="flex h-[17.5rem] items-center justify-center"><Spinner className="size-6" /></div>}>
+                <Suspense fallback={<div className="flex h-80 items-center justify-center"><Spinner className="size-6" /></div>}>
                   <StatusDistributionChart data={pieData} total={stats.total} />
                 </Suspense>
               ) : (
-                <div className="flex h-[17.5rem] items-center justify-center"><Spinner className="size-6" /></div>
+                <div className="flex h-80 items-center justify-center"><Spinner className="size-6" /></div>
               )
             ) : (
               <DashboardEmptyState
