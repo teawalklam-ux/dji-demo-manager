@@ -1,3 +1,6 @@
+/* Hallmark · genre: modern-minimal · macrostructure: Workbench / Stat-Led · tone: precise, calm, enterprise · anchor hue: DJI blue
+ * pre-emit critique: P5 H5 E4 S5 R5 V4 · contrast: pass (40–41) · tokens: pass (48) · mobile: pass (34, 49–57)
+ */
 @import "../tokens.css";
 
 @tailwind base;
@@ -403,11 +406,71 @@
     background: var(--color-paper-3);
     color: var(--color-neutral);
   }
+  .hm-status-charts {
+    min-width: 0;
+    min-height: 20rem;
+  }
+  .hm-chart-mode-row {
+    display: flex;
+    min-height: 2.25rem;
+    align-items: center;
+    justify-content: flex-end;
+  }
+  .hm-chart-tabs-list {
+    border: var(--rule-hair) solid var(--color-rule);
+    background: var(--color-paper-2);
+  }
+  .hm-chart-tabs-list [data-slot="tabs-trigger"]:active {
+    opacity: 0.72;
+  }
+  .hm-chart-tabs-list [data-slot="tabs-trigger"]:disabled {
+    cursor: not-allowed;
+  }
+  .hm-chart-view {
+    margin-top: 0;
+    animation: hm-chart-view-in var(--dur-short) var(--ease-out) both;
+  }
+  .hm-chart-plot {
+    position: relative;
+    min-width: 0;
+    height: 14rem;
+  }
+  .hm-status-chart {
+    width: 100%;
+    height: 100%;
+    min-width: 0;
+    aspect-ratio: auto;
+  }
+  .hm-chart-tooltip {
+    display: grid;
+    min-width: 8.5rem;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+    align-items: center;
+    gap: var(--space-2xs);
+    border: var(--rule-hair) solid var(--color-rule);
+    border-radius: var(--radius-input);
+    background: var(--color-paper);
+    color: var(--color-ink);
+    padding: var(--space-2xs) var(--space-xs);
+    box-shadow: var(--shadow-popover);
+    font-size: var(--text-xs);
+    line-height: 1.25;
+  }
+  .hm-chart-tooltip__swatch {
+    width: 0.5rem;
+    height: 0.5rem;
+    border-radius: var(--radius-pill);
+  }
+  .hm-chart-tooltip strong {
+    font-family: var(--font-outlier);
+    font-variant-numeric: tabular-nums;
+    font-weight: 600;
+  }
   .hm-chart-center {
     pointer-events: none;
     position: absolute;
     left: 50%;
-    top: 45%;
+    top: 50%;
     display: flex;
     transform: translate(-50%, -50%);
     flex-direction: column;
@@ -436,6 +499,19 @@
   .hm-donut-segment:focus-visible {
     outline: var(--rule-fine) solid var(--color-focus);
     outline-offset: var(--space-3xs);
+  }
+  .hm-status-bar {
+    cursor: pointer;
+    transition: opacity var(--dur-short) var(--ease-out);
+  }
+  .hm-chart-motion:has(.hm-status-bar.is-active) .hm-status-bar:not(.is-active) {
+    opacity: 0.48;
+  }
+  .hm-status-bar__label {
+    fill: var(--color-neutral);
+    font-family: var(--font-outlier);
+    font-size: var(--text-xs);
+    font-variant-numeric: tabular-nums;
   }
   .hm-donut-legend {
     display: flex;
@@ -558,6 +634,11 @@
   to { opacity: 1; transform: translateY(0); }
 }
 
+@keyframes hm-chart-view-in {
+  from { opacity: 0; transform: translateY(var(--space-2xs)); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
 @media (min-width: 40rem) {
   .hm-dashboard-actions {
     width: auto;
@@ -602,6 +683,9 @@
     transform: translateY(-1px);
   }
   .hm-donut-legend__button:hover {
+    color: var(--color-ink);
+  }
+  .hm-chart-tabs-list [data-slot="tabs-trigger"]:hover {
     color: var(--color-ink);
   }
 }
@@ -655,7 +739,9 @@
     transform: none;
   }
   .hm-donut-segment,
-  .hm-donut-segment.is-active {
+  .hm-donut-segment.is-active,
+  .hm-status-bar,
+  .hm-chart-view {
     transform: none;
     transition: none;
   }
