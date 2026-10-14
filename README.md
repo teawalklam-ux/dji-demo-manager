@@ -6,355 +6,468 @@
 
 ## English
 
-A web-based demo unit management system built for DJI authorized dealers, covering the complete lifecycle of demo units from inventory tracking, borrowing, multi-level approval, return with photo evidence, overdue monitoring, to reporting and export.
+A web application for tracking DJI demo units: inventory, borrow requests, approval, return photos, reservations, transfers, overdue handling, SOP guides, and Excel export.
+
+The production frontend is a static Vite build published to GitHub Pages. Data, auth, storage, and scheduled work run on Supabase. Return-photo archiving is a separate Docker service intended for a UGREEN NAS. GitHub Actions deploys only the frontend.
+
+Current Pages site: <https://teawalklam-ux.github.io/dji-demo-manager/>
 
 ### Features
 
-- **Dashboard** -- At-a-glance overview of total items, borrowed items, pending approvals, and overdue items. Pie charts show item distribution by category and status.
-- **Item Management** -- Add, edit, view, and delete demo units. Each unit has a unique CODE128 barcode (format: `DJI-YYYYMMDD-XXXX`), with support for category assignment, specification fields, location tracking, and batch barcode printing.
-- **Barcode System** -- Generate scannable barcodes via JsBarcode, scan with device camera using html5-qrcode (supports CODE128 + QR code), and quickly locate items by scanning their barcode labels.
-- **Borrow Requests** -- Submit borrow requests with borrow type (customer demo / marketing demo), purpose, customer info, and date range. Automatic approval chain matching based on borrow type.
-- **Multi-Level Approval** -- Configurable approval chains with flexible steps per level: by role or by specific person. Super admins and admins can approve any request. Status updates are trigger-driven (approval passed → auto-create borrow record + update item status).
-- **Return with Photo Evidence** -- Return items with captured photos that include GPS coordinates and timestamp watermarks burned into the image. Photos are automatically deleted after 30 days; metadata retained for 1 year.
-- **Renewal Requests** -- Submit renewal requests for active borrows with updated return dates.
-- **Overdue Management** -- Automated daily check via Supabase Edge Function + pg_cron. System notifications and WeCom (WeChat Work) webhook alerts for overdue items.
-- **User Management** -- 4-tier role system: super_admin > admin > approver > user. Registration requires admin approval. Support for role assignment, account enable/disable, and super admin privilege transfer.
-- **Reports & Export** -- Export item lists, borrow records, and approval records to Excel via SheetJS.
-- **Responsive Design** -- Card-based layout on mobile, table-based layout on desktop.
+- **Dashboard** — counts and status distribution for the signed-in user.
+- **Inventory** — create, edit, and list units. System barcodes use `DJI-YYYYMMDD-XXXX` (`BARCODE_PREFIX` in `src/lib/constants.ts`). Administrators can batch-import from the inventory page.
+- **Barcodes** — JsBarcode draws CODE128 labels. Scanning uses html5-qrcode for barcodes and qr-scanner for QR codes.
+- **Borrowing** — multi-item requests, customer and marketing types, administrator-defined extra types, and transfers. Approval chains are stored in `approval_chains`.
+- **Approval** — step-by-step. `private.process_approval` accepts an action only from the user assigned to the current open step. Administrators do not bypass that check.
+- **Reservations** — a fully approved future borrow becomes a reservation. Migration `20260812025031_reservation_lifecycle_and_status_consistency.sql` schedules `process_reservation_lifecycle_daily` at `1 16 * * *` UTC (00:01 Asia/Shanghai the next calendar day).
+- **Return photos** — the browser burns a timestamp and GPS watermark into the image. Photo metadata is kept permanently. Files are copied to the NAS archive. Supabase Storage is not deleted by age. `cleanup-return-photos` only removes objects queued when an administrator deletes a test or cancelled record. See `docs/RETURN_PHOTO_RETENTION.md`.
+- **Renewal and overdue state** — renewal requests exist. `check-overdue` can mark overdue rows and optionally send a WeCom message. The repository migrations do not schedule that function.
+- **People and admin** — roles are `super_admin`, `admin`, `approver`, and `user`. Self-registration stays pending until approved. Disabled accounts have their own page. Customer address book, request history, record cleanup, system logs, and global settings are separate admin screens.
+- **SOP** — in-app guides, including screenshot steps under `public/sop-steps/`.
+- **Export** — item, borrow, and approval sheets via SheetJS.
+- **Local demo** — development builds show a local-demo sign-in. It is absent from production builds.
 
-### Tech Stack
+### Tech stack
 
-| Layer | Technology |
-|-------|-----------|
-| Framework | React 19 + TypeScript |
-| Build Tool | Vite |
-| UI Library | shadcn/ui (Radix UI + Tailwind CSS 3.4) |
-| Routing | react-router-dom v7 |
-| Forms | react-hook-form + zod |
-| Backend (BaaS) | Supabase (PostgreSQL + Auth + RLS + Storage) |
-| Serverless | Supabase Edge Functions (Deno) |
-| Scheduler | pg_cron |
-| Charts | recharts |
-| Barcodes | JsBarcode (generate) + html5-qrcode (scan) |
-| Excel Export | SheetJS (xlsx) |
-| Icons | lucide-react |
-| Notifications | In-app + WeCom Webhook |
+| Layer | What the repo uses |
+| --- | --- |
+| UI | React 19, TypeScript, Vite 7, react-router-dom 7, Tailwind CSS 3.4, shadcn/ui (Radix) |
+| Forms | react-hook-form, zod |
+| Data | `@supabase/supabase-js` against hosted Supabase (Postgres, Auth, RLS, Storage) |
+| Functions | Supabase Edge Functions (Deno), listed below |
+| Scheduler | `pg_cron` jobs created by specific migrations |
+| Charts / barcodes / export | recharts, JsBarcode, html5-qrcode, qr-scanner, SheetJS (`xlsx`) |
+| Frontend hosting | GitHub Pages via `.github/workflows/deploy.yml` |
+| Photo archive | Python 3.12 image in `nas/return-photo-archive` |
+| Tests | `node --test` plus PGlite for the RLS test |
+
+`package.json` has no `engines` field. The Pages workflow pins Node.js 22.
 
 ### Architecture
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  GitHub Pages                    │
-│  React SPA (static build with content hashes)    │
-│  /dji-demo-manager/                              │
-└────────────────────┬────────────────────────────┘
-                     │ Supabase Client (anon key)
-┌────────────────────▼────────────────────────────┐
-│                   Supabase                       │
-│  ┌──────────────────────────────────────────┐   │
-│  │         PostgreSQL (RLS protected)        │   │
-│  │  9 core tables + triggers + functions     │   │
-│  └──────────────────────────────────────────┘   │
-│  ┌──────────────┐  ┌───────────────────────┐    │
-│  │  Auth (Email) │  │  Storage (return photos) │ │
-│  └──────────────┘  └───────────────────────┘    │
-│  ┌──────────────────────────────────────────┐   │
-│  │      Edge Functions (Deno)                │   │
-│  │  - check-overdue (daily cron)             │   │
-│  │  - cleanup-return-photos                  │   │
-│  └──────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────┘
+GitHub Actions (push to main, or workflow_dispatch)
+  npm ci → npm run build → upload dist → GitHub Pages
+  site path: /dji-demo-manager/
+
+Browser
+  VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY baked in at build time
+        │
+        ▼
+Supabase
+  Postgres + Auth + Storage + Edge Functions
+  pg_cron jobs from migrations (not all functions are scheduled)
+
+UGREEN NAS (separate)
+  nas/return-photo-archive polls nas-photo-archive
+  browsers read archived photos only from the NAS HTTPS gateway
 ```
 
-### Role System
+### Roles
 
-| Role | Access |
-|------|--------|
-| **super_admin** | Full system access: user management, category management, approval chain config, system settings, super admin transfer |
-| **admin** | Item CRUD, approve any request, view users |
-| **approver** | Approve borrow requests assigned to them |
-| **user** | View items, submit borrow requests, return & renew items |
+Navigation and route guards in `src/App.tsx` and `src/components/layout/app-layout.tsx`:
 
-### Database Tables
+| Role | What the UI allows |
+| --- | --- |
+| **super_admin** | Admin screens, plus user management, customer address book, and system settings. `invite-user` allows only an active super admin. |
+| **admin** | Create and edit items; categories, approval chains, request history, record cleanup, system logs. |
+| **approver** | The approval queue is visible to signed-in users. Acting on a step still requires that the row be assigned to that user. |
+| **user** | Inventory, borrow, own requests, return, renew, SOP, reports. |
 
-- `profiles` -- User profiles with role and status
-- `categories` -- Item categories
-- `items` -- Demo unit inventory with barcodes
-- `borrow_requests` -- Borrow application records
-- `approval_chains` -- Configurable approval workflows
-- `approval_records` -- Individual approval actions
-- `borrow_records` -- Active and historical borrow records
-- `stock_movements` -- Inventory change audit trail
-- `overdue_notifications` -- Overdue alert records
-- `return_photos` -- Return photo metadata with GPS coordinates
+`super_admin` satisfies every `hasRole` check. `admin` satisfies `admin`, `approver`, and `user`.
 
-### Project Structure
+### Database
+
+GitHub Actions does not apply SQL. Schema changes live in `supabase/migrations/` (84 files). Apply them in filename order. That order is not the same as sorting by the numeric prefix: `00024` and `00036` each appear twice, and later files use `2026…` timestamps that sort after `00042`.
+
+These files in the repository root are not part of that directory: `fix_all_sql.sql`, `setup_return_photos.sql`, `delete_requests.sql`.
+
+`supabase/config.toml` is the local Supabase CLI config (`project_id = "webdemo"`, Postgres 17). It references `supabase/seed.sql`, and that seed file is not in the repo. `00013_seed_data.sql` inserts categories and two approval chains.
+
+Public tables created by the migrations:
+
+`profiles`, `categories`, `items`, `borrow_requests`, `borrow_request_items`, `approval_chains`, `approval_records`, `borrow_records`, `stock_movements`, `overdue_notifications`, `return_photos`, `user_customers`, `reservation_events`, `storage_cleanup_queue`, `return_photo_archive_config`, `return_photo_archive_jobs`, `return_photo_archive_events`, `return_photo_storage_usage_snapshots`, `sop_processes`, `app_logs`, `system_settings`.
+
+`private.app_log_state` is created with the application-log migration.
+
+### Scheduled jobs in migrations
+
+Times below are UTC, as stored in `cron.schedule`.
+
+| Job | Cron | What it calls |
+| --- | --- | --- |
+| `process_reservation_lifecycle_daily` | `1 16 * * *` | `public.process_reservation_lifecycle` |
+| `notify_reservation_events` | `*/5 * * * *` | `notify-reservation-events`, only if Vault has `project_url` and `reservation_events_cron_secret` |
+| `monitor_return_photo_archive` | `3,13,23,33,43,53 * * * *` | `monitor-return-photo-archive`, only if Vault has `project_url` and `return_photo_archive_cron_secret` |
+| `prune_app_logs_daily` | `20 18 * * *` | `private.prune_app_logs` |
+| `prune_cron_history_daily` | `30 18 * * *` | deletes `cron.job_run_details` older than 7 days |
+
+`20260812025031_reservation_lifecycle_and_status_consistency.sql` unschedules the earlier job `activate_due_borrow_requests_daily`. The Edge Function `activate-reservations` is still in the repo and checks `CRON_SECRET`, but no migration schedules it.
+
+No migration schedules `check-overdue` or `cleanup-return-photos`.
+
+### Edge Functions
+
+Deploy these on the Supabase project yourself. The CLI package is the `supabase` devDependency (`2.109.1`). The workflow does not deploy functions, and the repo has no linked project ref.
+
+| Function | Caller check in this repo |
+| --- | --- |
+| `check-overdue` | `Authorization: Bearer <CRON_SECRET>`. WeCom send also depends on `system_settings.overdue_wecom_notify` (default false) and `WECOM_WEBHOOK_URL`. |
+| `cleanup-return-photos` | `Bearer <CRON_SECRET>`. Reads `storage_cleanup_queue` only. |
+| `activate-reservations` | `Bearer <CRON_SECRET>`. Calls `activate_due_borrow_requests`. Not the scheduled path above. |
+| `notify-reservation-events` | `verify_jwt = false` in `supabase/config.toml`. Compares the bearer token with `RESERVATION_EVENTS_CRON_SECRET`. |
+| `monitor-return-photo-archive` | `RETURN_PHOTO_ARCHIVE_CRON_SECRET`. |
+| `nas-photo-archive` | `NAS_ARCHIVE_TOKEN`. |
+| `notify-approval`, `notify-return`, `wecom-config-status` | `verify_jwt = true`. |
+| `invite-user` | Signed-in active `super_admin`. Uses the platform service role inside the function. |
+
+Platform-injected names used by the functions include `SUPABASE_URL`, `SUPABASE_ANON_KEY`, and `SUPABASE_SERVICE_ROLE_KEY`. Do not put the service role key in the frontend or in GitHub Actions.
+
+WeCom secret names and the Vault setup order are in `docs/WECOM_NOTIFICATION_SECURITY.md`. NAS secret names are in `docs/NAS_RETURN_PHOTO_ARCHIVE.md`. Global settings behavior is in `docs/system-settings.md`.
+
+`system_settings` stores `barcode_prefix`, `default_borrow_days`, `overdue_remind_days`, `overdue_email_notify`, and `overdue_wecom_notify`. It does not store webhook URLs. The settings migration does not add an email sender or an advance-reminder job.
+
+### Project layout
 
 ```
-├── src/
-│   ├── components/          # Reusable UI components
-│   │   ├── auth/            # Login form & auth guard
-│   │   ├── barcode/         # Barcode generator, scanner, scan input
-│   │   ├── borrow/          # Return photo capture
-│   │   ├── export/          # Excel export button
-│   │   ├── layout/          # App layout (sidebar + top nav)
-│   │   └── ui/              # shadcn/ui components (60+)
-│   ├── contexts/            # Auth context provider
-│   ├── hooks/               # Custom React hooks (7)
-│   ├── lib/                 # Utilities, constants, Supabase client
-│   ├── pages/               # Page components
-│   │   ├── items/           # List, detail, new, edit
-│   │   ├── borrow/          # Apply, my requests, return, renew
-│   │   ├── approval/        # Queue, detail
-│   │   ├── admin/           # Users, categories, approval chains, settings
-│   │   └── reports/         # Reports & export
-│   ├── services/            # API service layer (7 services)
-│   └── types/               # TypeScript interfaces
-├── supabase/
-│   ├── migrations/          # SQL migration files
-│   └── functions/           # Edge Functions (Deno)
-├── .github/workflows/       # CI/CD for GitHub Pages
-└── public/                  # Static assets
+src/                 React application
+  components/        UI, auth, barcode, borrow, layout
+  pages/             dashboard, items, borrow, approval, admin, reports, sop
+  services/          Supabase calls
+supabase/migrations/ SQL applied in filename order
+supabase/functions/  Edge Functions
+supabase/config.toml local CLI config
+.github/workflows/deploy.yml
+nas/return-photo-archive/
+docs/                NAS, retention, WeCom, settings, SOP, versioning
+public/              404.html, logo, sop-steps/
+scripts/             local demo API and SOP capture scripts
+tests/               node:test
 ```
 
-### Getting Started
+### Getting started
 
 #### Prerequisites
 
-- Node.js >= 20
+- Node.js 22 (the version in `.github/workflows/deploy.yml`)
 - npm
-- A Supabase project
+- A Supabase project for anything other than the local demo
 
-#### Environment Setup
+#### Environment
 
-Create `.env` file in the project root:
+Create a `.env` file in the repository root. `.gitignore` ignores `.env*` and `.env.*`.
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> ⚠️ Never commit `.env` files. Use GitHub Secrets for CI/CD.
+Those two names are the only frontend variables. `src/lib/supabase.ts` reads them. If either is missing, the client warns and uses a placeholder URL. The Pages build receives them from GitHub Actions secrets.
 
-#### Install & Run
-
-```bash
-npm install
-npm run dev          # Start dev server
-npm run build        # Production build
-npm run preview      # Preview production build
-```
-
-#### Database Setup
-
-Run the SQL migration files in `supabase/migrations/` in numerical order using the Supabase SQL Editor. The files create all tables, RLS policies, triggers, functions, and seed data.
-
-#### Deploy Edge Functions
-
-Deploy the Edge Functions via Supabase CLI or Dashboard:
+#### Install and run
 
 ```bash
-# check-overdue: daily overdue detection
-# cleanup-return-photos: auto-cleanup 30-day-old photos
+npm ci
+npm run dev       # Vite, base path /dji-demo-manager/
+npm run build     # tsc -b && vite build
+npm run preview
+npm run lint
+npm test
 ```
 
-Configure pg_cron to schedule `check-overdue` with the appropriate CRON secret.
+Open `http://127.0.0.1:5173/dji-demo-manager/`. `vite.config.ts` sets `base` to `/dji-demo-manager/`, and `BrowserRouter` uses the same basename.
 
-### Reservation activation
+`npm run build` writes `dist/`. Vite copies `public/`, including `public/404.html`. The workflow also runs `cp public/404.html dist/404.html` before uploading the artifact. `index.html` and `404.html` implement the GitHub Pages SPA redirect.
 
-After applying migration `00036_multi_item_reservations.sql`, deploy `activate-reservations` and schedule it once daily after midnight in the `Asia/Shanghai` business timezone. The function calls `activate_due_borrow_requests` with a service-role key and turns fully approved reservations into active borrow records. It uses the existing `CRON_SECRET` protection; do not expose the service-role key to the frontend.
+#### Local demo
 
-#### CI/CD
+The demo API is not an npm script. In one shell:
 
-The project uses GitHub Actions to deploy to GitHub Pages. Add the following secrets to your repository:
+```bash
+node scripts/demo-server.mjs
+```
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+It listens on `127.0.0.1:5176`. Then start `npm run dev` and use **本地演示** on the sign-in page. The button is rendered only when `import.meta.env.DEV` is true. The demo account is in `scripts/demo-server.mjs` and `src/lib/demo-mode.ts`.
 
-Then enable GitHub Pages with "GitHub Actions" as the source.
+#### NAS archive
+
+From `nas/return-photo-archive`:
+
+```bash
+docker compose up -d --build
+```
+
+`docker-compose.yml` builds `dji-return-photo-archive:1.63`, reads `.env`, and publishes `${VIEW_BIND_ADDRESS:-0.0.0.0}:${VIEW_PORT:-8787}`. The image runs `archive_agent.py` as user `archive`.
+
+The compose file requires `ARCHIVE_HOST_PATH`. The agent requires `SUPABASE_URL`, `SUPABASE_PUBLISHABLE_KEY`, and `NAS_ARCHIVE_TOKEN`. Optional names with defaults in code include `ARCHIVE_ROOT`, `STATE_DB`, `TLS_CERT_FILE`, `TLS_KEY_FILE`, `REQUIRE_TLS`, `WORKER_ID`, `POLL_SECONDS`, `ALLOWED_ORIGIN` (default `https://teawalklam-ux.github.io`), `VIEW_BIND`, and `VIEW_PORT`. Compose also reads `STATE_HOST_PATH`, `CERTS_HOST_PATH`, `PUID`, and `PGID`.
+
+There is no `.env.example` in the repo. The service README mentions copying one. Do not commit `.env`, NAS private keys, or webhook URLs. Unit tests in that directory:
+
+```bash
+python -m unittest -v test_archive_agent.py
+```
+
+Operational detail, retention thresholds, and the secret checklist are in `nas/return-photo-archive/README.md` and `docs/NAS_RETURN_PHOTO_ARCHIVE.md`.
+
+#### GitHub Pages
+
+`.github/workflows/deploy.yml`:
+
+- Triggers: push to `main`, or `workflow_dispatch`
+- Node.js 22, `npm ci`, `npm run build`
+- Build environment: secrets `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`
+- Uploads `./dist` with `actions/upload-pages-artifact@v3`
+- Deploys with `actions/deploy-pages@v4` to the `github-pages` environment
+- Concurrency group `pages`, `cancel-in-progress: false`
+
+Pages source for this workflow is GitHub Actions. The workflow does not set Supabase secrets, apply migrations, or deploy Edge Functions.
 
 ### Security
 
-- Row Level Security (RLS) on all database tables
-- SECURITY DEFINER functions for privileged operations
-- Frontend auth guard with role-based route protection
-- User registration requires admin approval
-- Edge Functions secured with CRON_SECRET validation
-- Environment variables for all sensitive configuration
+- RLS is defined in the migrations.
+- Privileged SQL is `SECURITY DEFINER` and then revoked from `anon` where later migrations say so.
+- The UI uses an auth guard and role checks on specific routes.
+- Self-registration does not start as an active user.
+- Cron-invoked functions check a dedicated bearer secret. That secret is not always `CRON_SECRET`; see the table above.
+- `app-log` redacts sensitive keys before insert. It is not a credential store.
 
 ### License
 
-This project is for internal use by DJI authorized dealers.
+[MIT License](LICENSE). Copyright (c) 2026 teawalklam-ux.
+
+Third-party notices: [THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md).
 
 ---
 
 ## 中文
 
-一套面向大疆授权代理商的 Web 端样机管理系统，覆盖样机库存管理、借用申请、多级审批、归还拍照留档、逾期监控和报表导出等完整生命周期。
+用于管理大疆样机的 Web 应用，覆盖库存、借用、审批、归还拍照、预约、转借、逾期、SOP 指引和 Excel 导出。
 
-### 功能特性
+生产前端是发布到 GitHub Pages 的 Vite 静态站点。数据、登录、存储和定时任务在 Supabase。归还照片归档是单独的 Docker 服务，面向 UGREEN NAS。GitHub Actions 只部署前端。
 
-- **仪表盘** -- 首页概览：样机总数、借出数量、待审批数、逾期数量。饼图展示样机分类和状态分布。
-- **样机管理** -- 样机的增删改查。每台样机拥有唯一 CODE128 条码（格式：`DJI-YYYYMMDD-XXXX`），支持分类归属、规格参数、存放位置、批量打印条码。
-- **条码系统** -- JsBarcode 生成可扫描条码，html5-qrcode 调用摄像头扫描（支持 CODE128 + 二维码），通过扫描条码快速定位样机。
-- **借用申请** -- 提交借用申请，支持借用类型（客户试用 / 营销演示）、用途说明、客户信息、借用日期范围。根据借用类型自动匹配审批链。
-- **多级审批** -- 可配置的审批链，每级支持按角色或按指定人审批。超级管理员和管理员可审批任意流程。状态变更由数据库触发器驱动（审批通过 → 自动创建借用记录 + 更新样机状态）。
-- **归还拍照留档** -- 归还时拍摄照片，自动叠加 GPS 坐标和时间戳水印。照片 30 天自动删除，元数据保留 1 年。
-- **续借申请** -- 对正在借用中的样机提交续借，更新预计归还日期。
-- **逾期管理** -- Supabase Edge Function + pg_cron 每日自动检测逾期。系统内通知 + 企业微信 Webhook 提醒。
-- **用户管理** -- 四级角色体系：超级管理员 > 管理员 > 审批人 > 普通用户。注册需管理员审批。支持角色分配、账号启停、超级管理员权限转移。
-- **报表导出** -- 通过 SheetJS 导出样机清单、借用记录、审批记录为 Excel 文件。
-- **响应式设计** -- 移动端卡片布局，桌面端表格布局。
+当前 Pages 站点：<https://teawalklam-ux.github.io/dji-demo-manager/>
+
+### 功能
+
+- **仪表盘** — 当前用户可见的数量和状态分布。
+- **样机** — 新增、编辑和列表。系统条码格式为 `DJI-YYYYMMDD-XXXX`（`src/lib/constants.ts` 的 `BARCODE_PREFIX`）。管理员可在库存页批量导入。
+- **条码** — JsBarcode 绘制 CODE128。扫描时条形码用 html5-qrcode，二维码用 qr-scanner。
+- **借用** — 多台样机、客户试用、营销演示、管理员配置的其他类型，以及转借。审批链存在 `approval_chains`。
+- **审批** — 按步骤进行。`private.process_approval` 只接受当前未完成步骤上指定的用户。管理员不能跳过这个检查。
+- **预约** — 已通过且借用日在未来的申请成为预约。迁移 `20260812025031_reservation_lifecycle_and_status_consistency.sql` 以 `1 16 * * *`（UTC，对应 Asia/Shanghai 次日 00:01）调度 `process_reservation_lifecycle_daily`。
+- **归还照片** — 浏览器把时间戳和 GPS 水印烧进图片。照片元数据永久保留。文件复制到 NAS。Supabase Storage 不按存放天数删除。`cleanup-return-photos` 只处理管理员删除测试或已取消记录时写入的清理队列。见 `docs/RETURN_PHOTO_RETENTION.md`。
+- **续借与逾期** — 有续借。`check-overdue` 可以更新逾期状态，并在开关打开时发送企业微信。仓库里的迁移没有调度这个函数。
+- **人员与管理** — 角色为 `super_admin`、`admin`、`approver`、`user`。自行注册后等待审批。停用账户有单独页面。客户地址簿、申请历史、记录清理、系统日志和全局设置是独立管理页。
+- **SOP** — 应用内指引，截图在 `public/sop-steps/`。
+- **导出** — 用 SheetJS 导出样机、借用和审批表。
+- **本地演示** — 仅开发构建显示本地演示登录，生产构建没有这个入口。
 
 ### 技术栈
 
-| 层级 | 技术 |
-|------|------|
-| 框架 | React 19 + TypeScript |
-| 构建工具 | Vite |
-| UI 组件库 | shadcn/ui (Radix UI + Tailwind CSS 3.4) |
-| 路由 | react-router-dom v7 |
-| 表单 | react-hook-form + zod |
-| 后端 (BaaS) | Supabase (PostgreSQL + Auth + RLS + Storage) |
-| 无服务器函数 | Supabase Edge Functions (Deno) |
-| 定时任务 | pg_cron |
-| 图表 | recharts |
-| 条码 | JsBarcode (生成) + html5-qrcode (扫描) |
-| Excel 导出 | SheetJS (xlsx) |
-| 图标 | lucide-react |
-| 通知 | 系统内通知 + 企业微信 Webhook |
+| 层级 | 仓库中的实现 |
+| --- | --- |
+| 界面 | React 19、TypeScript、Vite 7、react-router-dom 7、Tailwind CSS 3.4、shadcn/ui（Radix） |
+| 表单 | react-hook-form、zod |
+| 数据 | `@supabase/supabase-js` 连接托管的 Supabase（Postgres、Auth、RLS、Storage） |
+| 函数 | 下列 Supabase Edge Functions（Deno） |
+| 定时 | 由具体迁移创建的 `pg_cron` 任务 |
+| 图表 / 条码 / 导出 | recharts、JsBarcode、html5-qrcode、qr-scanner、SheetJS（`xlsx`） |
+| 前端托管 | GitHub Pages，工作流 `.github/workflows/deploy.yml` |
+| 照片归档 | `nas/return-photo-archive` 中的 Python 3.12 镜像 |
+| 测试 | `node --test`，RLS 测试使用 PGlite |
 
-### 系统架构
+`package.json` 没有 `engines`。Pages 工作流固定 Node.js 22。
+
+### 架构
 
 ```
-┌─────────────────────────────────────────────────┐
-│                  GitHub Pages                    │
-│  React SPA (静态构建 + 内容哈希)                  │
-│  /dji-demo-manager/                              │
-└────────────────────┬────────────────────────────┘
-                     │ Supabase Client (anon key)
-┌────────────────────▼────────────────────────────┐
-│                   Supabase                       │
-│  ┌──────────────────────────────────────────┐   │
-│  │       PostgreSQL (RLS 行级安全)           │   │
-│  │   9 张核心表 + 触发器 + 存储函数           │   │
-│  └──────────────────────────────────────────┘   │
-│  ┌──────────────┐  ┌───────────────────────┐    │
-│  │  Auth (邮件)  │  │ Storage (归还照片存储)  │   │
-│  └──────────────┘  └───────────────────────┘    │
-│  ┌──────────────────────────────────────────┐   │
-│  │      Edge Functions (Deno)                │   │
-│  │  - check-overdue (每日定时)                │   │
-│  │  - cleanup-return-photos                  │   │
-│  └──────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────┘
+GitHub Actions（推送到 main，或手动触发）
+  npm ci → npm run build → 上传 dist → GitHub Pages
+  站点路径：/dji-demo-manager/
+
+浏览器
+  构建时写入 VITE_SUPABASE_URL 与 VITE_SUPABASE_ANON_KEY
+        │
+        ▼
+Supabase
+  Postgres + Auth + Storage + Edge Functions
+  迁移里的 pg_cron（不是每个函数都有定时任务）
+
+UGREEN NAS（另外部署）
+  nas/return-photo-archive 轮询 nas-photo-archive
+  浏览器只从 NAS 的 HTTPS 网关读取已归档照片
 ```
 
-### 角色体系
+### 角色
 
-| 角色 | 权限范围 |
-|------|----------|
-| **super_admin** | 全部权限：用户管理、分类管理、审批链配置、系统设置、超管转移 |
-| **admin** | 样机增删改、审批任意流程、查看用户 |
-| **approver** | 审批分配给自己的借用申请 |
-| **user** | 查看样机、提交借用申请、归还/续借样机 |
+依据 `src/App.tsx` 和 `src/components/layout/app-layout.tsx` 的导航与路由守卫：
 
-### 数据库表结构
+| 角色 | 界面权限 |
+| --- | --- |
+| **super_admin** | 管理页，以及用户管理、客户地址簿、系统设置。`invite-user` 只允许启用中的超级管理员。 |
+| **admin** | 新增和编辑样机；分类、审批链、申请历史、记录清理、系统日志。 |
+| **approver** | 已登录用户都能看到审批队列。对某一步执行通过或拒绝，仍必须是该步骤指定的人。 |
+| **user** | 样机、借用、我的申请、归还、续借、SOP、报表。 |
 
-- `profiles` -- 用户档案（角色、状态）
-- `categories` -- 样机分类
-- `items` -- 样机库存（含条码）
-- `borrow_requests` -- 借用申请表
-- `approval_chains` -- 审批链配置
-- `approval_records` -- 各级审批记录
-- `borrow_records` -- 借用记录（含历史）
-- `stock_movements` -- 库存变动审计
-- `overdue_notifications` -- 逾期通知记录
-- `return_photos` -- 归还照片元数据（含 GPS 坐标）
+`super_admin` 通过所有 `hasRole` 检查。`admin` 同时满足 `admin`、`approver` 和 `user`。
 
-### 项目结构
+### 数据库
+
+GitHub Actions 不执行 SQL。结构变更在 `supabase/migrations/`（84 个文件），按文件名顺序应用。这和只按数字前缀排序不同：`00024` 和 `00036` 各有两个文件，更晚的文件使用 `2026…` 时间戳，排在 `00042` 之后。
+
+仓库根目录的 `fix_all_sql.sql`、`setup_return_photos.sql`、`delete_requests.sql` 不在迁移目录中。
+
+`supabase/config.toml` 是本地 Supabase CLI 配置（`project_id = "webdemo"`，Postgres 17）。它引用了 `supabase/seed.sql`，仓库里没有这个种子文件。`00013_seed_data.sql` 会插入分类和两条审批链。
+
+迁移创建的 public 表：
+
+`profiles`、`categories`、`items`、`borrow_requests`、`borrow_request_items`、`approval_chains`、`approval_records`、`borrow_records`、`stock_movements`、`overdue_notifications`、`return_photos`、`user_customers`、`reservation_events`、`storage_cleanup_queue`、`return_photo_archive_config`、`return_photo_archive_jobs`、`return_photo_archive_events`、`return_photo_storage_usage_snapshots`、`sop_processes`、`app_logs`、`system_settings`。
+
+应用日志迁移同时创建 `private.app_log_state`。
+
+### 迁移中的定时任务
+
+下面的时间是 `cron.schedule` 中的 UTC。
+
+| 任务 | Cron | 调用 |
+| --- | --- | --- |
+| `process_reservation_lifecycle_daily` | `1 16 * * *` | `public.process_reservation_lifecycle` |
+| `notify_reservation_events` | `*/5 * * * *` | `notify-reservation-events`；仅当 Vault 中有 `project_url` 和 `reservation_events_cron_secret` |
+| `monitor_return_photo_archive` | `3,13,23,33,43,53 * * * *` | `monitor-return-photo-archive`；仅当 Vault 中有 `project_url` 和 `return_photo_archive_cron_secret` |
+| `prune_app_logs_daily` | `20 18 * * *` | `private.prune_app_logs` |
+| `prune_cron_history_daily` | `30 18 * * *` | 删除 7 天前的 `cron.job_run_details` |
+
+`20260812025031_reservation_lifecycle_and_status_consistency.sql` 会取消更早的 `activate_due_borrow_requests_daily`。Edge Function `activate-reservations` 仍在仓库中，并校验 `CRON_SECRET`，但没有迁移去调度它。
+
+没有迁移调度 `check-overdue` 或 `cleanup-return-photos`。
+
+### Edge Functions
+
+需要自行部署到 Supabase 项目。CLI 在开发依赖 `supabase`（`2.109.1`）。工作流不部署函数，仓库里也没有已绑定的 project ref。
+
+| 函数 | 仓库中的调用校验 |
+| --- | --- |
+| `check-overdue` | `Authorization: Bearer <CRON_SECRET>`。企业微信还取决于 `system_settings.overdue_wecom_notify`（默认关闭）和 `WECOM_WEBHOOK_URL`。 |
+| `cleanup-return-photos` | `Bearer <CRON_SECRET>`。只读 `storage_cleanup_queue`。 |
+| `activate-reservations` | `Bearer <CRON_SECRET>`。调用 `activate_due_borrow_requests`。不是上面的定时路径。 |
+| `notify-reservation-events` | `supabase/config.toml` 中 `verify_jwt = false`。用 bearer token 与 `RESERVATION_EVENTS_CRON_SECRET` 比较。 |
+| `monitor-return-photo-archive` | `RETURN_PHOTO_ARCHIVE_CRON_SECRET`。 |
+| `nas-photo-archive` | `NAS_ARCHIVE_TOKEN`。 |
+| `notify-approval`、`notify-return`、`wecom-config-status` | `verify_jwt = true`。 |
+| `invite-user` | 已登录且启用的 `super_admin`。函数内部使用平台注入的 service role。 |
+
+函数还会读取平台注入的 `SUPABASE_URL`、`SUPABASE_ANON_KEY`、`SUPABASE_SERVICE_ROLE_KEY`。不要把 service role key 放到前端或 GitHub Actions。
+
+企业微信密钥名称和 Vault 顺序见 `docs/WECOM_NOTIFICATION_SECURITY.md`。NAS 密钥见 `docs/NAS_RETURN_PHOTO_ARCHIVE.md`。全局设置见 `docs/system-settings.md`。
+
+`system_settings` 保存 `barcode_prefix`、`default_borrow_days`、`overdue_remind_days`、`overdue_email_notify`、`overdue_wecom_notify`。这里不保存 Webhook URL。该迁移没有增加发信程序或提前提醒任务。
+
+### 目录
 
 ```
-├── src/
-│   ├── components/          # 可复用组件
-│   │   ├── auth/            # 登录表单、路由守卫
-│   │   ├── barcode/         # 条码生成、扫描、输入
-│   │   ├── borrow/          # 归还拍照
-│   │   ├── export/          # Excel 导出按钮
-│   │   ├── layout/          # 应用布局（侧边栏 + 顶栏）
-│   │   └── ui/              # shadcn/ui 组件库 (60+)
-│   ├── contexts/            # 认证上下文
-│   ├── hooks/               # 自定义 Hooks (7 个)
-│   ├── lib/                 # 工具函数、常量、Supabase 客户端
-│   ├── pages/               # 页面组件
-│   │   ├── items/           # 列表、详情、新增、编辑
-│   │   ├── borrow/          # 申请、我的申请、归还、续借
-│   │   ├── approval/        # 审批队列、审批详情
-│   │   ├── admin/           # 用户管理、分类管理、审批链、系统设置
-│   │   └── reports/         # 报表导出
-│   ├── services/            # API 服务层 (7 个服务)
-│   └── types/               # TypeScript 类型定义
-├── supabase/
-│   ├── migrations/          # SQL 迁移文件
-│   └── functions/           # Edge Functions (Deno)
-├── .github/workflows/       # GitHub Pages 自动部署
-└── public/                  # 静态资源
+src/                 React 应用
+  components/        界面、登录、条码、借用、布局
+  pages/             仪表盘、样机、借用、审批、管理、报表、SOP
+  services/          Supabase 调用
+supabase/migrations/ 按文件名顺序应用的 SQL
+supabase/functions/  Edge Functions
+supabase/config.toml 本地 CLI 配置
+.github/workflows/deploy.yml
+nas/return-photo-archive/
+docs/                NAS、留存、企业微信、设置、SOP、版本流程
+public/              404.html、标志、sop-steps/
+scripts/             本地演示 API 与 SOP 截图脚本
+tests/               node:test
 ```
 
-### 快速开始
+### 本地运行
 
 #### 前置条件
 
-- Node.js >= 20
+- Node.js 22（与 `.github/workflows/deploy.yml` 一致）
 - npm
-- 一个 Supabase 项目
+- 除本地演示外，需要一个 Supabase 项目
 
-#### 环境配置
+#### 环境变量
 
-在项目根目录创建 `.env` 文件：
+在仓库根目录创建 `.env`。`.gitignore` 忽略 `.env*` 和 `.env.*`。
 
 ```env
 VITE_SUPABASE_URL=https://your-project.supabase.co
 VITE_SUPABASE_ANON_KEY=your-anon-key
 ```
 
-> ⚠️ 切勿将 `.env` 文件提交到代码仓库。CI/CD 中使用 GitHub Secrets 注入。
+前端只用这两个变量，由 `src/lib/supabase.ts` 读取。缺任何一个时，客户端会警告并使用占位 URL。Pages 构建从 GitHub Actions secrets 注入它们。
 
-#### 安装与运行
+#### 安装与命令
 
 ```bash
-npm install
-npm run dev          # 启动开发服务器
-npm run build        # 生产构建
-npm run preview      # 预览生产构建
+npm ci
+npm run dev       # Vite，基础路径 /dji-demo-manager/
+npm run build     # tsc -b && vite build
+npm run preview
+npm run lint
+npm test
 ```
 
-#### 数据库初始化
+打开 `http://127.0.0.1:5173/dji-demo-manager/`。`vite.config.ts` 的 `base` 和 `BrowserRouter` 的 `basename` 都是 `/dji-demo-manager/`。
 
-按编号顺序在 Supabase SQL Editor 中执行 `supabase/migrations/` 目录下的 SQL 迁移文件。这些文件将创建所有数据表、RLS 策略、触发器和函数。
+`npm run build` 生成 `dist/`。Vite 会复制 `public/`，其中包括 `public/404.html`。工作流在上传前还会执行 `cp public/404.html dist/404.html`。`index.html` 与 `404.html` 负责 GitHub Pages 的 SPA 跳转。
 
-#### 部署 Edge Functions
+#### 本地演示
 
-通过 Supabase CLI 或 Dashboard 部署 Edge Functions，并配置 pg_cron 定时任务。
+演示 API 没有 npm script。另开一个终端：
 
-#### CI/CD
+```bash
+node scripts/demo-server.mjs
+```
 
-项目使用 GitHub Actions 自动部署到 GitHub Pages。在仓库的 Settings > Secrets 中添加：
+它监听 `127.0.0.1:5176`。再运行 `npm run dev`，在登录页使用 **本地演示**。这个按钮只在 `import.meta.env.DEV` 时渲染。演示账号写在 `scripts/demo-server.mjs` 和 `src/lib/demo-mode.ts`。
 
-- `VITE_SUPABASE_URL`
-- `VITE_SUPABASE_ANON_KEY`
+#### NAS 归档
 
-然后在 Settings > Pages 中选择 "GitHub Actions" 作为部署源。
+在 `nas/return-photo-archive` 目录：
 
-### 安全设计
+```bash
+docker compose up -d --build
+```
 
-- 所有数据表启用行级安全 (RLS)
-- 核心操作使用 SECURITY DEFINER 特权函数
-- 前端路由守卫 + 基于角色的页面权限控制
-- 用户注册需管理员审批通过
-- Edge Functions 通过 CRON_SECRET 验证调用来源
-- 敏感配置全部使用环境变量
+`docker-compose.yml` 构建镜像 `dji-return-photo-archive:1.63`，读取 `.env`，并把 `${VIEW_BIND_ADDRESS:-0.0.0.0}:${VIEW_PORT:-8787}` 发布出来。镜像以用户 `archive` 运行 `archive_agent.py`。
+
+Compose 必须提供 `ARCHIVE_HOST_PATH`。代理进程必须提供 `SUPABASE_URL`、`SUPABASE_PUBLISHABLE_KEY` 和 `NAS_ARCHIVE_TOKEN`。代码里带默认值的可选变量包括 `ARCHIVE_ROOT`、`STATE_DB`、`TLS_CERT_FILE`、`TLS_KEY_FILE`、`REQUIRE_TLS`、`WORKER_ID`、`POLL_SECONDS`、`ALLOWED_ORIGIN`（默认 `https://teawalklam-ux.github.io`）、`VIEW_BIND` 和 `VIEW_PORT`。Compose 还会读取 `STATE_HOST_PATH`、`CERTS_HOST_PATH`、`PUID` 和 `PGID`。
+
+仓库里没有 `.env.example`。该目录的 README 写了复制示例文件。不要提交 `.env`、NAS 私钥或 Webhook URL。该目录的单元测试：
+
+```bash
+python -m unittest -v test_archive_agent.py
+```
+
+留存阈值、密钥清单和操作顺序见 `nas/return-photo-archive/README.md` 与 `docs/NAS_RETURN_PHOTO_ARCHIVE.md`。
+
+#### GitHub Pages
+
+`.github/workflows/deploy.yml`：
+
+- 触发：推送到 `main`，或 `workflow_dispatch`
+- Node.js 22，`npm ci`，`npm run build`
+- 构建环境变量：secrets `VITE_SUPABASE_URL` 和 `VITE_SUPABASE_ANON_KEY`
+- 用 `actions/upload-pages-artifact@v3` 上传 `./dist`
+- 用 `actions/deploy-pages@v4` 部署到 `github-pages` 环境
+- 并发组 `pages`，`cancel-in-progress: false`
+
+此工作流对应的 Pages 来源是 GitHub Actions。它不设置 Supabase 密钥、不应用迁移、也不部署 Edge Functions。
+
+### 安全
+
+- 迁移中定义了 RLS。
+- 高权限 SQL 使用 `SECURITY DEFINER`，后续迁移会按文件中的语句撤销 `anon` 的执行权。
+- 界面有登录守卫，部分路由还有角色检查。
+- 自行注册不会直接成为启用用户。
+- 由 Cron 调用的函数校验各自的 bearer secret。这个 secret 不总是 `CRON_SECRET`，见上表。
+- `app-log` 在写入前会遮盖敏感字段名。它不是凭据存储。
 
 ### 许可证
 
-本项目仅供大疆授权代理商内部使用。
+[MIT License](LICENSE)。版权行：Copyright (c) 2026 teawalklam-ux。
+
+第三方声明：[THIRD_PARTY_NOTICES.md](THIRD_PARTY_NOTICES.md)。
