@@ -112,7 +112,7 @@ serve(async (req) => {
           customer_name,
           requester_id,
           items (name, model, barcode),
-          request_items (
+          request_items:borrow_request_items (
             items (name, model, barcode)
           ),
           requester:profiles!borrow_requests_requester_id_fkey (display_name, email, phone)
@@ -153,9 +153,14 @@ serve(async (req) => {
     )
 
     // 过滤掉已发送企业微信的申请+收件人组合
-    const unsentNotifications = pendingNotifications.filter(
-      (n) => !wecomSentKeys.has(`${n.borrow_request_id}:${n.recipient_id}`)
-    )
+    const unsentByRecipient = new Map<string, (typeof pendingNotifications)[number]>()
+    for (const notification of pendingNotifications) {
+      const deliveryKey = `${notification.borrow_request_id}:${notification.recipient_id}`
+      if (!wecomSentKeys.has(deliveryKey) && !unsentByRecipient.has(deliveryKey)) {
+        unsentByRecipient.set(deliveryKey, notification)
+      }
+    }
+    const unsentNotifications = [...unsentByRecipient.values()]
 
     if (unsentNotifications.length === 0) {
       return new Response(
@@ -172,6 +177,10 @@ serve(async (req) => {
     let wecomSentCount = 0
     const deliveredNotifications: typeof unsentNotifications = []
 
+    if (!wecomUrl?.trim()) {
+      return jsonResponse({ error: 'WECOM_WEBHOOK_URL is not configured' }, 500)
+    }
+
     const requiresApprovalCc = unsentNotifications.some((notification) => (
       notification.recipient_id === notification.borrow_requests?.requester_id
       && !(notification.message || '').includes('审批拒绝')
@@ -180,8 +189,7 @@ serve(async (req) => {
       return jsonResponse({ error: 'APPROVAL_CC_MOBILES is not configured' }, 500)
     }
 
-    if (wecomUrl) {
-      for (const n of unsentNotifications) {
+    for (const n of unsentNotifications) {
         const req = n.borrow_requests
         const recipient = n.recipient
         const requestId = n.borrow_request_id
@@ -284,9 +292,6 @@ serve(async (req) => {
         } catch (wecomError) {
           console.error(`WeCom notification failed for request ${requestId}:`, wecomError)
         }
-      }
-    } else {
-      console.log('WECOM_WEBHOOK_URL not configured, skipping WeCom notification')
     }
 
     // 标记这些通知为已发送企业微信
@@ -317,19 +322,22 @@ serve(async (req) => {
         .from('overdue_notifications')
         .insert(wecomNotifications)
       if (insertError) {
-        console.error('Failed to insert wecom notification records:', insertError)
+        throw new Error(`Failed to record WeCom deliveries: ${insertError.message}`)
       }
     }
 
-    return new Response(
-      JSON.stringify({
+    const failedCount = unsentNotifications.length - deliveredNotifications.length
+
+    return jsonResponse(
+      {
         message: 'Approval notifications processed',
         totalPendingCount: unsentNotifications.length,
         uniqueRequestCount: new Set(unsentNotifications.map((n) => n.borrow_request_id)).size,
         wecomSentCount,
+        failedCount,
         skippedAlreadySent: pendingNotifications.length - unsentNotifications.length,
-      }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      },
+      failedCount > 0 ? 502 : 200,
     )
   } catch (error) {
     console.error('Error:', error)

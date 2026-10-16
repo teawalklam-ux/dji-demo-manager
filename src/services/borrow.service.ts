@@ -93,7 +93,7 @@ export const borrowService = {
       if (!session) return
 
       const supabaseUrl = import.meta.env.VITE_SUPABASE_URL
-      await fetch(`${supabaseUrl}/functions/v1/notify-approval`, {
+      const response = await fetch(`${supabaseUrl}/functions/v1/notify-approval`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -101,6 +101,10 @@ export const borrowService = {
         },
         body: JSON.stringify({ request_id: requestId }),
       })
+      if (!response.ok) {
+        const detail = await response.text()
+        throw new Error(`企业微信审批通知失败（HTTP ${response.status}）：${detail}`)
+      }
     } catch (err) {
       console.error('Failed to trigger approval notification:', err)
     }
