@@ -7,3 +7,27 @@ dist/
 Thumbs.db
 .workbuddy/
 .codebuddy/
+
+# Local tools, captures, audit reports and deployment state
+.codex/
+.agents/
+.hallmark/
+artifacts/
+outputs/
+coverage/
+playwright-report/
+test-results/
+*.tsbuildinfo
+*.pem
+*.key
+*.p12
+*.pfx
+*.sqlite
+*.sqlite3
+*.db
+*.dump
+*.backup
+
+# Only reviewed, placeholder-only templates may be committed.
+!.env.example
+!**/.env.example

@@ -4,6 +4,8 @@
   "version": "1.83.0",
   "type": "module",
   "scripts": {
+    "security:scan": "node scripts/security-scan.mjs",
+    "security:history": "node scripts/security-scan.mjs --history",
     "test": "node --test tests/*.test.ts",
     "dev": "vite",
     "build": "tsc -b && vite build",

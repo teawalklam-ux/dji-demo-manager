@@ -136,6 +136,8 @@ VITE_SUPABASE_ANON_KEY=your-anon-key
 
 > ⚠️ Never commit `.env` files. Use GitHub Secrets for CI/CD.
 
+Copy `.env.example` to `.env.local` for local setup. Run `npm run security:scan` before committing. See [repository privacy and history cleanup](docs/REPOSITORY_PRIVACY.md).
+
 #### Install & Run
 
 ```bash
