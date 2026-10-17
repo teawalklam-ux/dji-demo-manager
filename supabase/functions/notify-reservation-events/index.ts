@@ -1,7 +1,7 @@
 import 'jsr:@supabase/functions-js/edge-runtime.d.ts'
 import { createClient } from 'jsr:@supabase/supabase-js@2'
 
-import { bearerToken, constantTimeEqual } from '../_shared/request-security.ts'
+import { bearerToken, constantTimeEqual, isUuid } from '../_shared/request-security.ts'
 
 type ReservationEvent = {
   id: string
@@ -25,11 +25,38 @@ type Profile = {
 
 type WorkerRequest = {
   action?: string
+  notification_ids?: unknown
 }
 
 type WeComWebhookResponse = {
   errcode?: number
   errmsg?: string
+}
+
+type ApprovalNotificationCandidate = {
+  id: string
+  recipient_id: string
+  borrow_request_id: string
+  borrow_requests: {
+    request_number: string
+    requester_id: string
+    status: string
+    borrow_type: string
+    expected_borrow_date: string
+    expected_return_date: string
+    purpose: string | null
+    customer_name: string | null
+    items: { name: string | null; model: string | null; barcode: string | null } | null
+    request_items: Array<{
+      items: { name: string | null; model: string | null; barcode: string | null } | null
+    }>
+    requester: { display_name: string | null; email: string | null } | null
+  } | null
+  recipient: {
+    display_name: string | null
+    email: string | null
+    phone: string | null
+  } | null
 }
 
 const jsonHeaders = { 'Content-Type': 'application/json' }
@@ -122,6 +149,171 @@ Deno.serve(async (request) => {
   const supabase = createClient(supabaseUrl, serviceRoleKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   })
+
+  if (body.action === 'resend_missed_approval_notifications') {
+    const notificationIds = Array.isArray(body.notification_ids)
+      ? [...new Set(body.notification_ids.filter(isUuid))]
+      : []
+    if (notificationIds.length === 0 || notificationIds.length > 20) {
+      return jsonResponse({ error: 'Between 1 and 20 valid notification_ids are required' }, 400)
+    }
+
+    const { data, error: candidateError } = await supabase
+      .from('overdue_notifications')
+      .select(`
+        id,
+        recipient_id,
+        borrow_request_id,
+        borrow_requests (
+          request_number,
+          requester_id,
+          status,
+          borrow_type,
+          expected_borrow_date,
+          expected_return_date,
+          purpose,
+          customer_name,
+          items (name, model, barcode),
+          request_items:borrow_request_items (
+            items (name, model, barcode)
+          ),
+          requester:profiles!borrow_requests_requester_id_fkey (display_name, email)
+        ),
+        recipient:profiles!overdue_notifications_recipient_id_fkey (display_name, email, phone)
+      `)
+      .eq('notification_category', 'approval')
+      .eq('notification_type', 'push')
+      .in('id', notificationIds)
+
+    if (candidateError) return jsonResponse({ error: candidateError.message }, 500)
+    const candidates = (data || []) as unknown as ApprovalNotificationCandidate[]
+    const requestIds = [...new Set(candidates.map((candidate) => candidate.borrow_request_id))]
+    const recipientIds = [...new Set(candidates.map((candidate) => candidate.recipient_id))]
+
+    const [{ data: sentRecords, error: sentError }, { data: pendingApprovals, error: approvalError }] = await Promise.all([
+      supabase
+        .from('overdue_notifications')
+        .select('borrow_request_id, recipient_id')
+        .eq('notification_category', 'approval')
+        .eq('notification_type', 'wecom')
+        .in('borrow_request_id', requestIds),
+      supabase
+        .from('approval_records')
+        .select('request_id, approver_id')
+        .in('request_id', requestIds)
+        .in('approver_id', recipientIds)
+        .is('acted_at', null),
+    ])
+    if (sentError) return jsonResponse({ error: sentError.message }, 500)
+    if (approvalError) return jsonResponse({ error: approvalError.message }, 500)
+
+    const sentKeys = new Set(
+      (sentRecords || []).map((record) => `${record.borrow_request_id}:${record.recipient_id}`),
+    )
+    const pendingKeys = new Set(
+      (pendingApprovals || []).map((record) => `${record.request_id}:${record.approver_id}`),
+    )
+    const sent: string[] = []
+    const skipped: Array<{ id: string; reason: string }> = []
+    const failed: Array<{ id: string; reason: string }> = []
+
+    for (const candidate of candidates) {
+      const deliveryKey = `${candidate.borrow_request_id}:${candidate.recipient_id}`
+      const borrowRequest = candidate.borrow_requests
+      const recipient = candidate.recipient
+      if (sentKeys.has(deliveryKey)) {
+        skipped.push({ id: candidate.id, reason: 'already_sent' })
+        continue
+      }
+      if (
+        !borrowRequest
+        || !recipient
+        || candidate.recipient_id === borrowRequest.requester_id
+        || !['pending', 'partially_approved'].includes(borrowRequest.status)
+        || !pendingKeys.has(deliveryKey)
+      ) {
+        skipped.push({ id: candidate.id, reason: 'no_longer_actionable' })
+        continue
+      }
+
+      const requestItems = (borrowRequest.request_items || [])
+        .map((line) => line.items)
+        .filter((item): item is NonNullable<typeof item> => Boolean(item))
+      const itemSummary = requestItems.length > 0
+        ? requestItems.map((item) => (
+            `${item.name || '未知'}${item.model ? ` (${item.model})` : ''}${item.barcode ? ` [${item.barcode}]` : ''}`
+          )).join('、')
+        : `${borrowRequest.items?.name || '未知'}${borrowRequest.items?.model ? ` (${borrowRequest.items.model})` : ''}${borrowRequest.items?.barcode ? ` [${borrowRequest.items.barcode}]` : ''}`
+      const requesterName = borrowRequest.requester?.display_name || borrowRequest.requester?.email || '未知'
+      const recipientName = recipient.display_name || recipient.email || '未知'
+      const borrowTypeLabel = borrowRequest.borrow_type === 'customer' ? '客户试用'
+        : borrowRequest.borrow_type === 'marketing' ? '营销演示'
+        : borrowRequest.borrow_type === 'transfer' ? '转借'
+        : borrowRequest.borrow_type
+      const content = [
+        '【审批提醒补发】',
+        `申请单号：${borrowRequest.request_number}`,
+        `申请人：${requesterName}`,
+        `样机：${itemSummary}`,
+        `借用类型：${borrowTypeLabel}`,
+        ...(['customer', 'transfer'].includes(borrowRequest.borrow_type) && borrowRequest.customer_name
+          ? [`客户：${borrowRequest.customer_name}`]
+          : []),
+        `借用日期：${borrowRequest.expected_borrow_date} ~ ${borrowRequest.expected_return_date}`,
+        `用途：${borrowRequest.purpose || '-'}`,
+        `当前待审批人：${recipientName}`,
+        '',
+        '说明：此前因系统故障未成功推送，当前仍待您审批，请及时处理。',
+      ].join('\n')
+
+      try {
+        const wecomResponse = await fetch(wecomUrl, {
+          method: 'POST',
+          headers: jsonHeaders,
+          body: JSON.stringify({
+            msgtype: 'text',
+            text: {
+              content,
+              mentioned_mobile_list: recipient.phone?.trim() ? [recipient.phone.trim()] : [],
+            },
+          }),
+        })
+        const wecomResult = await wecomResponse.json() as WeComWebhookResponse
+        if (!wecomResponse.ok || wecomResult.errcode !== 0) {
+          failed.push({ id: candidate.id, reason: `wecom_${wecomResult.errcode ?? wecomResponse.status}` })
+          continue
+        }
+
+        const { error: markerError } = await supabase
+          .from('overdue_notifications')
+          .insert({
+            borrower_id: borrowRequest.requester_id,
+            notification_type: 'wecom',
+            notification_category: 'approval',
+            recipient_id: candidate.recipient_id,
+            borrow_request_id: candidate.borrow_request_id,
+            message: `企业微信补发通知：${borrowRequest.request_number}`,
+            is_read: true,
+          })
+        if (markerError) {
+          failed.push({ id: candidate.id, reason: 'delivery_marker_failed' })
+          continue
+        }
+        sent.push(candidate.id)
+        sentKeys.add(deliveryKey)
+      } catch {
+        failed.push({ id: candidate.id, reason: 'delivery_exception' })
+      }
+    }
+
+    return jsonResponse({
+      action: 'resend_missed_approval_notifications',
+      requested: notificationIds.length,
+      sent,
+      skipped,
+      failed,
+    }, failed.length > 0 ? 502 : 200)
+  }
 
   const now = new Date().toISOString()
   const { data: candidates, error: candidateError } = await supabase

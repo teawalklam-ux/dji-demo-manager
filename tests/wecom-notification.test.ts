@@ -53,3 +53,20 @@ test('WeCom smoke test is cron-authenticated and bypasses business data processi
   assert.match(reservationEventFunction, /WeCom rejected the smoke test/)
   assert.match(reservationEventFunction, /delivered: true/)
 })
+
+test('approval reminder backfill only sends explicitly selected, still-actionable notifications', () => {
+  const authCheck = reservationEventFunction.indexOf(
+    'constantTimeEqual(bearerToken(request), cronSecret)',
+  )
+  const resendAction = reservationEventFunction.indexOf(
+    "body.action === 'resend_missed_approval_notifications'",
+  )
+
+  assert.ok(resendAction > authCheck)
+  assert.match(reservationEventFunction, /notificationIds\.length === 0 \|\| notificationIds\.length > 20/)
+  assert.match(reservationEventFunction, /\.eq\('notification_type', 'push'\)[^]*\.in\('id', notificationIds\)/)
+  assert.match(reservationEventFunction, /\.is\('acted_at', null\)/)
+  assert.match(reservationEventFunction, /!\['pending', 'partially_approved'\]\.includes\(borrowRequest\.status\)/)
+  assert.match(reservationEventFunction, /'【审批提醒补发】'/)
+  assert.match(reservationEventFunction, /notification_type: 'wecom'/)
+})
