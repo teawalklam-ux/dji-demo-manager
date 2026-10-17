@@ -14,6 +14,10 @@ const approvalService = readFileSync(
   new URL('../src/services/approval.service.ts', import.meta.url),
   'utf8',
 )
+const reservationEventFunction = readFileSync(
+  new URL('../supabase/functions/notify-reservation-events/index.ts', import.meta.url),
+  'utf8',
+)
 
 test('approval notification embeds the real request-item relationship through an alias', () => {
   assert.match(
@@ -34,4 +38,18 @@ test('approval notification failures are observable and do not create false deli
     assert.match(source, /if \(!response\.ok\)/)
     assert.match(source, /企业微信审批通知失败（HTTP \$\{response\.status\}）/)
   }
+})
+
+test('WeCom smoke test is cron-authenticated and bypasses business data processing', () => {
+  const authCheck = reservationEventFunction.indexOf(
+    'constantTimeEqual(bearerToken(request), cronSecret)',
+  )
+  const smokeTest = reservationEventFunction.indexOf("body.action === 'wecom_smoke_test'")
+  const databaseClient = reservationEventFunction.indexOf('const supabase = createClient')
+
+  assert.ok(authCheck >= 0)
+  assert.ok(smokeTest > authCheck)
+  assert.ok(databaseClient > smokeTest)
+  assert.match(reservationEventFunction, /WeCom rejected the smoke test/)
+  assert.match(reservationEventFunction, /delivered: true/)
 })

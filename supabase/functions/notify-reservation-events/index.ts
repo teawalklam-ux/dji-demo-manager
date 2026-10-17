@@ -23,6 +23,15 @@ type Profile = {
   phone: string | null
 }
 
+type WorkerRequest = {
+  action?: string
+}
+
+type WeComWebhookResponse = {
+  errcode?: number
+  errmsg?: string
+}
+
 const jsonHeaders = { 'Content-Type': 'application/json' }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -50,6 +59,61 @@ Deno.serve(async (request) => {
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
   const wecomUrl = Deno.env.get('WECOM_WEBHOOK_URL')
+
+  const body = await request.json().catch(() => ({})) as WorkerRequest
+  if (body.action === 'wecom_smoke_test') {
+    if (!wecomUrl) {
+      return jsonResponse({ error: 'WECOM_WEBHOOK_URL is not configured' }, 500)
+    }
+
+    const testId = crypto.randomUUID()
+    const sentAt = new Date().toISOString()
+    const wecomResponse = await fetch(wecomUrl, {
+      method: 'POST',
+      headers: jsonHeaders,
+      body: JSON.stringify({
+        msgtype: 'text',
+        text: {
+          content: [
+            '【系统测试｜企业微信 Webhook】',
+            '用途：验证样机借用系统通知通道',
+            '结果：若看到本消息，说明 Webhook 推送链路正常',
+            `测试编号：${testId}`,
+            `发送时间：${sentAt}`,
+          ].join('\n'),
+        },
+      }),
+    })
+
+    const responseText = await wecomResponse.text()
+    let wecomResult: WeComWebhookResponse
+    try {
+      wecomResult = JSON.parse(responseText) as WeComWebhookResponse
+    } catch {
+      return jsonResponse({
+        error: 'WeCom returned a non-JSON response',
+        providerStatus: wecomResponse.status,
+        testId,
+      }, 502)
+    }
+
+    if (!wecomResponse.ok || wecomResult.errcode !== 0) {
+      return jsonResponse({
+        error: 'WeCom rejected the smoke test',
+        providerStatus: wecomResponse.status,
+        errcode: wecomResult.errcode,
+        errmsg: wecomResult.errmsg,
+        testId,
+      }, 502)
+    }
+
+    return jsonResponse({
+      action: 'wecom_smoke_test',
+      delivered: true,
+      testId,
+      sentAt,
+    })
+  }
 
   if (!supabaseUrl || !serviceRoleKey || !wecomUrl) {
     return jsonResponse({ error: 'Reservation notification environment is incomplete' }, 500)
