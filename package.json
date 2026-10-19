@@ -2,6 +2,7 @@
   "name": "my-app",
   "private": true,
   "version": "1.83.0",
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "security:scan": "node scripts/security-scan.mjs",
