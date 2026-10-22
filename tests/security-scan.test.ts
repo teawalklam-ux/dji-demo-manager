@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { test } from 'node:test'
-import { mkdtempSync, writeFileSync, rmSync } from 'node:fs'
+import { mkdtempSync, writeFileSync, rmSync, mkdirSync } from 'node:fs'
+import { createHash } from 'node:crypto'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { execFileSync } from 'node:child_process'
@@ -47,6 +48,43 @@ test('history catches a secret deleted from the current tree; index catches stag
     git('commit', '-qm', 'remove fixture')
     assert.equal(scanRepository({ repo }).findings.length, 0)
     assert.ok(scanRepository({ repo, history: true }).findings.some(f => f.rule === 'access-token'))
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('history detects private commit identity even when files are clean', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'repository-identity-test-'))
+  const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { stdio: 'pipe' })
+  try {
+    git('init', '-q')
+    git('config', 'user.name', 'Test Contributor')
+    git('config', 'user.email', ['private-person', 'company.example.cn'].join('@'))
+    git('config', 'commit.gpgsign', 'false')
+    writeFileSync(join(repo, 'README.md'), 'Clean content')
+    git('add', '.')
+    git('commit', '-qm', 'Clean content')
+    assert.equal(scanRepository({ repo }).findings.length, 0)
+    assert.ok(scanRepository({ repo, history: true }).findings.some(f => f.file === '[commit]' && f.rule === 'personal-email'))
+  } finally {
+    rmSync(repo, { recursive: true, force: true })
+  }
+})
+
+test('public image approval is bound to exact content', () => {
+  const repo = mkdtempSync(join(tmpdir(), 'repository-image-test-'))
+  const git = (...args: string[]) => execFileSync('git', ['-C', repo, ...args], { stdio: 'pipe' })
+  try {
+    git('init', '-q')
+    mkdirSync(join(repo, 'public'))
+    mkdirSync(join(repo, 'docs'))
+    const data = Buffer.from([0, 1, 2, 3])
+    writeFileSync(join(repo, 'public', 'guide.png'), data)
+    assert.ok(scanRepository({ repo }).findings.some(f => f.rule === 'unreviewed-public-image'))
+    writeFileSync(join(repo, 'docs', 'reviewed-public-images.json'), JSON.stringify({ 'public/guide.png': createHash('sha256').update(data).digest('hex') }))
+    assert.equal(scanRepository({ repo }).findings.length, 0)
+    writeFileSync(join(repo, 'public', 'guide.png'), Buffer.from([0, 4, 5, 6]))
+    assert.ok(scanRepository({ repo }).findings.some(f => f.rule === 'unreviewed-public-image'))
   } finally {
     rmSync(repo, { recursive: true, force: true })
   }

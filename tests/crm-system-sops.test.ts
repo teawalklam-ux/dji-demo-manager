@@ -32,8 +32,8 @@ for (const requiredText of [
 for (const step of steps) {
   assert.equal(
     existsSync(new URL(`../public/sop-steps/${step.id}.jpg`, import.meta.url)),
-    true,
-    `missing bundled screenshot for ${step.id}`,
+    false,
+    `unreviewed bundled screenshot for ${step.id}`,
   )
 }
 

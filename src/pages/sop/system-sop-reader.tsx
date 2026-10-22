@@ -199,13 +199,13 @@ function StepScreenshot({ step, onOpenViewer }: { step: PersistedSopItem; onOpen
         {(!source || state === 'error') && (
           <div className="sop-reader-shot__empty" role="status">
             <ImageOff aria-hidden="true" />
-            <strong>{source ? '截图加载失败' : '这一步尚未配置截图'}</strong>
-            <p>{source ? '请检查网络后重试，或联系管理员更新截图。' : '请管理员在编辑模式中上传对应操作截图。'}</p>
+            <strong>{source ? '截图加载失败' : '请按文字步骤操作'}</strong>
+            <p>{source ? '请检查网络后重试，或联系管理员更新截图。' : '操作说明见下方；如需配图，请管理员提供已审核的演示截图。'}</p>
             {source && <button type="button" className="sop-text-button" onClick={() => { setState('loading'); setAttempt((value) => value + 1) }}>重新加载</button>}
           </div>
         )}
       </div>
-      <figcaption>{step.screenshot_caption || (step.screenshot ? '管理员提供的操作截图' : '实际系统界面 · 隔离演示数据 · 标记区域为本步操作位置')}</figcaption>
+      <figcaption>{step.screenshot_caption || (source ? '管理员提供的操作截图' : '文字操作指引')}</figcaption>
     </figure>
   )
 }

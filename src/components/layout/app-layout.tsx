@@ -93,11 +93,7 @@ function AppSidebar() {
       <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
         <div className="flex min-w-0 items-center gap-3">
           <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-input)] bg-sidebar-primary text-sidebar-primary-foreground">
-            <img
-              src={`${import.meta.env.BASE_URL}dji-logo-white.png`}
-              alt="DJI"
-              className="h-5 w-7 object-contain"
-            />
+            <Package className="size-5" aria-hidden="true" />
           </div>
           <div className="min-w-0">
             <h2 className="truncate font-display text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">样机管理系统</h2>

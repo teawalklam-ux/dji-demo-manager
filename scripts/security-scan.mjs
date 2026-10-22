@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto'
 import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
@@ -26,6 +27,7 @@ function isExample(rule, value, file) {
     const domain = value.split('@')[1].toLowerCase()
     return /(?:^|\.)(?:example\.(?:com|org|net)|test|invalid)$/.test(domain)
       || domain === 'users.noreply.github.com' || domain === 'noreply.github.com'
+      || value.toLowerCase() === 'noreply@github.com'
       || (file === 'supabase/config.toml' && domain === 'email.com' && /^(?:user|admin)@/.test(value))
   }
   if (rule === 'literal-credential') {
@@ -82,12 +84,19 @@ function git(repo, args, input) {
 }
 
 export function scanRepository({ repo = '.', history = false, staged = false } = {}) {
+  const reviewPath = resolve(repo, 'docs/reviewed-public-images.json')
+  let reviewedImages = {}
+  try { reviewedImages = JSON.parse(readFileSync(reviewPath, 'utf8')) } catch (error) { if (error.code !== 'ENOENT') throw error }
   let scanned = 0
   let binaries = 0
   const findings = []
   const inspect = (file, data, oid) => {
     scanned++
     const entries = scanPath(file)
+    if (file.startsWith('public/') && /\.(?:jpe?g|png|webp|gif|svg)$/i.test(file)
+      && reviewedImages[file] !== createHash('sha256').update(data).digest('hex')) {
+      entries.push({ file, line: 1, rule: 'unreviewed-public-image' })
+    }
     if (data.includes(0) || /\.(?:jpe?g|png|webp|gif|ico|woff2?|pdf|zip|xlsx?)$/i.test(file)) binaries++
     else entries.push(...scanText(file, data.toString('utf8')))
     findings.push(...entries.map(entry => oid ? { ...entry, object: oid } : entry))
