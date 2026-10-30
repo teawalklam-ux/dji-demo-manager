@@ -12,6 +12,10 @@ import { settingsService } from '@/services/settings.service'
 import { defaultSettings, type SystemSettings as Settings } from '@/lib/system-settings'
 import { useAuth } from '@/contexts/auth-context'
 import { getErrorMessage } from '@/lib/errors'
+import { FieldError } from '@/components/ui/field-error'
+import { clearFieldError, focusFirstFieldError, type FieldErrorMap } from '@/lib/field-errors'
+
+type SettingsField = 'barcode_prefix' | 'default_borrow_days' | 'overdue_remind_days'
 
 interface WeComConfigStatus {
   webhookConfigured: boolean
@@ -29,6 +33,7 @@ export function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [wecomStatus, setWecomStatus] = useState<WeComConfigStatus | null>(null)
   const [wecomStatusLoading, setWecomStatusLoading] = useState(true)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap<SettingsField>>({})
 
   useEffect(() => {
     let cancelled = false
@@ -69,6 +74,22 @@ export function SettingsPage() {
   }, [])
 
   async function handleSave() {
+    const validationErrors: FieldErrorMap<SettingsField> = {}
+    const prefix = settings.barcode_prefix.trim()
+    if (!prefix || prefix.length > 32) validationErrors.barcode_prefix = '条码前缀须为 1–32 个字符'
+    if (!Number.isInteger(settings.default_borrow_days) || settings.default_borrow_days < 1 || settings.default_borrow_days > 3650) {
+      validationErrors.default_borrow_days = '默认借用天数须为 1–3650 的整数'
+    }
+    if (!Number.isInteger(settings.overdue_remind_days) || settings.overdue_remind_days < 0 || settings.overdue_remind_days > 3650) {
+      validationErrors.overdue_remind_days = '逾期提醒天数须为 0–3650 的整数'
+    }
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      focusFirstFieldError(validationErrors)
+      return
+    }
+    setFieldErrors({})
+
     try {
       setSaving(true)
       if (!canEdit || loadError) return
@@ -85,6 +106,9 @@ export function SettingsPage() {
 
   function updateField<K extends keyof Settings>(key: K, value: Settings[K]) {
     setSettings(prev => ({ ...prev, [key]: value }))
+    if (key === 'barcode_prefix' || key === 'default_borrow_days' || key === 'overdue_remind_days') {
+      clearFieldError(setFieldErrors, key)
+    }
   }
 
   if (loading) {
@@ -116,30 +140,42 @@ export function SettingsPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">条码前缀</label>
               <Input
+                id="barcode_prefix"
                 value={settings.barcode_prefix}
                 onChange={e => updateField('barcode_prefix', e.target.value)}
                 placeholder="DJI"
+                aria-invalid={Boolean(fieldErrors.barcode_prefix)}
+                aria-describedby={fieldErrors.barcode_prefix ? 'barcode_prefix-error' : undefined}
               />
+              <FieldError field="barcode_prefix" message={fieldErrors.barcode_prefix} />
               <p className="text-xs text-muted-foreground">新生成样机的条码前缀</p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">默认借用天数</label>
               <Input
+                id="default_borrow_days"
                 type="number"
                 value={settings.default_borrow_days}
                 onChange={e => updateField('default_borrow_days', Number(e.target.value))}
                 min={1}
+                aria-invalid={Boolean(fieldErrors.default_borrow_days)}
+                aria-describedby={fieldErrors.default_borrow_days ? 'default_borrow_days-error' : undefined}
               />
+              <FieldError field="default_borrow_days" message={fieldErrors.default_borrow_days} />
               <p className="text-xs text-muted-foreground">创建借用申请时的默认天数</p>
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">逾期提醒天数</label>
               <Input
+                id="overdue_remind_days"
                 type="number"
                 value={settings.overdue_remind_days}
                 onChange={e => updateField('overdue_remind_days', Number(e.target.value))}
                 min={0}
+                aria-invalid={Boolean(fieldErrors.overdue_remind_days)}
+                aria-describedby={fieldErrors.overdue_remind_days ? 'overdue_remind_days-error' : undefined}
               />
+              <FieldError field="overdue_remind_days" message={fieldErrors.overdue_remind_days} />
               <p className="text-xs text-muted-foreground">到期前多少天开始提醒</p>
             </div>
             <div className="space-y-2">

@@ -12,7 +12,11 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { ArrowLeft, Plus, Trash2 } from 'lucide-react'
 import { ScanInput } from '@/components/barcode/scan-input'
+import { FieldError } from '@/components/ui/field-error'
+import { clearFieldError, focusFirstFieldError, type FieldErrorMap } from '@/lib/field-errors'
 import type { Category, ItemCreateInput } from '@/types'
+
+type ItemField = 'name' | 'model' | 'category_id' | 'purchase_price'
 
 export function NewItem() {
   const { isAdmin } = useAuth()
@@ -20,6 +24,7 @@ export function NewItem() {
   const [loading, setLoading] = useState(false)
   const [categories, setCategories] = useState<Category[]>([])
   const [error, setError] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap<ItemField>>({})
 
   const [form, setForm] = useState<ItemCreateInput>({
     name: '',
@@ -50,6 +55,9 @@ export function NewItem() {
 
   function handleChange(field: keyof ItemCreateInput, value: string | number | undefined) {
     setForm(prev => ({ ...prev, [field]: value }))
+    if (field === 'name' || field === 'model' || field === 'category_id' || field === 'purchase_price') {
+      clearFieldError(setFieldErrors, field)
+    }
   }
 
   function handleSpecKeyChange(index: number, key: string) {
@@ -76,18 +84,19 @@ export function NewItem() {
     e.preventDefault()
     setError(null)
 
-    if (!form.name.trim()) {
-      setError('请填写产品名称')
+    const validationErrors: FieldErrorMap<ItemField> = {}
+    if (!form.name.trim()) validationErrors.name = '请填写产品名称'
+    if (!form.model.trim()) validationErrors.model = '请填写产品型号'
+    if (!form.category_id) validationErrors.category_id = '请选择产品分类'
+    if (form.purchase_price !== undefined && Number(form.purchase_price) < 0) {
+      validationErrors.purchase_price = '购买价格不能小于 0'
+    }
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      focusFirstFieldError(validationErrors)
       return
     }
-    if (!form.model.trim()) {
-      setError('请填写产品型号')
-      return
-    }
-    if (!form.category_id) {
-      setError('请选择产品分类')
-      return
-    }
+    setFieldErrors({})
 
     try {
       setLoading(true)
@@ -143,7 +152,7 @@ export function NewItem() {
           <CardTitle>样机信息</CardTitle>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-6" noValidate>
             {error && (
               <div className="rounded-md bg-red-50 p-3 text-sm text-red-600">{error}</div>
             )}
@@ -156,8 +165,10 @@ export function NewItem() {
                   value={form.name}
                   onChange={(e) => handleChange('name', e.target.value)}
                   placeholder="请输入产品名称"
-                  required
+                  aria-invalid={Boolean(fieldErrors.name)}
+                  aria-describedby={fieldErrors.name ? 'name-error' : undefined}
                 />
+                <FieldError field="name" message={fieldErrors.name} />
               </div>
 
               <div className="space-y-2">
@@ -167,8 +178,10 @@ export function NewItem() {
                   value={form.model}
                   onChange={(e) => handleChange('model', e.target.value)}
                   placeholder="请输入产品型号"
-                  required
+                  aria-invalid={Boolean(fieldErrors.model)}
+                  aria-describedby={fieldErrors.model ? 'model-error' : undefined}
                 />
+                <FieldError field="model" message={fieldErrors.model} />
               </div>
 
               <div className="space-y-2">
@@ -184,7 +197,12 @@ export function NewItem() {
               <div className="space-y-2">
                 <Label>产品分类 *</Label>
                 <Select value={form.category_id} onValueChange={(val) => handleChange('category_id', val)}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger
+                    id="category_id"
+                    className="w-full"
+                    aria-invalid={Boolean(fieldErrors.category_id)}
+                    aria-describedby={fieldErrors.category_id ? 'category_id-error' : undefined}
+                  >
                     <SelectValue placeholder="请选择分类" />
                   </SelectTrigger>
                   <SelectContent>
@@ -193,6 +211,7 @@ export function NewItem() {
                     ))}
                   </SelectContent>
                 </Select>
+                <FieldError field="category_id" message={fieldErrors.category_id} />
               </div>
 
               <div className="space-y-2">
@@ -215,7 +234,10 @@ export function NewItem() {
                   value={form.purchase_price || ''}
                   onChange={(e) => handleChange('purchase_price', e.target.value ? Number(e.target.value) : undefined)}
                   placeholder="请输入购买价格"
+                  aria-invalid={Boolean(fieldErrors.purchase_price)}
+                  aria-describedby={fieldErrors.purchase_price ? 'purchase_price-error' : undefined}
                 />
+                <FieldError field="purchase_price" message={fieldErrors.purchase_price} />
               </div>
 
               <div className="space-y-2 md:col-span-2">

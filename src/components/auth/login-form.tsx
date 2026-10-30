@@ -5,7 +5,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Spinner } from '@/components/ui/spinner'
+import { FieldError } from '@/components/ui/field-error'
+import { clearFieldError, focusFirstFieldError, type FieldErrorMap } from '@/lib/field-errors'
 import { MonitorCog } from 'lucide-react'
+
+type AuthField = 'displayName' | 'email' | 'password'
 
 export function LoginForm() {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -15,12 +19,23 @@ export function LoginForm() {
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const [registerSuccess, setRegisterSuccess] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap<AuthField>>({})
   const { signIn, signInDemo, signUp } = useAuth()
   const navigate = useNavigate()
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault()
     setError('')
+    const validationErrors: FieldErrorMap<AuthField> = {}
+    if (!email.trim()) validationErrors.email = '请输入邮箱'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) validationErrors.email = '请输入有效的邮箱地址'
+    if (!password) validationErrors['password'] = '请输入密码'
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      focusFirstFieldError(validationErrors)
+      return
+    }
+    setFieldErrors({})
     setLoading(true)
 
     const { error } = await signIn(email, password)
@@ -42,14 +57,17 @@ export function LoginForm() {
     e.preventDefault()
     setError('')
 
-    if (!displayName.trim()) {
-      setError('请输入姓名')
+    const validationErrors: FieldErrorMap<AuthField> = {}
+    if (!displayName.trim()) validationErrors.displayName = '请输入姓名'
+    if (!email.trim()) validationErrors.email = '请输入邮箱'
+    else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) validationErrors.email = '请输入有效的邮箱地址'
+    if (password.length < 6) validationErrors['password'] = '密码至少 6 位'
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      focusFirstFieldError(validationErrors)
       return
     }
-    if (password.length < 6) {
-      setError('密码至少6位')
-      return
-    }
+    setFieldErrors({})
 
     setLoading(true)
     const { error } = await signUp(email, password, displayName.trim())
@@ -67,6 +85,7 @@ export function LoginForm() {
 
   const handleDemoLogin = async () => {
     setError('')
+    setFieldErrors({})
     setLoading(true)
     const { error } = await signInDemo()
     if (error) {
@@ -113,38 +132,55 @@ export function LoginForm() {
               </Button>
             </div>
           ) : (
-            <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-4">
+            <form onSubmit={mode === 'login' ? handleLogin : handleRegister} className="space-y-4" noValidate>
               {mode === 'register' && (
                 <div className="space-y-2">
                   <label className="text-sm font-medium">姓名 *</label>
                   <Input
+                    id="displayName"
                     placeholder="请输入姓名"
                     value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    required
+                    onChange={(e) => {
+                      setDisplayName(e.target.value)
+                      clearFieldError(setFieldErrors, 'displayName')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.displayName)}
+                    aria-describedby={fieldErrors.displayName ? 'displayName-error' : undefined}
                   />
+                  <FieldError field="displayName" message={fieldErrors.displayName} />
                 </div>
               )}
               <div className="space-y-2">
                 <label className="text-sm font-medium">邮箱</label>
                 <Input
+                  id="email"
                   type="email"
                   placeholder="请输入邮箱"
                   value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
+                  onChange={(e) => {
+                    setEmail(e.target.value)
+                    clearFieldError(setFieldErrors, 'email')
+                  }}
+                  aria-invalid={Boolean(fieldErrors.email)}
+                  aria-describedby={fieldErrors.email ? 'email-error' : undefined}
                 />
+                <FieldError field="email" message={fieldErrors.email} />
               </div>
               <div className="space-y-2">
                 <label className="text-sm font-medium">密码</label>
                 <Input
+                  id="password"
                   type="password"
                   placeholder={mode === 'register' ? '至少6位密码' : '请输入密码'}
                   value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                  minLength={mode === 'register' ? 6 : undefined}
+                  onChange={(e) => {
+                    setPassword(e.target.value)
+                    clearFieldError(setFieldErrors, 'password')
+                  }}
+                  aria-invalid={Boolean(fieldErrors.password)}
+                  aria-describedby={fieldErrors.password ? 'password-error' : undefined}
                 />
+                <FieldError field="password" message={fieldErrors.password} />
               </div>
               {error && (
                 <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive">

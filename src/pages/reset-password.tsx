@@ -7,7 +7,11 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Spinner } from '@/components/ui/spinner'
+import { FieldError } from '@/components/ui/field-error'
+import { clearFieldError, focusFirstFieldError, type FieldErrorMap } from '@/lib/field-errors'
 import { AlertCircle, CheckCircle2 } from 'lucide-react'
+
+type PasswordField = 'password' | 'confirmPassword'
 
 export function ResetPassword() {
   const navigate = useNavigate()
@@ -16,19 +20,22 @@ export function ResetPassword() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap<PasswordField>>({})
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
 
-    if (password.length < 6) {
-      setError('密码长度至少6位')
+    const validationErrors: FieldErrorMap<PasswordField> = {}
+    if (password.length < 6) validationErrors['password'] = '密码长度至少 6 位'
+    if (!confirmPassword) validationErrors['confirmPassword'] = '请再次输入新密码'
+    else if (password !== confirmPassword) validationErrors['confirmPassword'] = '两次输入的密码不一致'
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      focusFirstFieldError(validationErrors)
       return
     }
-    if (password !== confirmPassword) {
-      setError('两次输入的密码不一致')
-      return
-    }
+    setFieldErrors({})
 
     setLoading(true)
     try {
@@ -67,7 +74,7 @@ export function ResetPassword() {
           <CardDescription>请输入您的新密码</CardDescription>
         </CardHeader>
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-4" noValidate>
             <div className="space-y-2">
               <Label htmlFor="password">新密码</Label>
               <Input
@@ -75,10 +82,14 @@ export function ResetPassword() {
                 type="password"
                 placeholder="请输入新密码（至少6位）"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                required
-                minLength={6}
+                onChange={(e) => {
+                  setPassword(e.target.value)
+                  clearFieldError(setFieldErrors, 'password')
+                }}
+                aria-invalid={Boolean(fieldErrors.password)}
+                aria-describedby={fieldErrors.password ? 'password-error' : undefined}
               />
+              <FieldError field="password" message={fieldErrors.password} />
             </div>
             <div className="space-y-2">
               <Label htmlFor="confirmPassword">确认密码</Label>
@@ -87,10 +98,14 @@ export function ResetPassword() {
                 type="password"
                 placeholder="请再次输入新密码"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
-                required
-                minLength={6}
+                onChange={(e) => {
+                  setConfirmPassword(e.target.value)
+                  clearFieldError(setFieldErrors, 'confirmPassword')
+                }}
+                aria-invalid={Boolean(fieldErrors.confirmPassword)}
+                aria-describedby={fieldErrors.confirmPassword ? 'confirmPassword-error' : undefined}
               />
+              <FieldError field="confirmPassword" message={fieldErrors.confirmPassword} />
             </div>
 
             {error && (

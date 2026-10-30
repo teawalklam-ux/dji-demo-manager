@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Badge } from '@/components/ui/badge'
 import { Spinner } from '@/components/ui/spinner'
+import { FieldError } from '@/components/ui/field-error'
+import { clearFieldError, focusFirstFieldError, type FieldErrorMap } from '@/lib/field-errors'
 import { toast } from 'sonner'
 import type { Category } from '@/types'
 import { Plus, Pencil } from 'lucide-react'
@@ -18,6 +20,8 @@ interface CategoryForm {
   icon_name: string
   sort_order: number
 }
+
+type CategoryField = 'categoryName' | 'categoryCode'
 
 const emptyForm: CategoryForm = {
   name: '',
@@ -34,6 +38,7 @@ export function CategoriesPage() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [form, setForm] = useState<CategoryForm>(emptyForm)
   const [submitting, setSubmitting] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap<CategoryField>>({})
 
   const fetchCategories = useCallback(async () => {
     try {
@@ -55,6 +60,7 @@ export function CategoriesPage() {
   function openCreate() {
     setEditingId(null)
     setForm(emptyForm)
+    setFieldErrors({})
     setDialogOpen(true)
   }
 
@@ -67,14 +73,20 @@ export function CategoriesPage() {
       icon_name: category.icon_name || '',
       sort_order: category.sort_order,
     })
+    setFieldErrors({})
     setDialogOpen(true)
   }
 
   async function handleSubmit() {
-    if (!form.name || !form.code) {
-      toast.error('请填写分类名称和编码')
+    const validationErrors: FieldErrorMap<CategoryField> = {}
+    if (!form.name.trim()) validationErrors.categoryName = '请填写分类名称'
+    if (!form.code.trim()) validationErrors.categoryCode = '请填写分类编码'
+    if (Object.keys(validationErrors).length > 0) {
+      setFieldErrors(validationErrors)
+      focusFirstFieldError(validationErrors)
       return
     }
+    setFieldErrors({})
     try {
       setSubmitting(true)
       if (editingId) {
@@ -204,18 +216,32 @@ export function CategoriesPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">分类名称 *</label>
               <Input
+                id="categoryName"
                 placeholder="例如：无人机"
                 value={form.name}
-                onChange={e => setForm(prev => ({ ...prev, name: e.target.value }))}
+                onChange={e => {
+                  setForm(prev => ({ ...prev, name: e.target.value }))
+                  clearFieldError(setFieldErrors, 'categoryName')
+                }}
+                aria-invalid={Boolean(fieldErrors.categoryName)}
+                aria-describedby={fieldErrors.categoryName ? 'categoryName-error' : undefined}
               />
+              <FieldError field="categoryName" message={fieldErrors.categoryName} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">分类编码 *</label>
               <Input
+                id="categoryCode"
                 placeholder="例如：drone"
                 value={form.code}
-                onChange={e => setForm(prev => ({ ...prev, code: e.target.value }))}
+                onChange={e => {
+                  setForm(prev => ({ ...prev, code: e.target.value }))
+                  clearFieldError(setFieldErrors, 'categoryCode')
+                }}
+                aria-invalid={Boolean(fieldErrors.categoryCode)}
+                aria-describedby={fieldErrors.categoryCode ? 'categoryCode-error' : undefined}
               />
+              <FieldError field="categoryCode" message={fieldErrors.categoryCode} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">描述</label>

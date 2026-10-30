@@ -12,7 +12,29 @@ import {
   type BarcodeScanMode,
   type BarcodeScanKind,
 } from './barcode-scan-profile'
-import { ScanLine, Camera, QrCode, Zap, Package, X } from 'lucide-react'
+import { ScanLine, Camera, QrCode, Zap, Package, X, Flashlight } from 'lucide-react'
+
+interface TorchCapability {
+  apply(value: boolean): Promise<void>
+}
+
+type FocusCapabilities = MediaTrackCapabilities & {
+  focusMode?: string[]
+}
+
+async function enableContinuousFocus(track: MediaStreamTrack | null) {
+  if (!track) return
+  try {
+    const capabilities = track.getCapabilities() as FocusCapabilities
+    if (capabilities.focusMode?.includes('continuous')) {
+      await track.applyConstraints({
+        advanced: [{ focusMode: 'continuous' } as MediaTrackConstraintSet],
+      })
+    }
+  } catch {
+    // 部分浏览器会暴露能力但拒绝应用，保持默认自动对焦即可。
+  }
+}
 
 interface BarcodeScannerProps {
   open: boolean
@@ -29,10 +51,13 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
   const [lastScanResult, setLastScanResult] = useState('')
   const [lastScanKind, setLastScanKind] = useState<BarcodeScanKind | null>(null)
   const [scanNotice, setScanNotice] = useState('')
+  const [torchAvailable, setTorchAvailable] = useState(false)
+  const [torchOn, setTorchOn] = useState(false)
   // html5-qrcode 实例（条形码/mixed 模式）
   const html5Ref = useRef<Html5Qrcode | null>(null)
   // qr-scanner 实例（二维码模式）
   const qrRef = useRef<QrScanner | null>(null)
+  const html5TorchRef = useRef<TorchCapability | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const mountedRef = useRef(false)
   /** 非系统条码确认计数：累计相同结果直到达到 genericConfirmCount */
@@ -62,6 +87,7 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       }
       html5Ref.current = null
     }
+    html5TorchRef.current = null
     // 清理 qr-scanner
     if (qrRef.current) {
       try {
@@ -71,6 +97,8 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       }
       qrRef.current = null
     }
+    setTorchAvailable(false)
+    setTorchOn(false)
     setScanning(false)
   }, [])
 
@@ -164,13 +192,18 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
       html5Ref.current = scanner
 
       await scanner.start(
-        { facingMode: 'environment' },
         {
-          fps: scanProfile.html5Fps ?? 15,
+          facingMode: { ideal: 'environment' },
+          width: { ideal: scanProfile.cameraIdealWidth ?? 1920 },
+          height: { ideal: scanProfile.cameraIdealHeight ?? 1080 },
+        },
+        {
+          fps: Math.max(scanProfile.html5Fps ?? 15, scanProfile.systemFps ?? 0),
           // 自适应扫描框：根据视频实际尺寸动态计算，避免小屏超出容器
           qrbox: (viewfinderWidth: number, viewfinderHeight: number) => {
-            const w = Math.min(viewfinderWidth * 0.85, 320)
-            const h = Math.min(viewfinderHeight * 0.6, 180)
+            const target = scanProfile.html5Qrbox ?? { width: 320, height: 180 }
+            const w = Math.min(viewfinderWidth * 0.9, target.width)
+            const h = Math.min(viewfinderHeight * 0.72, w * (target.height / target.width))
             return { width: Math.floor(w), height: Math.floor(h) }
           },
         },
@@ -184,6 +217,21 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
           // 每帧未识别，忽略
         }
       )
+
+      const video = container.querySelector('video')
+      const track = video?.srcObject instanceof MediaStream
+        ? video.srcObject.getVideoTracks()[0] ?? null
+        : null
+      await enableContinuousFocus(track)
+      try {
+        const torchFeature = scanner.getRunningTrackCameraCapabilities().torchFeature()
+        if (torchFeature.isSupported()) {
+          html5TorchRef.current = torchFeature
+          setTorchAvailable(true)
+        }
+      } catch {
+        // 当前摄像头不支持补光灯。
+      }
     } catch (err: unknown) {
       setScanning(false)
       const msg = err instanceof Error ? err.message : String(err)
@@ -220,6 +268,19 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
           onDecodeError: () => {},
           preferredCamera: 'environment',
           maxScansPerSecond: scanProfile.qrMaxScansPerSecond ?? 15,
+          calculateScanRegion: (sourceVideo) => {
+            const ratio = scanProfile.qrScanRegionRatio ?? 0.75
+            const size = Math.round(Math.min(sourceVideo.videoWidth, sourceVideo.videoHeight) * ratio)
+            const downScaledSize = scanProfile.qrDownScaledSize ?? 500
+            return {
+              x: Math.round((sourceVideo.videoWidth - size) / 2),
+              y: Math.round((sourceVideo.videoHeight - size) / 2),
+              width: size,
+              height: size,
+              downScaledWidth: downScaledSize,
+              downScaledHeight: downScaledSize,
+            }
+          },
           highlightScanRegion: true,
           highlightCodeOutline: true,
           returnDetailedScanResult: true,
@@ -231,6 +292,21 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
 
       qrRef.current = scanner
       await scanner.start()
+      const track = video.srcObject instanceof MediaStream
+        ? video.srcObject.getVideoTracks()[0] ?? null
+        : null
+      if (track) {
+        try {
+          await track.applyConstraints({
+            width: { ideal: scanProfile.cameraIdealWidth ?? 1920 },
+            height: { ideal: scanProfile.cameraIdealHeight ?? 1080 },
+          })
+        } catch {
+          // 保留设备默认分辨率。
+        }
+      }
+      await enableContinuousFocus(track)
+      if (await scanner.hasFlash().catch(() => false)) setTorchAvailable(true)
     } catch (err: unknown) {
       setScanning(false)
       const msg = err instanceof Error ? err.message : String(err)
@@ -320,6 +396,23 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
     }
   }
 
+  const toggleTorch = async () => {
+    const next = !torchOn
+    try {
+      if (html5TorchRef.current) {
+        await html5TorchRef.current.apply(next)
+      } else if (qrRef.current) {
+        if (next) await qrRef.current.turnFlashOn()
+        else await qrRef.current.turnFlashOff()
+      } else {
+        return
+      }
+      setTorchOn(next)
+    } catch {
+      setScanNotice('当前摄像头无法切换补光灯')
+    }
+  }
+
   const isQrMode = scanProfile.engine === 'qr-scanner'
 
   return (
@@ -393,6 +486,20 @@ export function BarcodeScanner({ open, onOpenChange, onScan, mode = 'barcode' }:
                 </div>
               )}
             </div>
+          )}
+
+          {torchAvailable && scanning && (
+            <Button
+              type="button"
+              variant={torchOn ? 'default' : 'outline'}
+              size="sm"
+              className="w-full"
+              aria-pressed={torchOn}
+              onClick={toggleTorch}
+            >
+              <Flashlight className="size-4" />
+              {torchOn ? '关闭补光灯' : '打开补光灯'}
+            </Button>
           )}
 
           {lastScanResult && (

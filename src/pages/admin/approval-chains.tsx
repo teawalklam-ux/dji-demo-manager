@@ -9,6 +9,8 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { Spinner } from '@/components/ui/spinner'
+import { FieldError } from '@/components/ui/field-error'
+import { clearFieldError, focusFirstFieldError, type FieldErrorMap } from '@/lib/field-errors'
 import { toast } from 'sonner'
 import { ROLE_MAP, BUILT_IN_BORROW_TYPE_OPTIONS, getBorrowTypeInfo, getBorrowTypeOptions } from '@/lib/constants'
 import type { ApprovalChain, ApprovalStep, UserRole, Profile } from '@/types'
@@ -38,6 +40,7 @@ export function ApprovalChainsPage() {
   const [steps, setSteps] = useState<StepForm[]>([{ ...emptyStep }])
   const [submitting, setSubmitting] = useState(false)
   const [deleteConfirmId, setDeleteConfirmId] = useState<string | null>(null)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap>({})
 
   const fetchData = useCallback(async () => {
     try {
@@ -67,6 +70,7 @@ export function ApprovalChainsPage() {
     setNewBorrowType('')
     setMaxBorrowDays('')
     setSteps([{ ...emptyStep }])
+    setFieldErrors({})
     setDialogOpen(true)
   }
 
@@ -84,6 +88,7 @@ export function ApprovalChainsPage() {
         label: s.label,
       }))
     )
+    setFieldErrors({})
     setDialogOpen(true)
   }
 
@@ -97,20 +102,28 @@ export function ApprovalChainsPage() {
 
   function updateStep(index: number, field: keyof StepForm, value: string) {
     setSteps(prev => prev.map((s, i) => (i === index ? { ...s, [field]: value } : s)))
+    if (field === 'label') clearFieldError(setFieldErrors, `approvalStep-${index}-label`)
+    if (field === 'user_id') clearFieldError(setFieldErrors, `approvalStep-${index}-user`)
+  }
+
+  function showValidationError(field: string, message: string) {
+    const next: FieldErrorMap = { [field]: message }
+    setFieldErrors(next)
+    focusFirstFieldError(next)
   }
 
   async function handleSubmit() {
     if (!chainName.trim()) {
-      toast.error('请填写审批链名称')
+      showValidationError('chainName', '请填写审批链名称')
       return
     }
     const resolvedBorrowType = borrowType === NEW_BORROW_TYPE ? newBorrowType.trim() : borrowType
     if (!resolvedBorrowType) {
-      toast.error('请填写新借用类型名称')
+      showValidationError('newBorrowType', '请填写新借用类型名称')
       return
     }
     if (resolvedBorrowType.length > 50) {
-      toast.error('借用类型名称不能超过 50 个字符')
+      showValidationError('newBorrowType', '借用类型名称不能超过 50 个字符')
       return
     }
     if (borrowType === NEW_BORROW_TYPE) {
@@ -126,7 +139,7 @@ export function ApprovalChainsPage() {
         chain => chain.borrow_type.toLocaleLowerCase('zh-CN') === normalizedType
       )
       if (reservedNames.has(normalizedType) || typeAlreadyExists) {
-        toast.error('该借用类型已存在，请直接从下拉列表选择')
+        showValidationError('newBorrowType', '该借用类型已存在，请直接从下拉列表选择')
         return
       }
     }
@@ -137,17 +150,28 @@ export function ApprovalChainsPage() {
         && resolvedBorrowType !== 'all'
     )
     if (conflictingChain) {
-      toast.error(`借用类型“${getBorrowTypeInfo(resolvedBorrowType).label}”已有启用中的审批链`)
+      showValidationError('borrowType', `借用类型“${getBorrowTypeInfo(resolvedBorrowType).label}”已有启用中的审批链`)
       return
     }
-    if (steps.length === 0 || steps.some(s => !s.label)) {
-      toast.error('请为每个步骤填写标签')
+    const missingLabelIndex = steps.findIndex(s => !s.label.trim())
+    if (steps.length === 0 || missingLabelIndex >= 0) {
+      showValidationError(
+        missingLabelIndex >= 0 ? `approvalStep-${missingLabelIndex}-label` : 'approvalSteps',
+        '请填写步骤标签',
+      )
       return
     }
-    if (steps.some(s => s.type === 'person' && !s.user_id)) {
-      toast.error('请为人员类型步骤选择审批人')
+    const missingUserIndex = steps.findIndex(s => s.type === 'person' && !s.user_id)
+    if (missingUserIndex >= 0) {
+      showValidationError(`approvalStep-${missingUserIndex}-user`, '请选择审批人')
       return
     }
+    if (maxBorrowDays && (!Number.isInteger(Number(maxBorrowDays)) || Number(maxBorrowDays) < 1)) {
+      showValidationError('maxBorrowDays', '最大借用天数必须是大于 0 的整数')
+      return
+    }
+
+    setFieldErrors({})
 
     const chainSteps: ApprovalStep[] = steps.map((s, i) => ({
       level: i + 1,
@@ -318,15 +342,29 @@ export function ApprovalChainsPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">审批链名称 *</label>
               <Input
+                id="chainName"
                 placeholder="例如：客户试用审批链"
                 value={chainName}
-                onChange={e => setChainName(e.target.value)}
+                onChange={e => {
+                  setChainName(e.target.value)
+                  clearFieldError(setFieldErrors, 'chainName')
+                }}
+                aria-invalid={Boolean(fieldErrors.chainName)}
+                aria-describedby={fieldErrors.chainName ? 'chainName-error' : undefined}
               />
+              <FieldError field="chainName" message={fieldErrors.chainName} />
             </div>
             <div className="space-y-2">
               <label className="text-sm font-medium">借用类型</label>
-              <Select value={borrowType} onValueChange={setBorrowType}>
-                <SelectTrigger>
+              <Select value={borrowType} onValueChange={(value) => {
+                setBorrowType(value)
+                clearFieldError(setFieldErrors, 'borrowType')
+              }}>
+                <SelectTrigger
+                  id="borrowType"
+                  aria-invalid={Boolean(fieldErrors.borrowType)}
+                  aria-describedby={fieldErrors.borrowType ? 'borrowType-error' : undefined}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -340,15 +378,23 @@ export function ApprovalChainsPage() {
                   )}
                 </SelectContent>
               </Select>
+              <FieldError field="borrowType" message={fieldErrors.borrowType} />
               {borrowType === NEW_BORROW_TYPE && (
                 <div className="space-y-2 rounded-md border border-dashed p-3">
                   <label className="text-sm font-medium">新借用类型名称 *</label>
                   <Input
+                    id="newBorrowType"
                     placeholder="例如：内部培训"
                     maxLength={50}
                     value={newBorrowType}
-                    onChange={e => setNewBorrowType(e.target.value)}
+                    onChange={e => {
+                      setNewBorrowType(e.target.value)
+                      clearFieldError(setFieldErrors, 'newBorrowType')
+                    }}
+                    aria-invalid={Boolean(fieldErrors.newBorrowType)}
+                    aria-describedby={fieldErrors.newBorrowType ? 'newBorrowType-error' : undefined}
                   />
+                  <FieldError field="newBorrowType" message={fieldErrors.newBorrowType} />
                   <p className="text-xs text-muted-foreground">
                     创建后会作为独立选项显示在借用申请中，并只匹配这条审批链。
                   </p>
@@ -369,16 +415,23 @@ export function ApprovalChainsPage() {
             <div className="space-y-2">
               <label className="text-sm font-medium">最大借用天数（留空不限制）</label>
               <Input
+                id="maxBorrowDays"
                 type="number"
                 min="1"
                 placeholder="例如：3"
                 value={maxBorrowDays}
-                onChange={e => setMaxBorrowDays(e.target.value)}
+                onChange={e => {
+                  setMaxBorrowDays(e.target.value)
+                  clearFieldError(setFieldErrors, 'maxBorrowDays')
+                }}
+                aria-invalid={Boolean(fieldErrors.maxBorrowDays)}
+                aria-describedby={fieldErrors.maxBorrowDays ? 'maxBorrowDays-error' : undefined}
               />
+              <FieldError field="maxBorrowDays" message={fieldErrors.maxBorrowDays} />
               <p className="text-xs text-muted-foreground">设置后，用户申请该类型借用时归还日期不能超过此天数</p>
             </div>
 
-            <div className="space-y-3">
+            <div id="approvalSteps" data-field-target="approvalSteps" className="space-y-3" tabIndex={-1}>
               <div className="flex items-center justify-between">
                 <label className="text-sm font-medium">审批步骤</label>
                 <Button variant="outline" size="sm" onClick={addStep}>
@@ -448,7 +501,11 @@ export function ApprovalChainsPage() {
                           value={step.user_id}
                           onValueChange={v => updateStep(index, 'user_id', v)}
                         >
-                          <SelectTrigger>
+                          <SelectTrigger
+                            id={`approvalStep-${index}-user`}
+                            aria-invalid={Boolean(fieldErrors[`approvalStep-${index}-user`])}
+                            aria-describedby={fieldErrors[`approvalStep-${index}-user`] ? `approvalStep-${index}-user-error` : undefined}
+                          >
                             <SelectValue placeholder="选择人员" />
                           </SelectTrigger>
                           <SelectContent>
@@ -461,19 +518,31 @@ export function ApprovalChainsPage() {
                               ))}
                           </SelectContent>
                         </Select>
+                        <FieldError
+                          field={`approvalStep-${index}-user`}
+                          message={fieldErrors[`approvalStep-${index}-user`]}
+                        />
                       </div>
                     )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs text-muted-foreground">步骤标签</label>
                     <Input
+                      id={`approvalStep-${index}-label`}
                       placeholder="例如：部门主管审批"
                       value={step.label}
                       onChange={e => updateStep(index, 'label', e.target.value)}
+                      aria-invalid={Boolean(fieldErrors[`approvalStep-${index}-label`])}
+                      aria-describedby={fieldErrors[`approvalStep-${index}-label`] ? `approvalStep-${index}-label-error` : undefined}
+                    />
+                    <FieldError
+                      field={`approvalStep-${index}-label`}
+                      message={fieldErrors[`approvalStep-${index}-label`]}
                     />
                   </div>
                 </div>
               ))}
+              <FieldError field="approvalSteps" message={fieldErrors.approvalSteps} />
             </div>
 
             <Button className="w-full" onClick={handleSubmit} disabled={submitting}>

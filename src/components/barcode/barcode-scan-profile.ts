@@ -16,9 +16,13 @@ export interface BarcodeScanProfile {
   html5Formats?: Html5QrcodeSupportedFormats[]
   html5Qrbox?: { width: number; height: number }
   html5Fps?: number
+  cameraIdealWidth?: number
+  cameraIdealHeight?: number
   /** 二维码模式：使用 qr-scanner */
   qrMaxScansPerSecond?: number
   qrInversionMode?: 'original' | 'invert' | 'both'
+  qrScanRegionRatio?: number
+  qrDownScaledSize?: number
   /** 使用哪个引擎 */
   engine: 'html5-qrcode' | 'qr-scanner'
   title: string
@@ -61,9 +65,11 @@ const scanProfiles: Record<BarcodeScanMode, BarcodeScanProfile> = {
   barcode: {
     engine: 'html5-qrcode',
     html5Formats: commonBarcodeFormats,
-    html5Qrbox: { width: 280, height: 160 },
-    html5Fps: 15,
+    html5Qrbox: { width: 360, height: 180 },
+    html5Fps: 20,
     systemFps: 25,
+    cameraIdealWidth: 1920,
+    cameraIdealHeight: 1080,
     genericConfirmCount: 2,
     genericCloseDelayMs: 500,
     title: '扫描条形码',
@@ -73,8 +79,12 @@ const scanProfiles: Record<BarcodeScanMode, BarcodeScanProfile> = {
   },
   qrcode: {
     engine: 'qr-scanner',
-    qrMaxScansPerSecond: 15,
+    qrMaxScansPerSecond: 20,
     qrInversionMode: 'both',
+    qrScanRegionRatio: 0.82,
+    qrDownScaledSize: 600,
+    cameraIdealWidth: 1920,
+    cameraIdealHeight: 1080,
     title: '扫描二维码',
     helpText: '请将二维码完整放入方形扫描框（支持反色二维码）',
     placeholder: '输入二维码内容',
@@ -83,9 +93,11 @@ const scanProfiles: Record<BarcodeScanMode, BarcodeScanProfile> = {
   mixed: {
     engine: 'html5-qrcode',
     html5Formats: [...commonBarcodeFormats, Html5QrcodeSupportedFormats.QR_CODE],
-    html5Qrbox: { width: 260, height: 220 },
-    html5Fps: 15,
+    html5Qrbox: { width: 320, height: 280 },
+    html5Fps: 20,
     systemFps: 25,
+    cameraIdealWidth: 1920,
+    cameraIdealHeight: 1080,
     genericConfirmCount: 2,
     genericCloseDelayMs: 500,
     title: '扫描条形码 / 二维码',

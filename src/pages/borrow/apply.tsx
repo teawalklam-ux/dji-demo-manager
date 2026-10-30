@@ -24,6 +24,8 @@ import { Spinner } from '@/components/ui/spinner'
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
 import { Label } from '@/components/ui/label'
 import { Checkbox } from '@/components/ui/checkbox'
+import { FieldError } from '@/components/ui/field-error'
+import { clearFieldError, focusFirstFieldError, type FieldErrorMap } from '@/lib/field-errors'
 import {
   Select,
   SelectContent,
@@ -31,6 +33,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+
+type BorrowFormField = 'selectedItems' | 'borrowType' | 'customerName' | 'customerContact' | 'purpose' | 'borrowDate' | 'returnDate'
 
 function getItemAvailabilityLabel(item: Item, isTransfer = false) {
   if (isTransfer && item.source_borrow_record_id) {
@@ -110,6 +114,13 @@ export function BorrowApply() {
   const [availabilityConflicts, setAvailabilityConflicts] = useState<Array<{ item_id: string; item_name: string; occupied_start_date: string; occupied_end_date: string }>>([])
   const [availabilityChecking, setAvailabilityChecking] = useState(false)
   const [availabilityCheckFailed, setAvailabilityCheckFailed] = useState(false)
+  const [fieldErrors, setFieldErrors] = useState<FieldErrorMap<BorrowFormField>>({})
+
+  const showValidationError = useCallback((field: BorrowFormField, message: string) => {
+    const next: FieldErrorMap<BorrowFormField> = { [field]: message }
+    setFieldErrors(next)
+    focusFirstFieldError(next)
+  }, [])
 
   const selectedSourceBorrowerId = selectedItemIds
     .map((id) => items.find((item) => item.id === id)?.source_borrower_id)
@@ -313,6 +324,7 @@ export function BorrowApply() {
       return
     }
     setSelectedItemIds((current) => current.includes(id) ? current : [...current, id])
+    clearFieldError(setFieldErrors, 'selectedItems')
   }
 
   const removeItem = (id: string) => {
@@ -321,18 +333,18 @@ export function BorrowApply() {
 
   const handleSubmit = async () => {
     if (borrowType === 'transfer' && !currentChain) {
-      toast.error('转借审批链未启用，暂时无法提交转借申请')
+      showValidationError('borrowType', '转借审批链未启用，暂时无法提交转借申请')
       return
     }
     if (selectedItemIds.length === 0) {
-      toast.error('请至少选择一台样机')
+      showValidationError('selectedItems', '请至少选择一台样机')
       return
     }
     if (selectedItemIds.some((id) => {
       const item = items.find((candidate) => candidate.id === id)
       return !item || !isItemSelectable(item, borrowType, selectedSourceBorrowerId)
     })) {
-      toast.error('已选样机中包含当前不可申请的设备，请移除后再保存')
+      showValidationError('selectedItems', '已选样机中包含当前不可申请的设备，请移除后再保存')
       return
     }
     if (borrowType === 'transfer') {
@@ -340,50 +352,52 @@ export function BorrowApply() {
         items.find((candidate) => candidate.id === id)?.source_borrower_id
       )))
       if (sourceBorrowerIds.size !== 1 || sourceBorrowerIds.has(undefined)) {
-        toast.error('同一张转借申请中的设备必须属于同一当前借用人')
+        showValidationError('selectedItems', '同一张转借申请中的设备必须属于同一当前借用人')
         return
       }
     }
     if (!purpose.trim()) {
-      toast.error('请填写借用用途')
+      showValidationError('purpose', '请填写借用用途')
       return
     }
     if (!expectedBorrowDate) {
-      toast.error('请选择预计借用日期')
+      showValidationError('borrowDate', '请选择预计借用日期')
       return
     }
     if (!expectedReturnDate) {
-      toast.error('请选择预计归还日期')
+      showValidationError('returnDate', '请选择预计归还日期')
       return
     }
     if (expectedReturnDate < expectedBorrowDate) {
-      toast.error('归还日期不能早于借用日期')
+      showValidationError('returnDate', '归还日期不能早于借用日期')
       return
     }
     if (exceedsMaxDays) {
-      toast.error(`${borrowTypeInfo.label}最多可申请 ${maxBorrowDays} 天，当前为 ${borrowDays} 天`)
+      showValidationError('returnDate', `${borrowTypeInfo.label}最多可申请 ${maxBorrowDays} 天，当前为 ${borrowDays} 天`)
       return
     }
     if (availabilityConflicts.length > 0) {
-      toast.error('所选日期已有审批通过的样机预约，请调整样机或日期')
+      showValidationError('returnDate', '所选日期已有审批通过的样机预约，请调整样机或日期')
       return
     }
     if (availabilityChecking || availabilityCheckFailed) {
-      toast.error(availabilityChecking ? '正在校验样机可用性，请稍候' : '样机可用性校验失败，请刷新后重试')
+      showValidationError('returnDate', availabilityChecking ? '正在校验样机可用性，请稍候' : '样机可用性校验失败，请刷新后重试')
       return
     }
     if (borrowType === 'customer' || borrowType === 'transfer') {
       if (!customerName.trim()) {
-        toast.error('请填写客户名称')
+        showValidationError('customerName', '请填写客户名称')
         return
       }
     }
     if (borrowType === 'customer') {
       if (!customerContact.trim()) {
-        toast.error('请填写客户联系方式')
+        showValidationError('customerContact', '请填写客户联系方式')
         return
       }
     }
+
+    setFieldErrors({})
 
     setSubmitting(true)
     try {
@@ -470,7 +484,11 @@ export function BorrowApply() {
             onChange={(e) => setSearchQuery(e.target.value)}
           />
           <Select onValueChange={addItem}>
-            <SelectTrigger>
+            <SelectTrigger
+              id="selectedItems"
+              aria-invalid={Boolean(fieldErrors.selectedItems)}
+              aria-describedby={fieldErrors.selectedItems ? 'selectedItems-error' : undefined}
+            >
               <SelectValue placeholder="请选择样机" />
             </SelectTrigger>
             <SelectContent>
@@ -505,6 +523,7 @@ export function BorrowApply() {
               )}
             </SelectContent>
           </Select>
+          <FieldError field="selectedItems" message={fieldErrors.selectedItems} />
           {selectedItemIds.length > 0 && (
             <div className="space-y-2 rounded-md bg-muted/50 p-3">
               <div className="text-sm font-medium">已选 {selectedItemIds.length} 台样机</div>
@@ -544,11 +563,17 @@ export function BorrowApply() {
           <CardTitle>借用类型</CardTitle>
         </CardHeader>
         <CardContent>
-          <RadioGroup
-            value={borrowType}
-            onValueChange={(v) => setBorrowType(v as BorrowType)}
-            className="flex flex-wrap gap-x-6 gap-y-3"
-          >
+          <div id="borrowType" data-field-target="borrowType" tabIndex={-1}>
+            <RadioGroup
+              value={borrowType}
+              onValueChange={(v) => {
+                setBorrowType(v as BorrowType)
+                clearFieldError(setFieldErrors, 'borrowType')
+              }}
+              className="flex flex-wrap gap-x-6 gap-y-3"
+              aria-invalid={Boolean(fieldErrors.borrowType)}
+              aria-describedby={fieldErrors.borrowType ? 'borrowType-error' : undefined}
+            >
             {borrowTypeOptions.map(option => {
               const inputId = `borrow-type-${encodeURIComponent(option.value)}`
               return (
@@ -560,7 +585,9 @@ export function BorrowApply() {
                 </div>
               )
             })}
-          </RadioGroup>
+            </RadioGroup>
+          </div>
+          <FieldError field="borrowType" message={fieldErrors.borrowType} className="mt-2" />
 
           {borrowType === 'transfer' && (
             <div className="mt-4 rounded-md bg-amber-50 p-3 text-sm text-amber-800">
@@ -597,8 +624,12 @@ export function BorrowApply() {
                   onChange={(e) => {
                     setCustomerName(e.target.value)
                     setSelectedCustomerId('')
+                    clearFieldError(setFieldErrors, 'customerName')
                   }}
+                  aria-invalid={Boolean(fieldErrors.customerName)}
+                  aria-describedby={fieldErrors.customerName ? 'customerName-error' : undefined}
                 />
+                <FieldError field="customerName" message={fieldErrors.customerName} />
               </div>
               {borrowType === 'customer' && (
                 <>
@@ -611,8 +642,12 @@ export function BorrowApply() {
                       onChange={(e) => {
                         setCustomerContact(e.target.value)
                         setSelectedCustomerId('')
+                        clearFieldError(setFieldErrors, 'customerContact')
                       }}
+                      aria-invalid={Boolean(fieldErrors.customerContact)}
+                      aria-describedby={fieldErrors.customerContact ? 'customerContact-error' : undefined}
                     />
+                    <FieldError field="customerContact" message={fieldErrors.customerContact} />
                   </div>
                   <div className="flex items-center space-x-2">
                     <Checkbox
@@ -643,9 +678,15 @@ export function BorrowApply() {
               id="purpose"
               placeholder="请详细描述借用用途"
               value={purpose}
-              onChange={(e) => setPurpose(e.target.value)}
+              onChange={(e) => {
+                setPurpose(e.target.value)
+                clearFieldError(setFieldErrors, 'purpose')
+              }}
               rows={3}
+              aria-invalid={Boolean(fieldErrors.purpose)}
+              aria-describedby={fieldErrors.purpose ? 'purpose-error' : undefined}
             />
+            <FieldError field="purpose" message={fieldErrors.purpose} />
           </div>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div className="space-y-2">
@@ -657,9 +698,15 @@ export function BorrowApply() {
                 type="date"
                 min={new Date().toLocaleDateString('en-CA')}
                 value={expectedBorrowDate}
-                onChange={(e) => setExpectedBorrowDate(e.target.value)}
+                onChange={(e) => {
+                  setExpectedBorrowDate(e.target.value)
+                  clearFieldError(setFieldErrors, 'borrowDate')
+                }}
                 disabled={borrowType === 'transfer'}
+                aria-invalid={Boolean(fieldErrors.borrowDate)}
+                aria-describedby={fieldErrors.borrowDate ? 'borrowDate-error' : undefined}
               />
+              <FieldError field="borrowDate" message={fieldErrors.borrowDate} />
               {borrowType === 'transfer' && (
                 <p className="text-xs text-muted-foreground">实际以最终审批通过当天为准</p>
               )}
@@ -671,8 +718,15 @@ export function BorrowApply() {
                 type="date"
                 min={expectedBorrowDate || new Date().toLocaleDateString('en-CA')}
                 value={expectedReturnDate}
-                onChange={(e) => { setReturnDateEdited(true); setExpectedReturnDate(e.target.value) }}
+                onChange={(e) => {
+                  setReturnDateEdited(true)
+                  setExpectedReturnDate(e.target.value)
+                  clearFieldError(setFieldErrors, 'returnDate')
+                }}
+                aria-invalid={Boolean(fieldErrors.returnDate)}
+                aria-describedby={fieldErrors.returnDate ? 'returnDate-error' : undefined}
               />
+              <FieldError field="returnDate" message={fieldErrors.returnDate} />
             </div>
           </div>
           {availabilityConflicts.length > 0 && (
