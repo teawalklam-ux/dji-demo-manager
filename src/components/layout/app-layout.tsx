@@ -32,6 +32,7 @@ import { useNotifications } from '@/hooks/use-notifications'
 import { useState, useRef, useEffect, type CSSProperties } from 'react'
 import type { OverdueNotification, UserRole } from '@/types'
 import { appLogService } from '@/services/app-log.service'
+import companyLogoUrl from '@/assets/dji-demo-cube.png'
 
 interface MainNavItem {
   title: string
@@ -92,8 +93,12 @@ function AppSidebar() {
     <Sidebar className="border-r-0">
       <SidebarHeader className="border-b border-sidebar-border px-4 py-5">
         <div className="flex min-w-0 items-center gap-3">
-          <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[var(--radius-input)] bg-sidebar-primary text-sidebar-primary-foreground">
-            <Package className="size-5" aria-hidden="true" />
+          <div className="h-10 w-10 shrink-0 overflow-hidden rounded-[var(--radius-input)] border border-sidebar-border bg-[#031c4c] shadow-sm">
+            <img
+              src={companyLogoUrl}
+              alt="DJI DEMO 公司图标"
+              className="h-full w-full scale-[1.18] object-cover"
+            />
           </div>
           <div className="min-w-0">
             <h2 className="truncate font-display text-sm font-semibold tracking-[-0.015em] text-sidebar-foreground">样机管理系统</h2>
